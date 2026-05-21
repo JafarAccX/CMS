@@ -95,6 +95,16 @@ export async function loginUser(data: LoginInput) {
   const idType = detectIdentifierType(identifier);
 
   if (data.provider === "crm") {
+    // Check if we have a local user with this identifier who has a custom hashed password (not CRM_MANAGED placeholder)
+    const localUser = await findLocalUser(identifier, idType);
+    if (localUser && localUser.provider === "crm" && localUser.password_hash !== "CRM_MANAGED") {
+      if (localUser.is_banned) throw new UnauthorizedError("Your account has been banned");
+      const valid = await bcrypt.compare(data.password, localUser.password_hash);
+      if (!valid) throw new UnauthorizedError("Invalid credentials");
+
+      return issueTokens(localUser);
+    }
+
     return loginViaCrm(identifier, idType, data.password);
   }
 
