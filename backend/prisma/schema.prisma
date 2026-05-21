@@ -1,0 +1,342 @@
+// ─── Prisma Schema ───────────────────────────────────────────
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────
+
+enum UserRole {
+  admin
+  mentor
+  batch_moderator
+  learner
+  guest
+}
+
+enum Provider {
+  crm
+  website
+}
+
+enum SubscriptionStatus {
+  free
+  active
+  expired
+}
+
+enum BatchType {
+  general
+  private
+  paid
+  public
+  hidden
+}
+
+
+enum MembershipRole {
+  member
+  mentor
+  moderator
+}
+
+enum MessageType {
+  text
+  file
+  system
+}
+
+enum SubPlan {
+  free
+  pro
+}
+
+enum SubStatus {
+  active
+  expired
+  cancelled
+}
+
+enum NotificationType {
+  new_message
+  mention
+  admin_action
+  mod_action
+}
+
+enum ModQueueStatus {
+  pending
+  resolved
+  escalated
+}
+
+enum ModQueuePriority {
+  low
+  medium
+  high
+}
+
+// ─── Models ──────────────────────────────────────────────────
+
+model User {
+  id                  String             @id @default(uuid()) @db.Uuid
+  username            String             @unique
+  email               String             @unique
+  password_hash       String
+  role                UserRole           @default(learner)
+  provider            Provider           @default(website)
+  subscription_status SubscriptionStatus @default(free)
+  is_banned           Boolean            @default(false)
+  bio                 String?            @db.Text
+  phone               String?
+  avatar_url          String?
+  created_at          DateTime           @default(now())
+  updated_at          DateTime           @updatedAt
+
+  memberships         Membership[]
+  messages            Message[]          @relation("SenderMessages")
+  batches_created     Batch[]            @relation("BatchCreator")
+  subscription        Subscription?
+  admin_logs          AdminLog[]         @relation("ActorLogs")
+  notifications       Notification[]
+  pinned_messages     PinnedMessage[]
+  mod_queue_reported  ModQueue[]         @relation("Reporter")
+  mod_queue_reviewed  ModQueue[]         @relation("Reviewer")
+  conversations_as_a  Conversation[]     @relation("ConvUserA")
+  conversations_as_b  Conversation[]     @relation("ConvUserB")
+  direct_messages     DirectMessage[]    @relation("DMSender")
+  message_reactions   MessageReaction[]
+
+  @@map("users")
+}
+
+model Organization {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  slug       String   @unique
+  created_at DateTime @default(now())
+
+  batches Batch[]
+
+  @@map("organizations")
+}
+
+model Batch {
+  id          String    @id @default(uuid()) @db.Uuid
+  org_id      String    @db.Uuid
+  name        String
+  description String?
+  type        BatchType @default(general)
+  is_paid     Boolean   @default(false)
+  created_by  String    @db.Uuid
+  created_at  DateTime  @default(now())
+
+  organization    Organization    @relation(fields: [org_id], references: [id])
+  creator         User            @relation("BatchCreator", fields: [created_by], references: [id])
+  batch_settings  BatchSettings?
+  memberships     Membership[]
+  messages        Message[]
+  pinned_messages PinnedMessage[]
+  mod_queue       ModQueue[]
+
+  @@map("batches")
+}
+
+model BatchSettings {
+  id           String  @id @default(uuid()) @db.Uuid
+  batch_id     String  @unique @db.Uuid
+  allow_guests Boolean @default(false)
+  max_members  Int?
+  is_archived  Boolean @default(false)
+
+  batch Batch @relation(fields: [batch_id], references: [id])
+
+  @@map("batch_settings")
+}
+
+model Membership {
+  id            String         @id @default(uuid()) @db.Uuid
+  user_id       String         @db.Uuid
+  batch_id      String         @db.Uuid
+  role_in_batch MembershipRole @default(member)
+  joined_at     DateTime       @default(now())
+
+  user  User  @relation(fields: [user_id], references: [id])
+  batch Batch @relation(fields: [batch_id], references: [id])
+
+  @@unique([user_id, batch_id])
+  @@map("memberships")
+}
+
+model Message {
+  id           String      @id @default(uuid()) @db.Uuid
+  batch_id     String      @db.Uuid
+  sender_id    String      @db.Uuid
+  content      String
+  message_type MessageType @default(text)
+  is_deleted   Boolean     @default(false)
+  deleted_at   DateTime?
+  parent_id    String?     @db.Uuid
+  created_at   DateTime    @default(now())
+
+  batch       Batch              @relation(fields: [batch_id], references: [id])
+  sender      User               @relation("SenderMessages", fields: [sender_id], references: [id])
+  parent      Message?           @relation("ThreadReplies", fields: [parent_id], references: [id])
+  replies     Message[]          @relation("ThreadReplies")
+  attachments MessageAttachment[]
+  pinned      PinnedMessage[]
+  mod_queue   ModQueue[]
+  reactions   MessageReaction[]
+
+  @@map("messages")
+}
+
+model MessageAttachment {
+  id         String @id @default(uuid()) @db.Uuid
+  message_id String @db.Uuid
+  file_url   String
+  file_name  String
+  file_size  Int
+  mime_type  String
+
+  message Message @relation(fields: [message_id], references: [id])
+
+  @@map("message_attachments")
+}
+
+model Subscription {
+  id         String    @id @default(uuid()) @db.Uuid
+  user_id    String    @unique @db.Uuid
+  plan       SubPlan   @default(free)
+  status     SubStatus @default(active)
+  started_at DateTime  @default(now())
+  expires_at DateTime?
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("subscriptions")
+}
+
+model AdminLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actor_id    String   @db.Uuid
+  target_id   String?  @db.Uuid
+  action_type String
+  metadata    Json?
+  created_at  DateTime @default(now())
+
+  actor User @relation("ActorLogs", fields: [actor_id], references: [id])
+
+  @@map("admin_logs")
+}
+
+model Notification {
+  id              String           @id @default(uuid()) @db.Uuid
+  user_id         String           @db.Uuid
+  sender_id       String?          @db.Uuid
+  type            NotificationType
+  ref_id          String?          @db.Uuid
+  content_preview String?
+  is_read         Boolean          @default(false)
+  created_at      DateTime         @default(now())
+
+  user User @relation(fields: [user_id], references: [id])
+
+
+  @@map("notifications")
+}
+
+model PinnedMessage {
+  id         String   @id @default(uuid()) @db.Uuid
+  batch_id   String   @db.Uuid
+  message_id String   @db.Uuid
+  pinned_by  String   @db.Uuid
+  pinned_at  DateTime @default(now())
+
+  batch   Batch   @relation(fields: [batch_id], references: [id])
+  message Message @relation(fields: [message_id], references: [id])
+  pinner  User    @relation(fields: [pinned_by], references: [id])
+
+  @@map("pinned_messages")
+}
+
+model ModQueue {
+  id          String           @id @default(uuid()) @db.Uuid
+  batch_id    String           @db.Uuid
+  message_id  String           @db.Uuid
+  reported_by String           @db.Uuid
+  status      ModQueueStatus   @default(pending)
+  priority    ModQueuePriority @default(low)
+  notes       String?
+  reviewed_by String?          @db.Uuid
+  created_at  DateTime         @default(now())
+  updated_at  DateTime         @updatedAt
+
+  batch    Batch    @relation(fields: [batch_id], references: [id])
+  message  Message  @relation(fields: [message_id], references: [id])
+  reporter User     @relation("Reporter", fields: [reported_by], references: [id])
+  reviewer User?    @relation("Reviewer", fields: [reviewed_by], references: [id])
+
+  @@map("mod_queue")
+}
+
+model Conversation {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_a_id  String   @db.Uuid
+  user_b_id  String   @db.Uuid
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user_a   User             @relation("ConvUserA", fields: [user_a_id], references: [id])
+  user_b   User             @relation("ConvUserB", fields: [user_b_id], references: [id])
+  messages DirectMessage[]
+
+  @@unique([user_a_id, user_b_id])
+  @@map("conversations")
+}
+
+model DirectMessage {
+  id              String   @id @default(uuid()) @db.Uuid
+  conversation_id String   @db.Uuid
+  sender_id       String   @db.Uuid
+  content         String
+  is_read         Boolean  @default(false)
+  created_at      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversation_id], references: [id])
+  sender       User         @relation("DMSender", fields: [sender_id], references: [id])
+  attachments  DirectMessageAttachment[]
+
+  @@map("direct_messages")
+}
+
+model DirectMessageAttachment {
+  id                String @id @default(uuid()) @db.Uuid
+  direct_message_id String @db.Uuid
+  file_url          String
+  file_name         String
+  file_size         Int
+  mime_type         String
+
+  message DirectMessage @relation(fields: [direct_message_id], references: [id])
+
+  @@map("direct_message_attachments")
+}
+
+model MessageReaction {
+  id         String   @id @default(uuid()) @db.Uuid
+  message_id String   @db.Uuid
+  user_id    String   @db.Uuid
+  emoji      String
+  created_at DateTime @default(now())
+
+  message Message @relation(fields: [message_id], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [user_id], references: [id])
+
+  @@unique([message_id, user_id, emoji])
+  @@map("message_reactions")
+}

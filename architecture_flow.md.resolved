@@ -1,0 +1,93 @@
+# AcceleratorX Learning Flow Architecture
+
+This document provides a visual and structural breakdown of how the application handles data, real-time communication, and user interactions.
+
+## 1. Core System Flow
+This diagram illustrates the high-level journey from authentication to the main communication hubs.
+
+```mermaid
+graph TD
+    A[User Visits Site] --> B{Authenticated?}
+    B -- No --> C[Login / Register Page]
+    B -- Yes --> D[Dashboard]
+    
+    C --> B
+    
+    D --> E[Batch Chat]
+    D --> F[Direct Messages]
+    D --> G[User Profile]
+    D -- Admin Only --> H[Admin Panel]
+    
+    subgraph "Real-Time Layer"
+    I[Socket.IO Server]
+    end
+    
+    E <--> I
+    F <--> I
+    H --> |Update State| D
+```
+
+---
+
+## 2. Real-Time Messaging Flow (Socket.IO)
+How a message travels from User A to User B without a page reload.
+
+```mermaid
+sequenceDiagram
+    participant UA as User A (Frontend)
+    participant S as Backend (Socket.IO)
+    participant R as Redis (Presence/PubSub)
+    participant DB as PostgreSQL (Prisma)
+    participant UB as User B (Frontend)
+
+    UA->>UA: Optimistic Update (Show message instantly)
+    UA->>S: emit "send_message" / "send_dm"
+    S->>DB: Save Message to Database
+    S->>S: Identify recipient rooms
+    S->>R: Update Presence/Cache (if enabled)
+    S->>UB: emit "receive_message" / "receive_dm"
+    UB->>UB: Update Zustand Store
+    UB->>UB: Show Notification (if not in chat)
+```
+
+---
+
+## 3. Administrative Flow (Managing Members)
+The process of managing batch access and roles.
+
+```mermaid
+graph LR
+    Admin[Admin User] -->|Open Modal| Modal[Batch Manager]
+    Modal -->|Fetch Users| API1[GET /admin/users]
+    Modal -->|Fetch Members| API2[GET /batches/:id/members]
+    
+    Admin -->|Select User & Role| Add[Click Add]
+    Add -->|POST| Srv[Backend Service]
+    Srv -->|Validate Role| Val{member / mentor / moderator}
+    Val -->|Valid| DB[(Database)]
+    Val -->|Invalid| Err[Error Toast]
+    
+    DB -->|Success| UI[Refresh Member List]
+```
+
+---
+
+## 4. Key Architectural Components
+
+### Frontend (React + Zustand)
+- **`authStore.ts`**: Manages JWT tokens and user session.
+- **`socketStore.ts`**: Holds the active Socket.IO connection instance.
+- **`messageStore.ts`**: Persistent storage for batch messages.
+- **`dmStore.ts`**: Handles private conversation state.
+- **`uiStore.ts`**: Manages volatile UI states like typing indicators.
+
+### Backend (Node.js + Express + Socket.IO)
+- **Controllers**: Handle HTTP REST requests (Auth, Batch management).
+- **Services**: Business logic layer (Message persistence, Permission checks).
+- **Sockets**: Handles bidirectional events and room-based broadcasting.
+- **Middleware**: Validates JWTs and enforces role-based access control (RBAC).
+
+### Database (PostgreSQL + Prisma)
+- **UserRole**: `admin`, `mentor`, `batch_moderator`, `learner`.
+- **MembershipRole**: `member`, `mentor`, `moderator`.
+- **Enums**: Ensure data integrity across the system.

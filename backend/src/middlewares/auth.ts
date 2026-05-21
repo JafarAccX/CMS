@@ -1,0 +1,85 @@
+import type { Request, Response, NextFunction } from "express";
+import type { UserRole } from "@prisma/client";
+import { verifyAccessToken, type JwtPayload } from "../utils/jwt.js";
+import { UnauthorizedError, ForbiddenError } from "../utils/errors.js";
+import prisma from "../utils/prisma.js";
+
+// Extend Express Request
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        email: string;
+        role: UserRole;
+        username: string;
+        is_banned: boolean;
+        subscription_status: string;
+        provider: string;
+      };
+    }
+  }
+}
+
+/**
+ * JWT authentication middleware.
+ * Reads Bearer token from Authorization header and attaches user to req.
+ */
+export async function authenticate(req: Request, _res: Response, next: NextFunction) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      throw new UnauthorizedError("No token provided");
+    }
+
+    const token = authHeader.split(" ")[1];
+    let payload: JwtPayload;
+
+    try {
+      payload = verifyAccessToken(token);
+    } catch {
+      throw new UnauthorizedError("Invalid or expired token");
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        username: true,
+        is_banned: true,
+        subscription_status: true,
+        provider: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedError("User not found");
+    }
+    if (user.is_banned) {
+      throw new UnauthorizedError("Your account has been banned");
+    }
+
+    req.user = user;
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Role-based access control middleware.
+ * Returns 403 if req.user.role is not in the allowed roles.
+ */
+export function requireRole(...roles: UserRole[]) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(new UnauthorizedError("Authentication required"));
+    }
+    if (!roles.includes(req.user.role as UserRole)) {
+      return next(new ForbiddenError("Insufficient permissions"));
+    }
+    next();
+  };
+}

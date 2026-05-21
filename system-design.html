@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AcceleratorX CMS — System Design</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #07090f;
+    --surface: #0d1117;
+    --surface2: #161b27;
+    --surface3: #1e2535;
+    --border: #2d3748;
+    --border2: #3d4f6e;
+    --accent: #4f7cff;
+    --accent2: #6b8fff;
+    --accent3: #8ca6ff;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --dim: #64748b;
+    --faint: #3d4f6e;
+    --green: #34d399;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --violet: #a78bfa;
+    --teal: #2dd4bf;
+    --coral: #fb7185;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 36px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    position: sticky;
+    top: 0;
+    background: rgba(7,9,15,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+  .logo {
+    width: 34px; height: 34px;
+    background: linear-gradient(135deg, #4f7cff, #7c4fff);
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .header-title { font-size: 15px; font-weight: 600; color: var(--text); }
+  .header-sub { font-size: 11px; color: var(--dim); margin-top: 1px; }
+  .header-badge {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent2);
+    background: rgba(79,124,255,0.1);
+    border: 1px solid rgba(79,124,255,0.2);
+    border-radius: 6px;
+    padding: 3px 9px;
+  }
+
+  /* ── Nav tabs ── */
+  .nav {
+    display: flex;
+    gap: 2px;
+    padding: 12px 36px 0;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    background: var(--bg);
+    position: sticky;
+    top: 75px;
+    z-index: 99;
+  }
+  .nav-btn {
+    padding: 8px 16px;
+    border: none;
+    background: none;
+    color: var(--dim);
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .nav-btn:hover { color: var(--muted); }
+  .nav-btn.active { color: var(--accent2); border-bottom-color: var(--accent); }
+
+  /* ── Content ── */
+  .content { padding: 36px; max-width: 1400px; margin: 0 auto; }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* ── Section header ── */
+  .section-header { margin-bottom: 28px; }
+  .section-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent3);
+    margin-bottom: 8px;
+  }
+  .section-title { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .section-desc { font-size: 13px; color: var(--muted); line-height: 1.6; max-width: 680px; }
+
+  /* ── Cards grid ── */
+  .cards { display: grid; gap: 16px; }
+  .cards-2 { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
+  .cards-3 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .cards-4 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .card-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot-green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot-blue  { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .dot-violet{ background: var(--violet); box-shadow: 0 0 6px var(--violet); }
+  .dot-amber { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+  .dot-teal  { background: var(--teal); box-shadow: 0 0 6px var(--teal); }
+  .dot-coral { background: var(--coral); box-shadow: 0 0 6px var(--coral); }
+
+  /* ── Service block ── */
+  .service {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .service:last-child { margin-bottom: 0; }
+  .service-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .service-icon {
+    width: 28px; height: 28px;
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .service-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .service-url { font-size: 10.5px; color: var(--dim); font-family: monospace; }
+  .service-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .tag {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+  }
+  .tag-blue   { background: rgba(79,124,255,0.12); color: var(--accent3); border: 1px solid rgba(79,124,255,0.2); }
+  .tag-green  { background: rgba(52,211,153,0.1); color: var(--green); border: 1px solid rgba(52,211,153,0.2); }
+  .tag-violet { background: rgba(167,139,250,0.1); color: var(--violet); border: 1px solid rgba(167,139,250,0.2); }
+  .tag-amber  { background: rgba(251,191,36,0.1); color: var(--amber); border: 1px solid rgba(251,191,36,0.2); }
+  .tag-teal   { background: rgba(45,212,191,0.1); color: var(--teal); border: 1px solid rgba(45,212,191,0.2); }
+  .tag-coral  { background: rgba(251,113,133,0.1); color: var(--coral); border: 1px solid rgba(251,113,133,0.2); }
+  .tag-dim    { background: rgba(100,116,139,0.1); color: var(--dim); border: 1px solid rgba(100,116,139,0.2); }
+
+  /* ── Diagram wrapper ── */
+  .diagram-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    overflow-x: auto;
+    margin-bottom: 20px;
+  }
+  .diagram-wrap .mermaid { min-width: 600px; }
+
+  /* ── Flow steps ── */
+  .flow { display: flex; flex-direction: column; gap: 0; }
+  .flow-step {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    position: relative;
+    padding-bottom: 16px;
+  }
+  .flow-step:last-child { padding-bottom: 0; }
+  .flow-step::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 32px;
+    bottom: 0;
+    width: 1px;
+    background: var(--border);
+  }
+  .flow-step:last-child::before { display: none; }
+  .step-num {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: var(--surface3);
+    border: 1px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent2);
+    flex-shrink: 0;
+    z-index: 1;
+  }
+  .step-body { flex: 1; padding-top: 4px; }
+  .step-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+  .step-detail { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .step-code {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-top: 6px;
+    color: var(--accent3);
+    display: inline-block;
+  }
+
+  /* ── DB table ── */
+  .db-table {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .db-table-header {
+    background: var(--surface3);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .db-table-name { font-size: 12.5px; font-weight: 700; color: var(--text); }
+  .db-row {
+    display: flex;
+    padding: 7px 14px;
+    gap: 10px;
+    border-bottom: 1px solid rgba(45,55,72,0.5);
+    font-size: 11.5px;
+  }
+  .db-row:last-child { border-bottom: none; }
+  .db-col { color: var(--accent3); font-family: monospace; min-width: 120px; }
+  .db-type { color: var(--violet); font-family: monospace; min-width: 100px; }
+  .db-note { color: var(--dim); }
+
+  /* ── KV pairs ── */
+  .kv { display: flex; flex-direction: column; gap: 8px; }
+  .kv-row { display: flex; gap: 10px; align-items: baseline; }
+  .kv-key { font-size: 11.5px; font-family: monospace; color: var(--accent3); min-width: 160px; flex-shrink: 0; }
+  .kv-val { font-size: 12px; color: var(--muted); }
+
+  /* ── Stat chips ── */
+  .stats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  .stat {
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    text-align: center;
+    min-width: 100px;
+  }
+  .stat-val { font-size: 18px; font-weight: 700; color: var(--text); }
+  .stat-label { font-size: 10.5px; color: var(--dim); margin-top: 2px; }
+
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 24px 0;
+  }
+
+  /* ── Wide layout ── */
+  .wide { grid-column: 1 / -1; }
+
+  /* ── Alert ── */
+  .alert {
+    border-radius: 9px;
+    padding: 12px 16px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .alert-info { background: rgba(79,124,255,0.08); border: 1px solid rgba(79,124,255,0.2); color: var(--muted); }
+  .alert-warn { background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.2); color: var(--muted); }
+  .alert-ok   { background: rgba(52,211,153,0.08); border: 1px solid rgba(52,211,153,0.2); color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">⚡</div>
+  <div>
+    <div class="header-title">AcceleratorX CMS</div>
+    <div class="header-sub">System Design Document</div>
+  </div>
+  <div class="header-badge">v1.0 · May 2026</div>
+</div>
+
+<nav class="nav">
+  <button class="nav-btn active" onclick="show('overview')">Overview</button>
+  <button class="nav-btn" onclick="show('services')">Services</button>
+  <button class="nav-btn" onclick="show('auth')">Auth Flow</button>
+  <button class="nav-btn" onclick="show('data')">Data Flow</button>
+  <button class="nav-btn" onclick="show('database')">Database</button>
+  <button class="nav-btn" onclick="show('realtime')">Real-time</button>
+  <button class="nav-btn" onclick="show('integrations')">Integrations</button>
+  <button class="nav-btn" onclick="show('security')">Security</button>
+</nav>
+
+<div class="content">
+
+<!-- ─── OVERVIEW ──────────────────────────────────────────────────── -->
+<div id="overview" class="section active">
+  <div class="section-header">
+    <div class="section-tag">◆ System Design</div>
+    <div class="section-title">AcceleratorX CMS — Architecture Overview</div>
+    <div class="section-desc">A cohort-based learning platform that bridges a NestJS CRM, a legacy LMS, and a real-time batch communication layer. Learners see only their enrolled batches; staff manage everything from the CRM.</div>
+  </div>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+graph TB
+    subgraph Users["👤 Users"]
+        L[Learner<br/>Phone/Email OTP]
+        S[Staff/Admin<br/>CRM Password]
+    end
+
+    subgraph Frontend["🖥️ CMS Frontend · React 19 + Vite · :5173"]
+        LP[Login Page<br/>OTP + Staff tabs]
+        DB[Dashboard]
+        BR[Batch Rooms<br/>Real-time chat]
+        DM[Direct Messages]
+    end
+
+    subgraph CMS["⚙️ CMS Backend · Express.js · :5000"]
+        AUTH[Auth Controller]
+        OTP[OTP Controller]
+        BATCH[Batch Service]
+        MSG[Message Service]
+        WS[Socket.IO Gateway]
+        RL[Rate Limiter]
+    end
+
+    subgraph External["🔗 External Services"]
+        CRM["🏢 CRM Backend<br/>NestJS · :4001<br/>capi.acceleratorx.org"]
+        LMS["📚 LMS API<br/>lmsapi.acceleratorx.org"]
+        BREVO["✉️ Brevo<br/>Email OTP"]
+        MAXXCOM["📱 Maxxcom<br/>WhatsApp OTP"]
+    end
+
+    subgraph DB["🗄️ Databases"]
+        CMSDB[(CMS DB<br/>PostgreSQL<br/>chatapp)]
+        CRMDB[(CRM DB<br/>crm_db)]
+        MASTERDB[(Master DB<br/>master_db)]
+        REDIS[(Redis<br/>Rate limits<br/>Sessions)]
+    end
+
+    L --> LP
+    S --> LP
+    LP --> AUTH
+    LP --> OTP
+    AUTH --> CRM
+    OTP --> BREVO
+    OTP --> MAXXCOM
+    OTP --> CRM
+    AUTH --> CMSDB
+    BATCH --> CMSDB
+    BATCH --> CRM
+    MSG --> CMSDB
+    WS --> MSG
+    CRM --> CRMDB
+    CRM --> MASTERDB
+    AUTH --> LMS
+    RL --> REDIS
+
+    style CMS fill:#1a2234,stroke:#3d4f6e
+    style Frontend fill:#1a2234,stroke:#3d4f6e
+    style External fill:#1e1a34,stroke:#4d3f6e
+    style DB fill:#1a2827,stroke:#2d5748
+    style Users fill:#1a2234,stroke:#3d4f6e
+    </div>
+  </div>
+
+  <div class="cards cards-4">
+    <div class="stat">
+      <div class="stat-val" style="color:var(--accent2)">5</div>
+      <div class="stat-label">Backend Services</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" style="color:var(--green)">3</div>
+      <div class="stat-label">PostgreSQL DBs</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" style="color:var(--violet)">6</div>
+      <div class="stat-label">External APIs</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" style="color:var(--amber)">2</div>
+      <div class="stat-label">Auth Paths</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="cards cards-2">
+    <div class="card">
+      <div class="card-title"><span class="dot dot-blue"></span>What the CMS Does</div>
+      <div class="flow">
+        <div class="flow-step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">Learner Authentication</div>
+            <div class="step-detail">Learners log in via phone or email OTP. Identity is verified against the CRM — no separate password needed.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">Batch Provisioning</div>
+            <div class="step-detail">On login, CRM enrollments are synced to CMS. Batches are auto-created if missing. Learners only see their own batches.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">Real-time Communication</div>
+            <div class="step-detail">Socket.IO powers batch chat rooms and direct messages. Messages are persisted to PostgreSQL.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <div class="step-title">Staff Management</div>
+            <div class="step-detail">Admins manage batches, moderate messages, broadcast announcements and view audit logs.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot dot-green"></span>Technology Choices</div>
+      <div class="kv">
+        <div class="kv-row"><span class="kv-key">CMS Frontend</span><span class="kv-val">React 19 + Vite + Zustand + TanStack Query + Tailwind CSS</span></div>
+        <div class="kv-row"><span class="kv-key">CMS Backend</span><span class="kv-val">Express.js + TypeScript + Prisma ORM + Socket.IO</span></div>
+        <div class="kv-row"><span class="kv-key">CRM Backend</span><span class="kv-val">NestJS 11 + TypeORM + Socket.IO (separate project)</span></div>
+        <div class="kv-row"><span class="kv-key">Database</span><span class="kv-val">PostgreSQL (3 separate databases, shared Postgres server)</span></div>
+        <div class="kv-row"><span class="kv-key">Caching</span><span class="kv-val">Redis via ioredis (MemoryCache fallback for dev)</span></div>
+        <div class="kv-row"><span class="kv-key">Email</span><span class="kv-val">Brevo transactional API (@getbrevo/brevo v3)</span></div>
+        <div class="kv-row"><span class="kv-key">WhatsApp OTP</span><span class="kv-val">Maxxcom gateway (HMAC signed requests)</span></div>
+        <div class="kv-row"><span class="kv-key">File Storage</span><span class="kv-val">Firebase Storage (via Admin SDK)</span></div>
+        <div class="kv-row"><span class="kv-key">Auth Tokens</span><span class="kv-val">JWT — 15 min access + 7 day refresh (httpOnly cookie)</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── SERVICES ──────────────────────────────────────────────────── -->
+<div id="services" class="section">
+  <div class="section-header">
+    <div class="section-tag">◆ Services</div>
+    <div class="section-title">All Services & Their Roles</div>
+    <div class="section-desc">Five services work together. The CMS Backend is the main orchestrator — it calls the CRM and LMS on behalf of every login.</div>
+  </div>
+
+  <div class="cards cards-2">
+    <div class="card">
+      <div class="card-title"><span class="dot dot-blue"></span>Internal Services</div>
+
+      <div class="service">
+        <div class="service-header">
+          <div class="service-icon" style="background:rgba(79,124,255,0.15)">🖥️</div>
+          <div>
+            <div class="service-name">CMS Frontend</div>
+            <div class="service-url">localhost:5173 (dev) · cms.acceleratorx.org (prod)</div>
+          </div>
+        </div>
+        <div class="service-desc">React 19 SPA. Learner-facing batch rooms, DMs, notifications. Staff dashboard for batch management and moderation. Zustand for auth state, TanStack Query for server data.</div>
+        <div class="tags">
+          <span class="tag tag-blue">React 19</span>
+          <span class="tag tag-blue">Vite</span>
+          <span class="tag tag-blue">Zustand</span>
+          <span class="tag tag-blue">Socket.IO Client</span>
+          <span class="tag tag-blue">Tailwind CSS</span>
+        </div>
+      </div>
+
+      <div class="service">
+        <div class="service-header">
+          <div class="service-icon" style="background:rgba(79,124,255,0.15)">⚙️</div>
+          <div>
+            <div class="service-name">CMS Backend</div>
+            <div class="service-url">localhost:5000 · api.cms.acceleratorx.org</div>
+          </div>
+        </div>
+        <div class="service-desc">Express.js + TypeScript. Handles auth (OTP + staff), batch CRUD, real-time messages (Socket.IO), DMs, moderation queue, notifications, subscriptions, file uploads. Acts as the central integration hub — talks to CRM and LMS on every login.</div>
+        <div class="tags">
+          <span class="tag tag-blue">Express.js</span>
+          <span class="tag tag-blue">Prisma</span>
+          <span class="tag tag-blue">Socket.IO</span>
+          <span class="tag tag-green">Port 5000</span>
+          <span class="tag tag-violet">JWT Auth</span>
+        </div>
+      </div>
+
+      <div class="service">
+        <div class="service-header">
+          <div class="service-icon" style="background:rgba(167,139,250,0.15)">🏢</div>
+          <div>
+            <div class="service-name">CRM Backend (AcceleratorX)</div>
+            <div class="service-url">localhost:4001 · capi.acceleratorx.org</div>
+          </div>
+        </div>
+        <div class="service-desc">NestJS 11 REST + WebSocket API. Source of truth for customers, enrollments, batches, leads, payments. CMS calls it with a service-account JWT (12 min cached token) to look up learners and their batch assignments.</div>
+        <div class="tags">
+          <span class="tag tag-violet">NestJS 11</span>
+          <span class="tag tag-violet">TypeORM</span>
+          <span class="tag tag-violet">master_db</span>
+          <span class="tag tag-violet">crm_db</span>
+          <span class="tag tag-green">Port 4001</span>
+        </div>
+      </div>
+
+      <div class="service">
+        <div class="service-header">
+          <div class="service-icon" style="background:rgba(45,212,191,0.15)">🌐</div>
+          <div>
+            <div class="service-name">Website Backend</div>
+            <div class="service-url">localhost:3020 · api.acceleratorx.org</div>
+          </div>
+        </div>
+        <div class="service-desc">Express.js public-facing backend. Handles workshop registrations, public enrollments, payment webhooks (Razorpay), Zoom links, OTP auth for the marketing site. Shares Brevo and Maxxcom OTP credentials with CMS.</div>
+        <div class="tags">
+          <span class="tag tag-teal">Express.js</span>
+          <span class="tag tag-teal">website DB</span>
+          <span class="tag tag-teal">Razorpay</span>
+          <span class="tag tag-green">Port 3020</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot dot-violet"></span>External APIs</div>
+
+      <div class="service">
+        <div class="service-header">
+          <div class="service-icon" style="background:rgba(45,212,191,0.15)">📚</div>
+          <div>
+            <div class="service-name">LMS API</div>
+            <div class="service-url">lmsapi.acceleratorx.org</div>
+          </div>
+        </div>
+        <div class="service-desc">Legacy LMS REST API. Provides learner profile, course progress, skill data and completion status. Called on every learner login to enrich the session response. Uses HMAC-SHA512 signed requests (base64 of hex-encoded binary).</div>
+        <div class="tags">
+          <span class="tag tag-teal">HMAC-SHA512</span>
+          <span class="tag tag-teal">master_db</span>
+          <span class="tag tag-dim">Read-only</span>
+        </div>
+      </div>
+
+      <div class="service">
+        <div class="service-header">
+          <div class="service-icon" style="background:rgba(251,191,36,0.15)">✉️</div>
+          <div>
+            <div class="service-name">Brevo (Sendinblue)</div>
+            <div class="service-url">api.brevo.com</div>
+          </div>
+        </div>
+        <div class="service-desc">Transactional email via @getbrevo/brevo SDK. Sends OTP codes to learner emails. Sender: info@acceleratorx.org. Same API key shared with Website Backend.</div>
+        <div class="tags">
+          <span class="tag tag-amber">Email OTP</span>
+          <span class="tag tag-amber">Transactional</span>
+          <span class="tag tag-amber">SDK v3</span>
+        </div>
+      </div>
+
+      <div class="service">
+        <div class="service-header">
+          <div class="service-icon" style="background:rgba(52,211,153,0.15)">📱</div>
+          <div>
+            <div class="service-name">Maxxcom Gateway</div>
+            <div class="service-url">service.maxxcom.in/api/v1</div>
+          </div>
+        </div>
+        <div class="service-desc">WhatsApp OTP delivery. Used when learner logs in with phone number. Returns a requestId that maps to a pending OTP. Falls back to in-memory OTP generation if gateway is unreachable.</div>
+        <div class="tags">
+          <span class="tag tag-green">WhatsApp OTP</span>
+          <span class="tag tag-green">requestId flow</span>
+          <span class="tag tag-dim">Fallback: memory</span>
+        </div>
+      </div>
+
+      <div class="service">
+        <div class="service-header">
+          <div class="service-icon" style="background:rgba(251,113,133,0.15)">💳</div>
+          <div>
+            <div class="service-name">Razorpay</div>
+            <div class="service-url">api.razorpay.com</div>
+          </div>
+        </div>
+        <div class="service-desc">Payment gateway used by Website Backend for workshop registrations and course purchases. Webhook verification via HMAC signature. Also integrated in CRM for batch payment tracking.</div>
+        <div class="tags">
+          <span class="tag tag-coral">Payments</span>
+          <span class="tag tag-coral">Webhooks</span>
+          <span class="tag tag-coral">HMAC verify</span>
+        </div>
+      </div>
+
+      <div class="service">
+        <div class="service-header">
+          <div class="service-icon" style="background:rgba(167,139,250,0.15)">🔥</div>
+          <div>
+            <div class="service-name">Firebase Storage</div>
+            <div class="service-url">acceleratorx-lms.firebasestorage.app</div>
+          </div>
+        </div>
+        <div class="service-desc">Used for file attachments in batch messages and DMs. Files are uploaded from CMS backend via Firebase Admin SDK, public URL stored in message_attachments table.</div>
+        <div class="tags">
+          <span class="tag tag-violet">Admin SDK</span>
+          <span class="tag tag-violet">File uploads</span>
+          <span class="tag tag-violet">Public CDN</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── AUTH FLOW ─────────────────────────────────────────────────── -->
+<div id="auth" class="section">
+  <div class="section-header">
+    <div class="section-tag">◆ Authentication</div>
+    <div class="section-title">Auth Flows</div>
+    <div class="section-desc">Two completely separate login paths — OTP for learners, password for staff. Both issue the same JWT access + refresh token pair.</div>
+  </div>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+sequenceDiagram
+    actor L as Learner
+    participant FE as CMS Frontend
+    participant BE as CMS Backend :5000
+    participant CRM as CRM API :4001
+    participant BREVO as Brevo Email
+    participant WA as Maxxcom WhatsApp
+    participant DB as CMS DB
+
+    Note over L,DB: ── Learner OTP Login ──
+
+    L->>FE: Enter phone or email
+    FE->>BE: POST /auth/send-otp {identifier, provider:"crm"}
+    BE->>CRM: GET /customers?Email=... or ?Mobile=...
+    CRM-->>BE: Customer record (Active, CustId)
+    alt Customer not found
+        BE-->>FE: 404 "No account found in CRM"
+    else Phone method
+        BE->>WA: POST /whatsapp/send {phone}
+        WA-->>BE: {requestId}
+        BE-->>FE: {requestId}
+    else Email method
+        BE->>BREVO: sendTransacEmail {to, otp}
+        BREVO-->>BE: 201 OK
+        BE-->>FE: {success:true}
+    end
+
+    L->>FE: Enter 6-digit OTP
+    FE->>BE: POST /auth/verify-otp {identifier, otpCode, provider:"crm"}
+    BE->>CRM: GET /customers?... (re-verify)
+    CRM-->>BE: Customer
+    BE->>DB: findOrCreate User (auto-provision)
+    BE->>CRM: GET /enrollments?CustId=...
+    CRM-->>BE: Enrollments[]
+    BE->>DB: Upsert Batches + Memberships
+    BE-->>FE: {user, accessToken, sources{crm,lms,enrollments}}
+    FE->>FE: Store token, redirect to Dashboard
+    </div>
+  </div>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+sequenceDiagram
+    actor S as Staff/Admin
+    participant FE as CMS Frontend
+    participant BE as CMS Backend :5000
+    participant CRM as CRM API :4001
+    participant DB as CMS DB
+
+    Note over S,DB: ── Staff Password Login ──
+
+    S->>FE: Enter email + password
+    FE->>BE: POST /auth/login {identifier, password, provider:"crm"}
+    BE->>CRM: POST /auth/login {email, password}
+    CRM-->>BE: {user{role, id}, accessToken}
+    alt role !== "admin"
+        BE-->>FE: 403 "Only CRM admins can sign in"
+    else role === "admin"
+        BE->>DB: Upsert admin user (CRM_MANAGED)
+        BE-->>FE: {user, accessToken, refreshToken cookie}
+        FE->>FE: Redirect to Dashboard (admin view)
+    end
+    </div>
+  </div>
+
+  <div class="cards cards-2">
+    <div class="card">
+      <div class="card-title"><span class="dot dot-green"></span>Learner OTP Flow — Detail</div>
+      <div class="flow">
+        <div class="flow-step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">Identifier Input</div>
+            <div class="step-detail">Learner enters phone (10 digits) or email. Toggle switches between modes. No password ever required.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">CRM Lookup (with 10s timeout)</div>
+            <div class="step-detail">CMS backend calls CRM API to verify the identifier belongs to an active customer. If not found → 404. All CRM calls wrapped in AbortController.</div>
+            <div class="step-code">GET capi.acceleratorx.org/customers?Mobile=91XXXXXXXXXX</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">OTP Delivery</div>
+            <div class="step-detail">Phone → WhatsApp via Maxxcom (returns requestId). Email → Brevo transactional (styled HTML email). Falls back to in-memory store if gateway fails.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <div class="step-title">OTP Verification</div>
+            <div class="step-detail">6-digit code validated. Max 3 attempts, 5-min expiry. Uses crypto.timingSafeEqual() to prevent timing attacks.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">5</div>
+          <div class="step-body">
+            <div class="step-title">Auto-Provision + Batch Sync</div>
+            <div class="step-detail">User created in CMS DB if first login (password_hash = "OTP_MANAGED"). Enrollments fetched from CRM, batches auto-created as type="private", memberships upserted.</div>
+            <div class="step-code">upsert batch name (case-insensitive) → upsert membership</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">6</div>
+          <div class="step-body">
+            <div class="step-title">Token Issue</div>
+            <div class="step-detail">JWT access token (15 min) returned in body. Refresh token (7 days) set as httpOnly Secure SameSite=Strict cookie.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot dot-amber"></span>Token Architecture</div>
+      <div class="kv" style="margin-bottom:16px">
+        <div class="kv-row"><span class="kv-key">Access Token</span><span class="kv-val">JWT · 15 min · returned in response body · stored in localStorage</span></div>
+        <div class="kv-row"><span class="kv-key">Refresh Token</span><span class="kv-val">JWT · 7 days · httpOnly cookie · SameSite=Strict · Secure in prod</span></div>
+        <div class="kv-row"><span class="kv-key">Token Payload</span><span class="kv-val">userId, email, role, username, is_banned, subscription_status</span></div>
+        <div class="kv-row"><span class="kv-key">Refresh Endpoint</span><span class="kv-val">POST /auth/refresh — reads cookie, issues new access token</span></div>
+        <div class="kv-row"><span class="kv-key">Rate Limiting</span><span class="kv-val">10,000 req/min per IP via Redis incr (MemoryCache fallback for dev)</span></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="card-title" style="margin-top:0"><span class="dot dot-violet"></span>Service-Account Token (CRM)</div>
+      <div class="kv">
+        <div class="kv-row"><span class="kv-key">Purpose</span><span class="kv-val">CMS Backend authenticates as admin to read CRM customer/enrollment data</span></div>
+        <div class="kv-row"><span class="kv-key">TTL</span><span class="kv-val">Cached 12 min (CRM tokens expire at 15 min)</span></div>
+        <div class="kv-row"><span class="kv-key">Refresh</span><span class="kv-val">Auto-retry on 401 with force=true flag</span></div>
+        <div class="kv-row"><span class="kv-key">Timeout</span><span class="kv-val">10 s AbortController on every CRM fetch call</span></div>
+        <div class="kv-row"><span class="kv-key">Fallback</span><span class="kv-val">Returns 503 "Could not reach AcceleratorX servers" on timeout</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── DATA FLOW ─────────────────────────────────────────────────── -->
+<div id="data" class="section">
+  <div class="section-header">
+    <div class="section-tag">◆ Data Flow</div>
+    <div class="section-title">How Data Moves Through the System</div>
+    <div class="section-desc">Three key flows: login enrichment, batch sync, and real-time messaging.</div>
+  </div>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+flowchart LR
+    subgraph Login["Login Response Enrichment"]
+        direction TB
+        CRM1["CRM /customers<br/>profile data"] --> MERGE
+        CRM2["CRM /enrollments<br/>batch list"] --> MERGE
+        LMS1["LMS API<br/>profile + courses"] --> MERGE
+        MERGE["sources object<br/>{crm, lms, crmEnrollments}"] --> JWT["JWT + response"]
+    end
+
+    subgraph Sync["Batch Sync on Login"]
+        direction TB
+        ENR["CRM Enrollments[]"] --> FIND["Find batch by name<br/>(case-insensitive)"]
+        FIND --> CREATE["Create if missing<br/>type=private<br/>desc=Auto-synced from CRM"]
+        CREATE --> UPSERT["Upsert Membership<br/>role=member"]
+        UPSERT --> STUDENTS["Sync all batchmates<br/>from CRM /batches/:id/students"]
+    end
+
+    subgraph Msg["Real-time Message Flow"]
+        direction TB
+        CLIENT["Client emits<br/>new_message"] --> WS["Socket.IO Server"]
+        WS --> DB2["Persist to DB<br/>messages table"]
+        DB2 --> BROADCAST["Broadcast to<br/>batch room"]
+        BROADCAST --> NOTIF["Notify mentioned<br/>users"]
+    end
+    </div>
+  </div>
+
+  <div class="cards cards-3">
+    <div class="card">
+      <div class="card-title"><span class="dot dot-blue"></span>Learner Visibility Rules</div>
+      <div class="flow">
+        <div class="flow-step">
+          <div class="step-num">✓</div>
+          <div class="step-body">
+            <div class="step-title">Sees: Own CRM batches</div>
+            <div class="step-detail">type=private + description starts with "Auto-synced from CRM" + has membership</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">✓</div>
+          <div class="step-body">
+            <div class="step-title">Sees: General rooms</div>
+            <div class="step-detail">type=general — open to all learners (announcements, community)</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">✗</div>
+          <div class="step-body">
+            <div class="step-title">Cannot see: Others' batches</div>
+            <div class="step-detail">private batches without membership are filtered out at the service layer, never sent to client</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot dot-teal"></span>CRM Data Mapping</div>
+      <div class="kv">
+        <div class="kv-row"><span class="kv-key">CRM Customer</span><span class="kv-val">→ CMS User (auto-provisioned)</span></div>
+        <div class="kv-row"><span class="kv-key">CRM CustId</span><span class="kv-val">→ used as LMS lookup key</span></div>
+        <div class="kv-row"><span class="kv-key">CRM Enrollment</span><span class="kv-val">→ CMS Membership (upserted)</span></div>
+        <div class="kv-row"><span class="kv-key">CRM Batch.Batch</span><span class="kv-val">→ CMS Batch.name (matched case-insensitive)</span></div>
+        <div class="kv-row"><span class="kv-key">CRM Mobile</span><span class="kv-val">→ CMS User.phone (synced if missing)</span></div>
+        <div class="kv-row"><span class="kv-key">CRM ProfilePicture</span><span class="kv-val">→ CMS User.avatar_url (synced if missing)</span></div>
+        <div class="kv-row"><span class="kv-key">CRM Staff login</span><span class="kv-val">→ CMS admin user (role=admin, provider=crm)</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot dot-violet"></span>LMS Data (Read-only)</div>
+      <div class="kv">
+        <div class="kv-row"><span class="kv-key">Auth Method</span><span class="kv-val">HMAC-SHA512 signature per request</span></div>
+        <div class="kv-row"><span class="kv-key">Signature Format</span><span class="kv-val">base64(hex(hmac_binary)) — custom encoding</span></div>
+        <div class="kv-row"><span class="kv-key">Service Acct</span><span class="kv-val">CallingCode=91, Mobile=9999999999</span></div>
+        <div class="kv-row"><span class="kv-key">Fetched Data</span><span class="kv-val">learner profile, skills, education, experience</span></div>
+        <div class="kv-row"><span class="kv-key">Course Data</span><span class="kv-val">title, image, batch, dates, payment status, completion</span></div>
+        <div class="kv-row"><span class="kv-key">Usage</span><span class="kv-val">enriches login response only — not stored in CMS DB</span></div>
+        <div class="kv-row"><span class="kv-key">Error handling</span><span class="kv-val">best-effort — failure returns {profile:null, courses:[]}</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── DATABASE ──────────────────────────────────────────────────── -->
+<div id="database" class="section">
+  <div class="section-header">
+    <div class="section-tag">◆ Database</div>
+    <div class="section-title">CMS Database Schema</div>
+    <div class="section-desc">Single PostgreSQL database (chatapp) managed by Prisma. 13 tables, all UUID primary keys, soft deletes on messages.</div>
+  </div>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+erDiagram
+    User {
+        uuid id PK
+        string username UK
+        string email UK
+        string password_hash
+        enum role
+        enum provider
+        enum subscription_status
+        bool is_banned
+        string phone
+        string avatar_url
+    }
+    Organization {
+        uuid id PK
+        string name
+        string slug UK
+    }
+    Batch {
+        uuid id PK
+        uuid org_id FK
+        uuid created_by FK
+        string name
+        enum type
+        bool is_paid
+        string description
+    }
+    Membership {
+        uuid id PK
+        uuid user_id FK
+        uuid batch_id FK
+        enum role_in_batch
+    }
+    Message {
+        uuid id PK
+        uuid batch_id FK
+        uuid sender_id FK
+        string content
+        enum message_type
+        bool is_deleted
+        uuid parent_id FK
+    }
+    Subscription {
+        uuid id PK
+        uuid user_id FK
+        enum plan
+        enum status
+        datetime expires_at
+    }
+    Conversation {
+        uuid id PK
+        uuid user_a_id FK
+        uuid user_b_id FK
+    }
+    DirectMessage {
+        uuid id PK
+        uuid conversation_id FK
+        uuid sender_id FK
+        string content
+        bool is_read
+    }
+    Notification {
+        uuid id PK
+        uuid user_id FK
+        enum type
+        bool is_read
+    }
+
+    User ||--o{ Membership : "joins"
+    Batch ||--o{ Membership : "has"
+    Organization ||--o{ Batch : "owns"
+    User ||--o{ Message : "sends"
+    Batch ||--o{ Message : "contains"
+    User ||--|| Subscription : "has"
+    User ||--o{ Notification : "receives"
+    User ||--o{ Conversation : "participates"
+    Conversation ||--o{ DirectMessage : "has"
+    </div>
+  </div>
+
+  <div class="cards cards-3">
+    <div class="card">
+      <div class="card-title"><span class="dot dot-blue"></span>Key Enums</div>
+      <div class="kv">
+        <div class="kv-row"><span class="kv-key">UserRole</span><span class="kv-val">admin · mentor · batch_moderator · learner · guest</span></div>
+        <div class="kv-row"><span class="kv-key">Provider</span><span class="kv-val">crm · website</span></div>
+        <div class="kv-row"><span class="kv-key">BatchType</span><span class="kv-val">general · private · paid · public · hidden</span></div>
+        <div class="kv-row"><span class="kv-key">MembershipRole</span><span class="kv-val">member · mentor · moderator</span></div>
+        <div class="kv-row"><span class="kv-key">MessageType</span><span class="kv-val">text · file · system</span></div>
+        <div class="kv-row"><span class="kv-key">SubPlan</span><span class="kv-val">free · pro</span></div>
+        <div class="kv-row"><span class="kv-key">SubStatus</span><span class="kv-val">active · expired · cancelled</span></div>
+        <div class="kv-row"><span class="kv-key">NotificationType</span><span class="kv-val">new_message · mention · admin_action · mod_action</span></div>
+        <div class="kv-row"><span class="kv-key">ModQueueStatus</span><span class="kv-val">pending · resolved · escalated</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot dot-green"></span>Three PostgreSQL Databases</div>
+      <div class="service">
+        <div class="service-header">
+          <div class="service-icon" style="background:rgba(79,124,255,0.1)">💬</div>
+          <div><div class="service-name">chatapp (CMS DB)</div><div class="service-url">port 5432 · Prisma ORM</div></div>
+        </div>
+        <div class="service-desc">Users, batches, messages, memberships, DMs, notifications, subscriptions, mod queue. Managed exclusively by CMS backend.</div>
+      </div>
+      <div class="service">
+        <div class="service-header">
+          <div class="service-icon" style="background:rgba(167,139,250,0.1)">🏢</div>
+          <div><div class="service-name">crm_db (CRM DB)</div><div class="service-url">port 5432 · TypeORM</div></div>
+        </div>
+        <div class="service-desc">CRM users (staff), leads, payments, notifications, teams. Managed by CRM NestJS backend. CMS never writes here.</div>
+      </div>
+      <div class="service">
+        <div class="service-header">
+          <div class="service-icon" style="background:rgba(45,212,191,0.1)">📚</div>
+          <div><div class="service-name">master_db (LMS DB)</div><div class="service-url">port 5432 · TypeORM</div></div>
+        </div>
+        <div class="service-desc">Customers (CustId), enrollments, batches, courses, mentors. Read by CRM API. CMS reads it indirectly via CRM REST endpoints.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot dot-amber"></span>Important Constraints</div>
+      <div class="alert alert-info">
+        <span>ℹ️</span>
+        <span>Prisma <code>synchronize: false</code> — schema changes always require a migration file. Never alter the DB directly.</span>
+      </div>
+      <div class="alert alert-warn">
+        <span>⚠️</span>
+        <span>BatchType <code>@default(general)</code> — any batch created without explicit type will be visible to all learners. Always set <code>type: "private"</code> for CRM-synced batches.</span>
+      </div>
+      <div class="alert alert-ok">
+        <span>✓</span>
+        <span>Memberships use composite unique key <code>[user_id, batch_id]</code> — safe to upsert on every login without duplicates.</span>
+      </div>
+      <div class="alert alert-ok">
+        <span>✓</span>
+        <span>Messages use soft delete (<code>is_deleted</code> flag + <code>deleted_at</code>) — data is preserved for audit and mod review.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── REAL-TIME ─────────────────────────────────────────────────── -->
+<div id="realtime" class="section">
+  <div class="section-header">
+    <div class="section-tag">◆ Real-time Layer</div>
+    <div class="section-title">Socket.IO Architecture</div>
+    <div class="section-desc">All real-time communication runs through a single Socket.IO server on the CMS backend. Events are scoped to batch rooms and DM conversations.</div>
+  </div>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+flowchart TB
+    subgraph Client["CMS Frontend"]
+        SC["Socket.IO Client<br/>useNotificationsSocket<br/>useBatchSocket"]
+    end
+
+    subgraph Server["CMS Backend Socket.IO Server"]
+        AUTH_MW["Auth Middleware<br/>verify JWT on connect"]
+        BATCH_NS["Batch Namespace<br/>join / leave rooms"]
+        MSG_H["Message Handler<br/>new_message event"]
+        DM_H["DM Handler<br/>dm_message event"]
+        NOTIF["Notification Broadcaster"]
+        PERM["Permissions Gateway<br/>role changes"]
+    end
+
+    subgraph DB["PostgreSQL"]
+        MSG_T["messages table"]
+        DM_T["direct_messages table"]
+        NOTIF_T["notifications table"]
+    end
+
+    SC -->|"connect + JWT"| AUTH_MW
+    AUTH_MW --> BATCH_NS
+    SC -->|"emit: join_batch {batchId}"| BATCH_NS
+    SC -->|"emit: new_message {batchId, content, files}"| MSG_H
+    MSG_H --> MSG_T
+    MSG_H -->|"broadcast to room"| SC
+    MSG_H --> NOTIF
+    NOTIF --> NOTIF_T
+    NOTIF -->|"emit: notification"| SC
+    SC -->|"emit: dm_message {conversationId}"| DM_H
+    DM_H --> DM_T
+    DM_H -->|"emit to recipient"| SC
+    </div>
+  </div>
+
+  <div class="cards cards-2">
+    <div class="card">
+      <div class="card-title"><span class="dot dot-teal"></span>Socket Events</div>
+      <div class="db-table">
+        <div class="db-table-header"><div class="db-table-name">Client → Server</div></div>
+        <div class="db-row"><span class="db-col">join_batch</span><span class="db-type">{batchId}</span><span class="db-note">Join a batch room (verified against membership)</span></div>
+        <div class="db-row"><span class="db-col">leave_batch</span><span class="db-type">{batchId}</span><span class="db-note">Leave a batch room</span></div>
+        <div class="db-row"><span class="db-col">new_message</span><span class="db-type">{batchId, content}</span><span class="db-note">Send message to batch</span></div>
+        <div class="db-row"><span class="db-col">dm_message</span><span class="db-type">{conversationId, content}</span><span class="db-note">Send direct message</span></div>
+        <div class="db-row"><span class="db-col">react</span><span class="db-type">{messageId, emoji}</span><span class="db-note">Add emoji reaction</span></div>
+        <div class="db-row"><span class="db-col">typing</span><span class="db-type">{batchId, isTyping}</span><span class="db-note">Typing indicator broadcast</span></div>
+      </div>
+      <div class="db-table">
+        <div class="db-table-header"><div class="db-table-name">Server → Client</div></div>
+        <div class="db-row"><span class="db-col">message</span><span class="db-type">Message</span><span class="db-note">New message in batch room</span></div>
+        <div class="db-row"><span class="db-col">dm</span><span class="db-type">DirectMessage</span><span class="db-note">New DM received</span></div>
+        <div class="db-row"><span class="db-col">notification</span><span class="db-type">Notification</span><span class="db-note">Mention, mod action, admin broadcast</span></div>
+        <div class="db-row"><span class="db-col">message_deleted</span><span class="db-type">{messageId}</span><span class="db-note">Soft-delete broadcast</span></div>
+        <div class="db-row"><span class="db-col">permission_updated</span><span class="db-type">{userId, role}</span><span class="db-note">Role change (PermissionsGateway)</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot dot-violet"></span>CRM Real-time (Separate)</div>
+      <div class="service">
+        <div class="service-header">
+          <div class="service-icon" style="background:rgba(167,139,250,0.15)">📡</div>
+          <div><div class="service-name">LeadsGateway</div><div class="service-url">CRM NestJS · Socket.IO</div></div>
+        </div>
+        <div class="service-desc">Real-time lead updates broadcast to CRM staff. Separate from CMS — learners never connect to this.</div>
+      </div>
+      <div class="service">
+        <div class="service-header">
+          <div class="service-icon" style="background:rgba(167,139,250,0.15)">🔔</div>
+          <div><div class="service-name">NotificationsGateway</div><div class="service-url">CRM NestJS · Socket.IO</div></div>
+        </div>
+        <div class="service-desc">Staff notifications in CRM — task assignments, payment events, lead stage changes.</div>
+      </div>
+      <div class="service">
+        <div class="service-header">
+          <div class="service-icon" style="background:rgba(167,139,250,0.15)">🔐</div>
+          <div><div class="service-name">PermissionsGateway</div><div class="service-url">CRM NestJS · Socket.IO</div></div>
+        </div>
+        <div class="service-desc">Broadcasts role/permission changes to connected CRM staff sessions in real-time.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── INTEGRATIONS ──────────────────────────────────────────────── -->
+<div id="integrations" class="section">
+  <div class="section-header">
+    <div class="section-tag">◆ Integrations</div>
+    <div class="section-title">External Integration Map</div>
+    <div class="section-desc">Every external call from the CMS backend, with auth method and failure strategy.</div>
+  </div>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+graph LR
+    CMS["CMS Backend\n:5000"]
+
+    CMS -->|"JWT Bearer\n10s timeout\n12min cached token"| CRM["CRM API\ncapi.acceleratorx.org\n:4001"]
+    CMS -->|"HMAC-SHA512\nper-request signature"| LMS["LMS API\nlmsapi.acceleratorx.org"]
+    CMS -->|"x-api-key\n8s timeout"| WA["Maxxcom WhatsApp\nservice.maxxcom.in"]
+    CMS -->|"Brevo API key\nSDK v3"| BREVO["Brevo Email\napi.brevo.com"]
+    CMS -->|"Firebase Admin SDK\nservice account"| FB["Firebase Storage\nacceleratorx-lms"]
+    CMS -->|"Redis protocol\nioredis"| REDIS["Redis\nlocalhost:6379"]
+
+    CRM -->|"TypeORM"| CRMDB[(crm_db)]
+    CRM -->|"TypeORM"| MASTERDB[(master_db)]
+
+    style CMS fill:#1a2234,stroke:#4f7cff,color:#e2e8f0
+    style CRM fill:#1e1a34,stroke:#7c4fff,color:#e2e8f0
+    style LMS fill:#1a2827,stroke:#2dd4bf,color:#e2e8f0
+    style WA  fill:#1a2218,stroke:#34d399,color:#e2e8f0
+    style BREVO fill:#2a1a18,stroke:#fb7185,color:#e2e8f0
+    style FB  fill:#1e1a34,stroke:#a78bfa,color:#e2e8f0
+    style REDIS fill:#2a2218,stroke:#fbbf24,color:#e2e8f0
+    </div>
+  </div>
+
+  <div class="cards cards-2">
+    <div class="card">
+      <div class="card-title"><span class="dot dot-blue"></span>CRM API Integration</div>
+      <div class="kv">
+        <div class="kv-row"><span class="kv-key">Base URL</span><span class="kv-val">https://capi.acceleratorx.org</span></div>
+        <div class="kv-row"><span class="kv-key">Auth</span><span class="kv-val">Service-account JWT (email+password login, token cached 12 min)</span></div>
+        <div class="kv-row"><span class="kv-key">Token refresh</span><span class="kv-val">Auto-retry on 401 with force flag</span></div>
+        <div class="kv-row"><span class="kv-key">Timeout</span><span class="kv-val">10 seconds per call (AbortController)</span></div>
+        <div class="kv-row"><span class="kv-key">Endpoints used</span><span class="kv-val">POST /auth/login, GET /customers, GET /enrollments, GET /batches/:id/students</span></div>
+        <div class="kv-row"><span class="kv-key">On failure</span><span class="kv-val">Returns 503 to client with friendly message</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot dot-teal"></span>LMS API Integration</div>
+      <div class="kv">
+        <div class="kv-row"><span class="kv-key">Base URL</span><span class="kv-val">https://lmsapi.acceleratorx.org</span></div>
+        <div class="kv-row"><span class="kv-key">Auth</span><span class="kv-val">HMAC-SHA512 per request — signature in header</span></div>
+        <div class="kv-row"><span class="kv-key">Signature algo</span><span class="kv-val">base64(toHex(HMAC-SHA512(body, secret)))</span></div>
+        <div class="kv-row"><span class="kv-key">Service account</span><span class="kv-val">CallingCode=91, Mobile=9999999999 (admin customer in master_db)</span></div>
+        <div class="kv-row"><span class="kv-key">Data fetched</span><span class="kv-val">learner profile, skills, education, course list with completion</span></div>
+        <div class="kv-row"><span class="kv-key">On failure</span><span class="kv-val">Best-effort — returns {profile:null, courses:[]} silently</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot dot-green"></span>OTP Delivery</div>
+      <div class="kv">
+        <div class="kv-row"><span class="kv-key">WhatsApp</span><span class="kv-val">Maxxcom · POST /whatsapp/send · returns requestId</span></div>
+        <div class="kv-row"><span class="kv-key">WhatsApp verify</span><span class="kv-val">POST /whatsapp/verify {requestId, otp}</span></div>
+        <div class="kv-row"><span class="kv-key">Maxxcom timeout</span><span class="kv-val">8 seconds (AbortController)</span></div>
+        <div class="kv-row"><span class="kv-key">Email</span><span class="kv-val">Brevo SDK v3 · sendTransacEmail · styled HTML template</span></div>
+        <div class="kv-row"><span class="kv-key">Email sender</span><span class="kv-val">info@acceleratorx.org (verified Brevo sender)</span></div>
+        <div class="kv-row"><span class="kv-key">OTP fallback</span><span class="kv-val">In-memory Map store with 5 min TTL (dev / gateway down)</span></div>
+        <div class="kv-row"><span class="kv-key">OTP security</span><span class="kv-val">crypto.timingSafeEqual · max 3 attempts · auto-delete on success</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot dot-amber"></span>Caching — Redis</div>
+      <div class="kv">
+        <div class="kv-row"><span class="kv-key">Library</span><span class="kv-val">ioredis · lazyConnect with retry strategy</span></div>
+        <div class="kv-row"><span class="kv-key">Fallback</span><span class="kv-val">In-memory MemoryCache class (Map-based) when Redis unreachable</span></div>
+        <div class="kv-row"><span class="kv-key">Rate limiting</span><span class="kv-val">incr(key) per IP · expire(key, 60s) on first request</span></div>
+        <div class="kv-row"><span class="kv-key">TTL preservation</span><span class="kv-val">incr() preserves existing expiry — bug fixed to prevent counter never resetting</span></div>
+        <div class="kv-row"><span class="kv-key">Limit</span><span class="kv-val">10,000 req/min per IP (high for dev — reduce for prod)</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── SECURITY ──────────────────────────────────────────────────── -->
+<div id="security" class="section">
+  <div class="section-header">
+    <div class="section-tag">◆ Security</div>
+    <div class="section-title">Security Model</div>
+    <div class="section-desc">Layered security: network timeouts, rate limiting, JWT validation, role-based access control, timing-safe comparisons, and httpOnly cookies.</div>
+  </div>
+
+  <div class="cards cards-2">
+    <div class="card">
+      <div class="card-title"><span class="dot dot-green"></span>What's Implemented</div>
+      <div class="flow">
+        <div class="flow-step">
+          <div class="step-num">✓</div>
+          <div class="step-body">
+            <div class="step-title">JWT with httpOnly Refresh Cookie</div>
+            <div class="step-detail">Access token (15 min) in memory/localStorage. Refresh token (7 days) in httpOnly Secure SameSite=Strict cookie — not accessible to JS.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">✓</div>
+          <div class="step-body">
+            <div class="step-title">Role-Based Access Control</div>
+            <div class="step-detail">requireRole() middleware on all admin/mentor endpoints. Learners cannot access admin routes at all.</div>
+            <div class="step-code">requireRole("admin") → requireRole("admin", "batch_moderator")</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">✓</div>
+          <div class="step-body">
+            <div class="step-title">OTP Timing-Safe Comparison</div>
+            <div class="step-detail">crypto.timingSafeEqual() prevents timing-based OTP guessing attacks. Max 3 attempts before OTP is invalidated.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">✓</div>
+          <div class="step-body">
+            <div class="step-title">AbortController Timeouts</div>
+            <div class="step-detail">All outbound HTTP calls (CRM: 10s, Maxxcom: 8s) have hard timeouts — no request can hang the server indefinitely.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">✓</div>
+          <div class="step-body">
+            <div class="step-title">Rate Limiting</div>
+            <div class="step-detail">Redis-backed per-IP rate limiter on all API routes. MemoryCache fallback preserves expiry correctly.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">✓</div>
+          <div class="step-body">
+            <div class="step-title">bcrypt Password Hashing</div>
+            <div class="step-detail">12 rounds for staff passwords. OTP-authenticated learners use "OTP_MANAGED" placeholder — never a real password hash.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot dot-amber"></span>Production Hardening Checklist</div>
+      <div class="alert alert-warn">
+        <span>⚠️</span>
+        <span>Reduce rate limit from 10,000 to ~100 req/min per IP for production. Current value is dev-friendly.</span>
+      </div>
+      <div class="alert alert-warn">
+        <span>⚠️</span>
+        <span>JWT secrets in .env are placeholder values — replace with long random secrets (&gt;64 chars) in prod.</span>
+      </div>
+      <div class="alert alert-warn">
+        <span>⚠️</span>
+        <span>OTP store is in-memory — if CMS server restarts, all pending OTPs are lost. Use Redis for OTP store in prod.</span>
+      </div>
+      <div class="alert alert-info">
+        <span>ℹ️</span>
+        <span>CORS is configured per-environment in middleware. Add production domain to allowed origins before deploy.</span>
+      </div>
+      <div class="alert alert-info">
+        <span>ℹ️</span>
+        <span>File uploads use Firebase Storage — no local disk exposure. Multer handles multipart with a 20MB limit.</span>
+      </div>
+      <div class="alert alert-ok">
+        <span>✓</span>
+        <span>Banned users are checked at every auth path — login, token refresh, and Socket.IO connection all fail for banned accounts.</span>
+      </div>
+
+      <div class="divider"></div>
+      <div class="card-title" style="margin-top:0"><span class="dot dot-coral"></span>API Routes Summary</div>
+      <div class="kv">
+        <div class="kv-row"><span class="kv-key">Public routes</span><span class="kv-val">/auth/login · /auth/register · /auth/refresh · /auth/send-otp · /auth/verify-otp</span></div>
+        <div class="kv-row"><span class="kv-key">Authenticated</span><span class="kv-val">All other routes — checked by authenticate() middleware</span></div>
+        <div class="kv-row"><span class="kv-key">Admin only</span><span class="kv-val">/admin/* · POST /batches · DELETE /batches/:id</span></div>
+        <div class="kv-row"><span class="kv-key">Mentor only</span><span class="kv-val">/mentor/batches · /mentor/batches/:id/members</span></div>
+        <div class="kv-row"><span class="kv-key">Mod + Admin</span><span class="kv-val">/mod-queue · /batches/:id/members (add/remove)</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /content -->
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      darkMode: true,
+      background: '#0d1117',
+      primaryColor: '#1e2535',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#3d4f6e',
+      lineColor: '#4f7cff',
+      secondaryColor: '#161b27',
+      tertiaryColor: '#1a2234',
+      edgeLabelBackground: '#161b27',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontSize: '13px',
+    },
+    flowchart: { curve: 'basis', htmlLabels: true },
+    sequence: { useMaxWidth: false },
+    er: { useMaxWidth: false },
+  });
+
+  function show(id) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    event.target.classList.add('active');
+    // Re-render mermaid in newly visible tab
+    mermaid.run({ querySelector: `#${id} .mermaid` });
+  }
+</script>
+</body>
+</html>
