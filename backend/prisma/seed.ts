@@ -6,77 +6,94 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Seeding database...");
 
+  // Clean existing tables in reverse dependency order
+  console.log("🧹 Cleaning up existing tables...");
+  await prisma.message.deleteMany();
+  await prisma.membership.deleteMany();
+  await prisma.batchSettings.deleteMany();
+  await prisma.batch.deleteMany();
+  await prisma.subscription.deleteMany();
+  await prisma.user.deleteMany();
+  await prisma.organization.deleteMany();
+
   // ── Organization ─────────────────────────────────────────
-  const org = await prisma.organization.create({
-    data: {
-      name: "Acme Learning",
-      slug: "acme-learning",
-    },
+  let org = await prisma.organization.findUnique({
+    where: { slug: "acme-learning" },
   });
+  if (!org) {
+    org = await prisma.organization.create({
+      data: {
+        name: "Acme Learning",
+        slug: "acme-learning",
+      },
+    });
+  }
 
   // ── Users ────────────────────────────────────────────────
   const hash = await bcrypt.hash("password123", 12);
 
-  const admin = await prisma.user.create({
-    data: {
-      username: "admin",
-      email: "admin@acme.com",
-      password_hash: hash,
-      role: "admin",
-      provider: "crm",
-    },
+  // Helper helper to upsert a user
+  const upsertUser = async (data: {
+    username: string;
+    email: string;
+    password_hash: string;
+    role: any;
+    provider: any;
+    subscription_status?: any;
+  }) => {
+    const existing = await prisma.user.findUnique({ where: { email: data.email } });
+    if (existing) return existing;
+    return prisma.user.create({ data });
+  };
+
+  const admin = await upsertUser({
+    username: "admin",
+    email: "admin@acme.com",
+    password_hash: hash,
+    role: "admin",
+    provider: "crm",
   });
 
-  const mentorUser = await prisma.user.create({
-    data: {
-      username: "mentor",
-      email: "mentor@acme.com",
-      password_hash: hash,
-      role: "mentor",
-      provider: "crm",
-    },
+  const mentorUser = await upsertUser({
+    username: "mentor",
+    email: "mentor@acme.com",
+    password_hash: hash,
+    role: "mentor",
+    provider: "crm",
   });
 
-  const modUser = await prisma.user.create({
-    data: {
-      username: "moderator",
-      email: "mod@acme.com",
-      password_hash: hash,
-      role: "batch_moderator",
-      provider: "website",
-    },
+  const modUser = await upsertUser({
+    username: "moderator",
+    email: "mod@acme.com",
+    password_hash: hash,
+    role: "batch_moderator",
+    provider: "website",
   });
 
-  const alice = await prisma.user.create({
-    data: {
-      username: "alice",
-      email: "alice@acme.com",
-      password_hash: hash,
-      role: "learner",
-      provider: "website",
-      subscription_status: "active",
-    },
+  const alice = await upsertUser({
+    username: "alice",
+    email: "alice@acme.com",
+    password_hash: hash,
+    role: "learner",
+    provider: "website",
+    subscription_status: "active",
   });
 
-  const bob = await prisma.user.create({
-    data: {
-      username: "bob",
-      email: "bob@acme.com",
-      password_hash: hash,
-      role: "learner",
-      provider: "website",
-      subscription_status: "free",
-    },
+  const bob = await upsertUser({
+    username: "bob",
+    email: "bob@acme.com",
+    password_hash: hash,
+    role: "learner",
+    provider: "website",
+    subscription_status: "free",
   });
 
-  const guestUser = await prisma.user.create({
-    data: {
-      username: "guest",
-      email: "guest@acme.com",
-      password_hash: hash,
-      role: "guest",
-      provider: "website",
-    },
+  const guestUser = await upsertUser({
+    username: "guest",
+    email: "guest@acme.com",
+    password_hash: hash,
+    role: "guest",
+    provider: "website",
   });
 
   // ── Subscriptions ────────────────────────────────────────
