@@ -47,6 +47,7 @@ interface LmsProfile {
   YearOfExperience?: number | null;
   CurrentCompany?: string | null;
   Designation?: string | null;
+  Mobile?: string | number | null;
   [k: string]: unknown;
 }
 
