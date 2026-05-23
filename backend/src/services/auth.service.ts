@@ -95,7 +95,30 @@ export async function loginUser(data: LoginInput) {
   const idType = detectIdentifierType(identifier);
 
   if (data.provider === "crm") {
-    // Check if we have a local user with this identifier who has a custom hashed password (not CRM_MANAGED placeholder)
+    // 1) For email logins, always try CRM staff auth FIRST. This keeps the
+    //    admin role in sync with CRM even if a stale local user record exists
+    //    (e.g. user was previously synced as a learner customer).
+    if (idType === "email") {
+      try {
+        const staff = await loginCrmStaff(identifier, data.password);
+        if (staff) {
+          const crmRole = (staff.user.role || "").toLowerCase();
+          if (crmRole !== "admin") {
+            throw new ForbiddenError(
+              "Only CRM admins can sign in here. Other staff roles are not yet supported."
+            );
+          }
+          return upsertAndIssueAdmin(staff);
+        }
+      } catch (err) {
+        // Re-throw the explicit role rejection — don't fall back to customer flow
+        if (err instanceof ForbiddenError) throw err;
+        // Network/CRM unavailable: fall through to local-user / customer flow
+        console.warn("CRM staff login attempt failed, trying local fallback:", (err as Error).message);
+      }
+    }
+
+    // 2) Local user shortcut (only for users with a real password set).
     const localUser = await findLocalUser(identifier, idType);
     if (localUser && localUser.provider === "crm" && localUser.password_hash !== "CRM_MANAGED") {
       if (localUser.is_banned) throw new UnauthorizedError("Your account has been banned");
@@ -105,6 +128,7 @@ export async function loginUser(data: LoginInput) {
       return issueTokens(localUser);
     }
 
+    // 3) Fall through to CRM customer (learner) flow.
     return loginViaCrm(identifier, idType, data.password);
   }
 
@@ -217,20 +241,9 @@ async function loginViaCrm(identifier: string, idType: IdentifierType, password:
     return issueTokens(cmsUser, enriched);
   }
 
-  // 2. Not a customer. If it's an email, try CRM staff login.
-  if (idType === "email") {
-    const staff = await loginCrmStaff(identifier, password);
-    if (staff) {
-      if ((staff.user.role || "").toLowerCase() !== "admin") {
-        throw new ForbiddenError(
-          "Only CRM admins can sign in here. Other staff roles are not yet supported."
-        );
-      }
-      return upsertAndIssueAdmin(staff);
-    }
-  }
-
-  // 3. Neither customer nor staff — not found.
+  // 2. Not a customer. Staff login is already handled by loginUser() before
+  //    this function is called for emails, so getting here means: not a
+  //    customer, and (if email) staff login also failed → no account.
   throw new UnauthorizedError("No account found with that identifier");
 }
 
@@ -372,6 +385,10 @@ async function syncLearnerBatches(
           created_by: defaultAdmin.id,
           description: `Auto-synced from CRM (Course: ${enr.Batch.Course ?? "—"})`,
         },
+      });
+      // Auto-create default channel1 for the new batch
+      await prisma.channel.create({
+        data: { batch_id: batch.id, name: "channel1", created_by: defaultAdmin.id },
       });
     }
 

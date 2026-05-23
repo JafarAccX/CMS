@@ -1,158 +1,129 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import {
-  Zap, ArrowRight, Phone, Mail, KeyRound, Lock, GraduationCap, Shield, RotateCcw, User,
+  Zap, ArrowRight, Phone, Mail, KeyRound, Lock, RotateCcw, CheckCircle2,
 } from "lucide-react";
 
-// ─── Staff Login ─────────────────────────────────────────────────────────────
+type Kind = "email" | "phone" | "unknown";
+type Step = "input" | "verify";
 
-function StaffLoginForm() {
-  const navigate = useNavigate();
-  const login = useAuthStore((s) => s.login);
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!identifier.trim() || !password) return;
-    setError("");
-    setLoading(true);
-    try {
-      await login(identifier.trim(), password, "crm");
-      navigate("/");
-    } catch (err: any) {
-      setError(err.response?.data?.error || "Invalid credentials. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div>
-        <label className="block text-[11px] font-medium text-muted mb-1.5">Email or username</label>
-        <div className="relative">
-          <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint pointer-events-none" />
-          <input
-            type="text"
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
-            required
-            autoComplete="username"
-            placeholder="admin@acceleratorx.co"
-            className="w-full h-[42px] pl-10 pr-3.5 bg-surface-100 border border-hairline-strong rounded-[10px] text-[13.5px] text-primary placeholder-faint focus:outline-none focus:ring-2 focus:ring-accent-400/30 focus:border-accent-400/50 transition-all"
-          />
-        </div>
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <label className="text-[11px] font-medium text-muted">Password</label>
-          <span className="text-[11px] text-accent-300 cursor-pointer font-medium">Forgot?</span>
-        </div>
-        <div className="relative">
-          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint pointer-events-none" />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete="current-password"
-            placeholder="••••••••"
-            className="w-full h-[42px] pl-10 pr-3.5 bg-surface-100 border border-hairline-strong rounded-[10px] text-[13.5px] text-primary placeholder-faint focus:outline-none focus:ring-2 focus:ring-accent-400/30 focus:border-accent-400/50 transition-all"
-          />
-        </div>
-      </div>
-
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-[10px] p-3">
-          {error}
-        </div>
-      )}
-
-      <button
-        type="submit"
-        disabled={loading}
-        className="btn-primary flex items-center justify-center gap-2 h-[44px] rounded-[10px] text-sm mt-1 disabled:opacity-50"
-      >
-        {loading ? "Signing in…" : <><Shield className="w-3.5 h-3.5" /> Sign in as Staff <ArrowRight className="w-3.5 h-3.5" /></>}
-      </button>
-    </form>
-  );
+/**
+ * Auto-detect what the user typed.
+ * - Contains "@" → email
+ * - 10 consecutive digits (after stripping non-digits) → phone
+ * - otherwise unknown
+ */
+function detectKind(raw: string): Kind {
+  const value = raw.trim();
+  if (!value) return "unknown";
+  if (value.includes("@")) return "email";
+  const digits = value.replace(/\D/g, "");
+  if (/^\d{10}$/.test(digits)) return "phone";
+  return "unknown";
 }
 
-// ─── Learner Login (OTP flow) ─────────────────────────────────────────────────
+function isValidEmail(v: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+}
 
-type OtpMethod = "phone" | "email";
-type OtpStep = "input" | "verify";
-
-function LearnerLoginForm() {
+function UnifiedLoginForm() {
   const navigate = useNavigate();
+  const login = useAuthStore((s) => s.login);
   const sendOtp = useAuthStore((s) => s.sendOtp);
   const verifyOtp = useAuthStore((s) => s.verifyOtp);
 
-  const [method, setMethod] = useState<OtpMethod>("phone");
-  const [step, setStep] = useState<OtpStep>("input");
   const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [requestId, setRequestId] = useState("");
+  const [step, setStep] = useState<Step>("input");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(0);
 
-  // Countdown timer for resend
+  const kind = useMemo(() => detectKind(identifier), [identifier]);
+
+  // Resend countdown
   useEffect(() => {
     if (timer <= 0) return;
     const id = setInterval(() => setTimer((t) => t - 1), 1000);
     return () => clearInterval(id);
   }, [timer]);
 
-  const handleSendOtp = useCallback(async () => {
+  const handleEmailSignIn = useCallback(async () => {
     setError("");
-    const val = identifier.trim();
-    if (!val) { setError(method === "phone" ? "Enter your phone number." : "Enter your email."); return; }
-    if (method === "phone" && !/^\d{10}$/.test(val)) { setError("Enter a valid 10-digit phone number."); return; }
-    if (method === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) { setError("Enter a valid email address."); return; }
-
+    if (!isValidEmail(identifier)) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    if (!password) {
+      setError("Enter your password.");
+      return;
+    }
     setLoading(true);
     try {
-      const result = await sendOtp(val, method, "crm");
-      if (result.requestId) setRequestId(result.requestId);
+      await login(identifier.trim(), password, "crm");
+      navigate("/");
+    } catch (err: any) {
+      setError(err?.response?.data?.error || "Invalid credentials. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [identifier, password, login, navigate]);
+
+  const handleSendOtp = useCallback(async () => {
+    setError("");
+    const digits = identifier.replace(/\D/g, "");
+    if (!/^\d{10}$/.test(digits)) {
+      setError("Enter a valid 10-digit mobile number.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await sendOtp(digits, "phone", "crm");
+      if (result?.requestId) setRequestId(result.requestId);
       setStep("verify");
       setTimer(60);
     } catch (err: any) {
-      setError(err.response?.data?.error || "Failed to send OTP. Please try again.");
+      setError(err?.response?.data?.error || "Failed to send OTP. Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [identifier, method, sendOtp]);
+  }, [identifier, sendOtp]);
 
   const handleVerifyOtp = useCallback(async () => {
     setError("");
-    if (!/^\d{6}$/.test(otpCode.trim())) { setError("Enter the 6-digit OTP."); return; }
-
+    if (!/^\d{6}$/.test(otpCode.trim())) {
+      setError("Enter the 6-digit OTP.");
+      return;
+    }
     setLoading(true);
     try {
-      await verifyOtp(identifier.trim(), otpCode.trim(), method, "crm", requestId || undefined);
+      const digits = identifier.replace(/\D/g, "");
+      await verifyOtp(digits, otpCode.trim(), "phone", "crm", requestId || undefined);
       navigate("/");
     } catch (err: any) {
-      setError(err.response?.data?.error || "Verification failed. Check the OTP and try again.");
+      setError(err?.response?.data?.error || "Verification failed. Check the OTP and try again.");
     } finally {
       setLoading(false);
     }
-  }, [otpCode, identifier, method, requestId, verifyOtp, navigate]);
+  }, [otpCode, identifier, requestId, verifyOtp, navigate]);
 
-  // ── Step 2: OTP entry ─────────────────────────────────────
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (kind === "email") return handleEmailSignIn();
+    if (kind === "phone") return handleSendOtp();
+  };
+
+  // ── OTP verify step ──────────────────────────────────────
   if (step === "verify") {
     return (
       <div className="flex flex-col gap-4">
         <div className="bg-accent-100 border border-accent-200 rounded-[10px] p-3 text-[12px] text-accent-300 flex items-start gap-2">
           <KeyRound className="w-4 h-4 shrink-0 mt-px" />
           <span>
-            OTP sent to <span className="font-semibold">{identifier}</span>.
+            OTP sent to <span className="font-semibold">+91 {identifier.replace(/\D/g, "")}</span>.
             Enter the 6-digit code below.
           </span>
         </div>
@@ -185,7 +156,7 @@ function LearnerLoginForm() {
           disabled={loading || otpCode.length < 6}
           className="btn-primary flex items-center justify-center gap-2 h-[44px] rounded-[10px] text-sm disabled:opacity-50"
         >
-          {loading ? "Verifying…" : <><GraduationCap className="w-3.5 h-3.5" /> Verify & Access Batches <ArrowRight className="w-3.5 h-3.5" /></>}
+          {loading ? "Verifying…" : <>Verify & continue <ArrowRight className="w-3.5 h-3.5" /></>}
         </button>
 
         <div className="flex items-center justify-between text-[12px]">
@@ -194,7 +165,7 @@ function LearnerLoginForm() {
             onClick={() => { setStep("input"); setOtpCode(""); setError(""); }}
             className="text-dim hover:text-muted flex items-center gap-1 transition-colors"
           >
-            <RotateCcw className="w-3 h-3" /> Change {method === "phone" ? "number" : "email"}
+            <RotateCcw className="w-3 h-3" /> Change number
           </button>
           {timer > 0 ? (
             <span className="text-faint">Resend in {timer}s</span>
@@ -208,70 +179,65 @@ function LearnerLoginForm() {
     );
   }
 
-  // ── Step 1: Identifier entry ──────────────────────────────
+  // ── Input step ───────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-4">
-      {/* Phone / Email toggle */}
-      <div className="flex bg-surface-100 rounded-[10px] p-1 border border-hairline gap-1">
-        <button
-          type="button"
-          onClick={() => { setMethod("phone"); setIdentifier(""); setError(""); }}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-[7px] text-[13px] font-medium transition-all ${
-            method === "phone"
-              ? "bg-surface-200 text-primary border border-hairline-strong"
-              : "text-dim hover:text-muted border border-transparent"
-          }`}
-        >
-          <Phone className="w-3.5 h-3.5" /> Phone
-        </button>
-        <button
-          type="button"
-          onClick={() => { setMethod("email"); setIdentifier(""); setError(""); }}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-[7px] text-[13px] font-medium transition-all ${
-            method === "email"
-              ? "bg-surface-200 text-primary border border-hairline-strong"
-              : "text-dim hover:text-muted border border-transparent"
-          }`}
-        >
-          <Mail className="w-3.5 h-3.5" /> Email
-        </button>
-      </div>
-
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div>
-        <label className="block text-[11px] font-medium text-muted mb-1.5">
-          {method === "phone" ? "Phone number registered with AcceleratorX" : "Email registered with AcceleratorX"}
-        </label>
-        <div className="relative">
-          {method === "phone" ? (
-            <>
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint pointer-events-none" />
-              <span className="absolute left-9 top-1/2 -translate-y-1/2 text-[13px] text-dim font-medium pointer-events-none">+91</span>
-              <input
-                type="tel"
-                inputMode="numeric"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                placeholder="9876543210"
-                autoFocus
-                className="w-full h-[42px] pl-[58px] pr-3.5 bg-surface-100 border border-hairline-strong rounded-[10px] text-[13.5px] text-primary placeholder-faint focus:outline-none focus:ring-2 focus:ring-accent-400/30 focus:border-accent-400/50 transition-all"
-              />
-            </>
-          ) : (
-            <>
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint pointer-events-none" />
-              <input
-                type="email"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="you@example.com"
-                autoFocus
-                autoComplete="email"
-                className="w-full h-[42px] pl-10 pr-3.5 bg-surface-100 border border-hairline-strong rounded-[10px] text-[13.5px] text-primary placeholder-faint focus:outline-none focus:ring-2 focus:ring-accent-400/30 focus:border-accent-400/50 transition-all"
-              />
-            </>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-[11px] font-medium text-muted">Email or mobile number</label>
+          {kind !== "unknown" && (
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-accent-300 flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" />
+              {kind === "email" ? "Email detected" : "Mobile detected"}
+            </span>
           )}
         </div>
+        <div className="relative">
+          {kind === "email" ? (
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent-400 pointer-events-none" />
+          ) : kind === "phone" ? (
+            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent-400 pointer-events-none" />
+          ) : (
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint pointer-events-none" />
+          )}
+          <input
+            type="text"
+            inputMode={kind === "phone" ? "numeric" : "email"}
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            required
+            autoFocus
+            autoComplete="username"
+            placeholder="you@example.com or 9876543210"
+            className="w-full h-[42px] pl-10 pr-3.5 bg-surface-100 border border-hairline-strong rounded-[10px] text-[13.5px] text-primary placeholder-faint focus:outline-none focus:ring-2 focus:ring-accent-400/30 focus:border-accent-400/50 transition-all"
+          />
+        </div>
+        <p className="text-[11px] text-faint mt-1.5">
+          Email signs in with password. Mobile signs in with OTP.
+        </p>
       </div>
+
+      {/* Password — only for email */}
+      {kind === "email" && (
+        <div className="animate-in slide-in-from-top-1 fade-in duration-200">
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-[11px] font-medium text-muted">Password</label>
+            <span className="text-[11px] text-accent-300 cursor-pointer font-medium">Forgot?</span>
+          </div>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint pointer-events-none" />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              placeholder="••••••••"
+              className="w-full h-[42px] pl-10 pr-3.5 bg-surface-100 border border-hairline-strong rounded-[10px] text-[13.5px] text-primary placeholder-faint focus:outline-none focus:ring-2 focus:ring-accent-400/30 focus:border-accent-400/50 transition-all"
+            />
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-[10px] p-3">
@@ -280,31 +246,26 @@ function LearnerLoginForm() {
       )}
 
       <button
-        type="button"
-        onClick={handleSendOtp}
-        disabled={loading}
-        className="btn-primary flex items-center justify-center gap-2 h-[44px] rounded-[10px] text-sm disabled:opacity-50"
+        type="submit"
+        disabled={loading || kind === "unknown" || (kind === "email" && !password)}
+        className="btn-primary flex items-center justify-center gap-2 h-[44px] rounded-[10px] text-sm mt-1 disabled:opacity-50"
       >
-        {loading ? "Sending OTP…" : <><GraduationCap className="w-3.5 h-3.5" /> Send OTP <ArrowRight className="w-3.5 h-3.5" /></>}
+        {loading
+          ? kind === "email" ? "Signing in…" : "Sending OTP…"
+          : kind === "email"
+            ? <>Sign in <ArrowRight className="w-3.5 h-3.5" /></>
+            : kind === "phone"
+              ? <>Send OTP <ArrowRight className="w-3.5 h-3.5" /></>
+              : <>Continue <ArrowRight className="w-3.5 h-3.5" /></>
+        }
       </button>
-
-      <p className="text-[11.5px] text-dim text-center">
-        No account?{" "}
-        <span className="text-accent-300 font-medium cursor-pointer">
-          Contact your AcceleratorX coordinator.
-        </span>
-      </p>
-    </div>
+    </form>
   );
 }
 
 // ─── Main Login Page ──────────────────────────────────────────────────────────
 
-type LoginMode = "staff" | "learner";
-
 export default function LoginPage() {
-  const [mode, setMode] = useState<LoginMode>("learner");
-
   return (
     <div className="min-h-screen flex bg-surface relative overflow-hidden">
       {/* Left — Form panel */}
@@ -326,39 +287,10 @@ export default function LoginPage() {
             Sign in to your<br />workspace.
           </h1>
           <p className="text-[13px] text-muted mb-8">
-            {mode === "learner"
-              ? "Access your batch channels with your enrolled phone and email."
-              : "Staff and admin access via CRM credentials."}
+            Use your registered email or mobile number — we'll pick the right method.
           </p>
 
-          {/* Mode Toggle */}
-          <div className="flex bg-surface-100 rounded-[12px] p-1 mb-7 border border-hairline gap-1">
-            <button
-              type="button"
-              onClick={() => setMode("learner")}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-[9px] text-[13px] font-semibold transition-all ${
-                mode === "learner"
-                  ? "bg-accent-400 text-white shadow-btn"
-                  : "text-dim hover:text-muted border border-transparent"
-              }`}
-            >
-              <GraduationCap className="w-3.5 h-3.5" /> Learner
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("staff")}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-[9px] text-[13px] font-semibold transition-all ${
-                mode === "staff"
-                  ? "bg-surface-200 text-primary border border-hairline-strong"
-                  : "text-dim hover:text-muted border border-transparent"
-              }`}
-            >
-              <Shield className="w-3.5 h-3.5" /> Staff
-            </button>
-          </div>
-
-          {/* Form */}
-          {mode === "learner" ? <LearnerLoginForm /> : <StaffLoginForm />}
+          <UnifiedLoginForm />
         </div>
 
         <div className="flex items-center justify-between pt-6 border-t border-hairline text-dim text-xs mt-8">

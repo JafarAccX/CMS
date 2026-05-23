@@ -6,6 +6,7 @@ import { upload } from "../middlewares/upload.js";
 import * as authCtrl from "../controllers/auth.controller.js";
 import * as otpAuthCtrl from "../controllers/otp-auth.controller.js";
 import * as batchCtrl from "../controllers/batch.controller.js";
+import * as channelCtrl from "../controllers/channel.controller.js";
 import * as memberCtrl from "../controllers/member.controller.js";
 import * as messageCtrl from "../controllers/message.controller.js";
 import * as modqueueCtrl from "../controllers/modqueue.controller.js";
@@ -46,6 +47,18 @@ router.post("/batches", requireRole("admin"), batchCtrl.createBatch);
 router.get("/batches/:id", batchCtrl.getBatch);
 router.patch("/batches/:id", requireRole("admin"), batchCtrl.updateBatch);
 router.delete("/batches/:id", requireRole("admin"), batchCtrl.archiveBatch);
+router.post("/batches/:id/pin", requireRole("admin"), channelCtrl.toggleBatchPin);
+
+// ── Channels ──────────────────────────────────────────────
+router.get("/batches/:id/channels", channelCtrl.listChannels);
+router.post("/batches/:id/channels", requireRole("admin", "batch_moderator"), channelCtrl.createChannel);
+router.get("/channels/:id", channelCtrl.getChannel);
+router.patch("/channels/:id", requireRole("admin", "batch_moderator"), channelCtrl.renameChannel);
+router.delete("/channels/:id", requireRole("admin"), channelCtrl.deleteChannel);
+router.post("/channels/:id/pin", requireRole("admin"), channelCtrl.toggleChannelPin);
+
+// User-scoped pinned items (for dashboard "Active rooms")
+router.get("/pinned", channelCtrl.listPinned);
 
 // ── Members ───────────────────────────────────────────────
 router.get("/batches/:id/members", memberCtrl.listMembers);
@@ -87,6 +100,7 @@ router.post("/admin/users", requireRole("admin"), adminCtrl.createUser);
 router.patch("/admin/users/:id/ban", requireRole("admin"), adminCtrl.toggleBanUser);
 router.patch("/admin/users/:id/role", requireRole("admin"), adminCtrl.updateUserRole);
 router.get("/admin/logs", requireRole("admin"), adminCtrl.listLogs);
+router.get("/admin/pinned", requireRole("admin"), adminCtrl.listPinned);
 
 router.delete("/admin/messages/:id", requireRole("admin"), adminCtrl.hardDeleteMessage);
 router.post("/admin/broadcast", requireRole("admin"), adminCtrl.broadcast);

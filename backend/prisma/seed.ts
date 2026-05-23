@@ -173,18 +173,31 @@ async function main() {
     ],
   });
 
+  // ── Auto-created channels (channel1 per batch) ──────────
+  const [generalCh, reactCh, proCh] = await Promise.all([
+    prisma.channel.create({
+      data: { batch_id: generalBatch.id, name: "channel1", created_by: admin.id },
+    }),
+    prisma.channel.create({
+      data: { batch_id: reactBatch.id, name: "channel1", created_by: admin.id },
+    }),
+    prisma.channel.create({
+      data: { batch_id: proBatch.id, name: "channel1", created_by: admin.id },
+    }),
+  ]);
+
   // ── Seed Messages ────────────────────────────────────────
   const seedMessages = [
-    { batch_id: generalBatch.id, sender_id: admin.id, content: "Welcome to Acme Learning! 🎉" },
-    { batch_id: generalBatch.id, sender_id: alice.id, content: "Thanks! Excited to be here." },
-    { batch_id: generalBatch.id, sender_id: bob.id, content: "Hello everyone!" },
-    { batch_id: reactBatch.id, sender_id: mentorUser.id, content: "Welcome to React Deep Dive. Let's start with hooks." },
-    { batch_id: reactBatch.id, sender_id: alice.id, content: "Looking forward to learning advanced patterns!" },
-    { batch_id: reactBatch.id, sender_id: bob.id, content: "Can we cover useReducer vs useState?" },
-    { batch_id: reactBatch.id, sender_id: modUser.id, content: "Please keep discussions on topic." },
-    { batch_id: proBatch.id, sender_id: admin.id, content: "Pro Workshop is now live! 🚀" },
-    { batch_id: proBatch.id, sender_id: alice.id, content: "Great, let's dive in." },
-    { batch_id: generalBatch.id, sender_id: guestUser.id, content: "Just browsing as a guest." },
+    { channel_id: generalCh.id, sender_id: admin.id, content: "Welcome to Acme Learning! 🎉" },
+    { channel_id: generalCh.id, sender_id: alice.id, content: "Thanks! Excited to be here." },
+    { channel_id: generalCh.id, sender_id: bob.id, content: "Hello everyone!" },
+    { channel_id: reactCh.id, sender_id: mentorUser.id, content: "Welcome to React Deep Dive. Let's start with hooks." },
+    { channel_id: reactCh.id, sender_id: alice.id, content: "Looking forward to learning advanced patterns!" },
+    { channel_id: reactCh.id, sender_id: bob.id, content: "Can we cover useReducer vs useState?" },
+    { channel_id: reactCh.id, sender_id: modUser.id, content: "Please keep discussions on topic." },
+    { channel_id: proCh.id, sender_id: admin.id, content: "Pro Workshop is now live! 🚀" },
+    { channel_id: proCh.id, sender_id: alice.id, content: "Great, let's dive in." },
+    { channel_id: generalCh.id, sender_id: guestUser.id, content: "Just browsing as a guest." },
   ];
 
   for (const msg of seedMessages) {

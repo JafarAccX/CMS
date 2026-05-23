@@ -2,7 +2,12 @@ import { Server } from "socket.io";
 import { verifyAccessToken } from "../utils/jwt.js";
 import prisma from "../utils/prisma.js";
 import { canSendMessage } from "../utils/permissions.js";
-import { socketSendMessageSchema, socketJoinBatchSchema, socketSendDmSchema, socketJoinDmSchema } from "../validators/index.js";
+import {
+  socketSendMessageSchema,
+  socketJoinChannelSchema,
+  socketSendDmSchema,
+  socketJoinDmSchema,
+} from "../validators/index.js";
 import { redisSet, redisDel } from "../utils/redis.js";
 import { parseMentions } from "../services/message.service.js";
 import { sendDirectMessage } from "../services/dm.service.js";
@@ -11,7 +16,7 @@ interface ServerToClientEvents {
   receive_message: (message: any) => void;
   user_joined: (data: { userId: string; username: string }) => void;
   user_left: (data: { userId: string; username: string }) => void;
-  typing_indicator: (data: { userId: string; username: string; batchId: string; typing: boolean }) => void;
+  typing_indicator: (data: { userId: string; username: string; channelId: string; typing: boolean }) => void;
   notify_user: (notification: any) => void;
   notification_read: (data: { notificationId: string }) => void;
   mod_queue_updated: (item: any) => void;
@@ -31,11 +36,11 @@ interface AttachmentPayload {
 }
 
 interface ClientToServerEvents {
-  join_batch: (data: { batchId: string }) => void;
-  leave_batch: (data: { batchId: string }) => void;
-  send_message: (data: { batchId: string; content?: string; messageType?: "text" | "file" | "system"; parentId?: string; tempId?: string; attachments?: AttachmentPayload[] }) => void;
-  typing_start: (data: { batchId: string }) => void;
-  typing_stop: (data: { batchId: string }) => void;
+  join_channel: (data: { channelId: string }) => void;
+  leave_channel: (data: { channelId: string }) => void;
+  send_message: (data: { channelId: string; content?: string; messageType?: "text" | "file" | "system"; parentId?: string; tempId?: string; attachments?: AttachmentPayload[] }) => void;
+  typing_start: (data: { channelId: string }) => void;
+  typing_stop: (data: { channelId: string }) => void;
   mark_read: (data: { notificationId: string }) => void;
   join_dm: (data: { conversationId: string }) => void;
   leave_dm: (data: { conversationId: string }) => void;
@@ -52,8 +57,29 @@ interface SocketData {
   username: string;
 }
 
+/**
+ * Helper: load channel + parent batch + caller's membership for permission checks.
+ */
+async function loadChannelContext(channelId: string, userId: string) {
+  const channel = await prisma.channel.findUnique({
+    where: { id: channelId },
+    include: { batch: { include: { batch_settings: true } } },
+  });
+  if (!channel) return null;
+
+  const [user, membership] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId } }),
+    prisma.membership.findUnique({
+      where: { user_id_batch_id: { user_id: userId, batch_id: channel.batch_id } },
+    }),
+  ]);
+
+  if (!user) return null;
+  return { channel, user, membership };
+}
+
 export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>) {
-  // Middleware for authentication
+  // Authentication middleware
   io.use(async (socket, next) => {
     try {
       let token = socket.handshake.auth.token;
@@ -78,73 +104,72 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
     const { userId, username } = socket.data;
     console.log(`🔌 Socket connected: ${username} (${socket.id})`);
 
-    // Join personal room for private notifications
+    // Personal room for private notifications
     socket.join(`user:${userId}`);
-    
-    // Set online status & broadcast
+
+    // Online status & broadcast
     redisSet(`user:online:${userId}`, "1", 30);
     io.emit("user_online", { userId });
-    
-    // Heartbeat: refresh online status every 15s
+
+    // Heartbeat
     const heartbeatInterval = setInterval(() => {
       redisSet(`user:online:${userId}`, "1", 30);
     }, 15000);
 
-    // ── Batch Events ────────────────────────────────────
-    socket.on("join_batch", async (data) => {
+    // ── Channel Events ──────────────────────────────────
+    socket.on("join_channel", async (data) => {
       try {
-        const { batchId } = socketJoinBatchSchema.parse(data);
-        socket.join(batchId);
-        io.to(batchId).emit("user_joined", { userId, username });
+        const { channelId } = socketJoinChannelSchema.parse(data);
+        socket.join(`channel:${channelId}`);
+        io.to(`channel:${channelId}`).emit("user_joined", { userId, username });
       } catch (err) {
-        console.error("join_batch error:", err);
+        console.error("join_channel error:", err);
       }
     });
 
-    socket.on("leave_batch", (data) => {
+    socket.on("leave_channel", (data) => {
       try {
-        const { batchId } = socketJoinBatchSchema.parse(data);
-        socket.leave(batchId);
-        io.to(batchId).emit("user_left", { userId, username });
+        const { channelId } = socketJoinChannelSchema.parse(data);
+        socket.leave(`channel:${channelId}`);
+        io.to(`channel:${channelId}`).emit("user_left", { userId, username });
       } catch (err) {
-        console.error("leave_batch error:", err);
+        console.error("leave_channel error:", err);
       }
     });
 
     socket.on("send_message", async (data) => {
       try {
-        const { batchId, content, messageType, parentId, tempId, attachments } = socketSendMessageSchema.parse(data);
+        const { channelId, content, messageType, parentId, tempId, attachments } = socketSendMessageSchema.parse(data);
 
-        // Access check
-        const [user, batch, membership] = await Promise.all([
-          prisma.user.findUniqueOrThrow({ where: { id: userId } }),
-          prisma.batch.findUniqueOrThrow({ where: { id: batchId }, include: { batch_settings: true } }),
-          prisma.membership.findUnique({ where: { user_id_batch_id: { user_id: userId, batch_id: batchId } } }),
-        ]);
+        const ctx = await loadChannelContext(channelId, userId);
+        if (!ctx) {
+          console.warn(`🚫 Channel not found or user missing for ${channelId}`);
+          return;
+        }
+        const { channel, user, membership } = ctx;
 
-        if (!canSendMessage(user, batch, membership)) {
-          console.warn(`🚫 User ${username} permission denied for batch ${batchId}`);
+        if (!canSendMessage(user, channel.batch, membership)) {
+          console.warn(`🚫 User ${username} permission denied for channel ${channelId}`);
           return;
         }
 
-        // Persist message
         const message = await prisma.message.create({
           data: {
-            batch_id: batchId,
+            channel_id: channelId,
             sender_id: userId,
             content: content || "",
             message_type: messageType || "text",
             parent_id: parentId,
             ...(attachments && attachments.length > 0 && {
               attachments: {
-                create: attachments.map(a => ({
+                create: attachments.map((a) => ({
                   file_url: a.file_url,
                   file_name: a.file_name,
                   file_size: a.file_size,
-                  mime_type: a.mime_type
-                }))
-              }
-            })
+                  mime_type: a.mime_type,
+                })),
+              },
+            }),
           },
           include: {
             sender: { select: { id: true, username: true, role: true } },
@@ -154,11 +179,10 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
           },
         });
 
-        // Broadcast to batch
-        io.to(batchId).emit("receive_message", { ...message, tempId });
+        io.to(`channel:${channelId}`).emit("receive_message", { ...message, tempId });
 
-        // Handle mentions
-        const mentionedIds = content ? await parseMentions(content, batchId) : [];
+        // Mentions are resolved against the parent batch's members
+        const mentionedIds = content ? await parseMentions(content, channel.batch_id) : [];
         for (const targetId of mentionedIds) {
           if (targetId === userId) continue;
           const notif = await prisma.notification.create({
@@ -177,7 +201,7 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
       }
     });
 
-    // ── Emoji Reactions ──────────────────────────────────
+    // ── Reactions ──────────────────────────────────────
     socket.on("toggle_reaction", async (data) => {
       try {
         const { messageId, emoji } = data;
@@ -186,26 +210,24 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
         const message = await prisma.message.findUnique({ where: { id: messageId } });
         if (!message) return;
 
-        // Check if reaction already exists
         const existing = await prisma.messageReaction.findUnique({
-          where: { message_id_user_id_emoji: { message_id: messageId, user_id: userId, emoji } }
+          where: { message_id_user_id_emoji: { message_id: messageId, user_id: userId, emoji } },
         });
 
         if (existing) {
           await prisma.messageReaction.delete({ where: { id: existing.id } });
         } else {
           await prisma.messageReaction.create({
-            data: { message_id: messageId, user_id: userId, emoji }
+            data: { message_id: messageId, user_id: userId, emoji },
           });
         }
 
-        // Fetch updated reactions for this message
         const reactions = await prisma.messageReaction.findMany({
           where: { message_id: messageId },
-          select: { id: true, emoji: true, user_id: true, user: { select: { username: true } } }
+          select: { id: true, emoji: true, user_id: true, user: { select: { username: true } } },
         });
 
-        io.to(message.batch_id).emit("reaction_updated", { messageId, reactions });
+        io.to(`channel:${message.channel_id}`).emit("reaction_updated", { messageId, reactions });
       } catch (err) {
         console.error("toggle_reaction error:", err);
       }
@@ -213,17 +235,17 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
 
     socket.on("typing_start", (data) => {
       try {
-        const { batchId } = socketJoinBatchSchema.parse(data);
-        redisSet(`typing:${batchId}:${userId}`, "1", 5);
-        socket.to(batchId).emit("typing_indicator", { userId, username, batchId, typing: true });
+        const { channelId } = socketJoinChannelSchema.parse(data);
+        redisSet(`typing:${channelId}:${userId}`, "1", 5);
+        socket.to(`channel:${channelId}`).emit("typing_indicator", { userId, username, channelId, typing: true });
       } catch (err) {}
     });
 
     socket.on("typing_stop", (data) => {
       try {
-        const { batchId } = socketJoinBatchSchema.parse(data);
-        redisDel(`typing:${batchId}:${userId}`);
-        socket.to(batchId).emit("typing_indicator", { userId, username, batchId, typing: false });
+        const { channelId } = socketJoinChannelSchema.parse(data);
+        redisDel(`typing:${channelId}:${userId}`);
+        socket.to(`channel:${channelId}`).emit("typing_indicator", { userId, username, channelId, typing: false });
       } catch (err) {}
     });
 
@@ -237,7 +259,7 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
       } catch (err) {}
     });
 
-    // ── DM Events ────────────────────────────────────────
+    // ── DM Events (unchanged) ───────────────────────────
     socket.on("join_dm", (data) => {
       try {
         const { conversationId } = socketJoinDmSchema.parse(data);
@@ -255,18 +277,15 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
     socket.on("send_dm", async (data) => {
       try {
         const { conversationId, content, tempId, attachments } = socketSendDmSchema.parse(data);
-        
+
         const message = await sendDirectMessage(conversationId, userId, content?.trim(), attachments);
-        
+
         const conv = await prisma.conversation.findUnique({ where: { id: conversationId } });
         if (conv) {
           const otherId = conv.user_a_id === userId ? conv.user_b_id : conv.user_a_id;
-          
-          // Broadcast to DM room + other user's personal room (NOT sender's personal room)
-          // Sender already has optimistic message; DM room broadcast reaches sender if they're in it
+
           io.to(`dm:${conversationId}`).to(`user:${otherId}`).emit("receive_dm", { ...message, tempId });
-          
-          // Create notification for the other user
+
           try {
             const notif = await prisma.notification.create({
               data: {
@@ -287,17 +306,15 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
       }
     });
 
-    // Mark DM conversation as read
     socket.on("mark_dm_read", async (data) => {
       try {
         const { conversationId } = socketJoinDmSchema.parse(data);
-        
+
         await prisma.directMessage.updateMany({
           where: { conversation_id: conversationId, sender_id: { not: userId }, is_read: false },
           data: { is_read: true },
         });
-        
-        // Notify the other user that their messages were read
+
         const conv = await prisma.conversation.findUnique({ where: { id: conversationId } });
         if (conv) {
           const otherId = conv.user_a_id === userId ? conv.user_b_id : conv.user_a_id;

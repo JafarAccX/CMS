@@ -28,7 +28,7 @@ export default function MentorPage() {
               <p className="text-dim text-sm mt-1">{b.description || "No description"}</p>
               <div className="flex gap-4 mt-3 text-xs text-faint">
                 <span className="flex items-center gap-1"><Users className="w-3 h-3" />{b._count?.memberships || 0}</span>
-                <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" />{b._count?.messages || 0}</span>
+                <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" />{b._count?.channels || 0}</span>
               </div>
             </Link>
           ))}
@@ -43,7 +43,7 @@ export default function MentorPage() {
             <div key={q.id} className="card p-4">
               <div className="flex items-center gap-2 mb-1">
                 <span className={`px-2 py-0.5 rounded text-xs font-bold ${q.priority === "high" ? "bg-red-500/15 text-red-400" : "bg-amber-500/15 text-amber-400"}`}>{q.priority}</span>
-                <span className="text-faint text-xs">in {q.batch?.name}</span>
+                <span className="text-faint text-xs">in #{q.channel?.name} ({q.channel?.batch?.name})</span>
               </div>
               <p className="text-muted text-sm">"{q.message?.content?.slice(0, 100)}"</p>
               <p className="text-faint text-xs mt-1">by {q.message?.sender?.username}</p>

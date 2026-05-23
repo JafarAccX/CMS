@@ -26,7 +26,7 @@ export async function listBatches(user: NonNullable<Express.Request["user"]>) {
     include: {
       batch_settings: true,
       memberships: { select: { user_id: true, role_in_batch: true } },
-      _count: { select: { messages: true, memberships: true } },
+      _count: { select: { channels: true, memberships: true } },
     },
     orderBy: { created_at: "asc" },
   });
@@ -73,24 +73,47 @@ export async function createBatch(data: CreateBatchInput, actorId: string) {
     },
   });
 
+  // Auto-create default "channel1" for every new batch
+  await prisma.channel.create({
+    data: {
+      batch_id: batch.id,
+      name: "channel1",
+      created_by: actorId,
+    },
+  });
+
   await logAdminAction(actorId, batch.id, "create_batch", { batchName: data.name });
 
   return prisma.batch.findUniqueOrThrow({
     where: { id: batch.id },
-    include: { batch_settings: true },
+    include: { batch_settings: true, channels: true },
   });
 }
 
-export async function getBatchById(batchId: string) {
+export async function getBatchById(batchId: string, userId?: string) {
   const batch = await prisma.batch.findUnique({
     where: { id: batchId },
     include: {
       batch_settings: true,
       organization: true,
-      _count: { select: { messages: true, memberships: true } },
+      _count: { select: { channels: true, memberships: true } },
     },
   });
   if (!batch) throw new NotFoundError("Batch not found");
+
+  // If a user is supplied, attach their access flag + membership for this batch.
+  if (userId) {
+    const [user, membership] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId } }),
+      prisma.membership.findUnique({
+        where: { user_id_batch_id: { user_id: userId, batch_id: batchId } },
+        select: { user_id: true, role_in_batch: true },
+      }),
+    ]);
+    const hasAccess = user ? canAccessBatch(user, batch, membership as any) : false;
+    return { ...batch, hasAccess, userMembership: membership };
+  }
+
   return batch;
 }
 

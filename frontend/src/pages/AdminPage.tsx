@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "../api/client";
-import { Users, Shield, FileText, AlertTriangle, Check, Plus, UserPlus, Trash2, Megaphone } from "lucide-react";
+import { Users, Shield, FileText, AlertTriangle, Check, Plus, UserPlus, Trash2, Megaphone, Pin, PinOff, Hash, ArrowRight } from "lucide-react";
 import { toast } from "react-hot-toast";
 import PageShell from "../components/PageShell";
 import { Modal, ModalHeader, ModalBody, ModalFooter } from "../components/Modal";
@@ -20,11 +21,14 @@ export default function AdminPage() {
   const [newMember, setNewMember] = useState({ userId: "", roleInBatch: "member" });
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [broadcastContent, setBroadcastContent] = useState("");
+  const [broadcastTargets, setBroadcastTargets] = useState<Set<string>>(new Set()); // channelIds
+  const [broadcastAll, setBroadcastAll] = useState(true);
 
   const qc = useQueryClient();
 
   const { data: usersData } = useQuery({ queryKey: ["admin-users"], queryFn: async () => (await api.get("/admin/users")).data });
-  const { data: batchesData } = useQuery({ queryKey: ["batches"], queryFn: async () => (await api.get("/batches")).data });
+  const { data: pinnedData } = useQuery({ queryKey: ["admin-pinned"], queryFn: async () => (await api.get("/admin/pinned")).data });
+  const { data: allBatchesData } = useQuery({ queryKey: ["batches"], queryFn: async () => (await api.get("/batches")).data });
   const { data: statsData } = useQuery({ queryKey: ["admin-stats"], queryFn: async () => (await api.get("/admin/stats")).data });
   const { data: logsData } = useQuery({ queryKey: ["admin-logs"], queryFn: async () => (await api.get("/admin/logs")).data, enabled: tab === "logs" });
   const { data: modData } = useQuery({ queryKey: ["mod-queue"], queryFn: async () => (await api.get("/mod-queue")).data, enabled: tab === "modqueue" });
@@ -71,6 +75,19 @@ export default function AdminPage() {
   });
 
   const resolveMutation = useMutation({ mutationFn: ({ id, status }: { id: string; status: string }) => api.patch(`/mod-queue/${id}`, { status }), onSuccess: () => qc.invalidateQueries({ queryKey: ["mod-queue"] }) });
+
+  const togglePinBatch = useMutation({
+    mutationFn: (batchId: string) => api.post(`/batches/${batchId}/pin`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-pinned"] });
+      qc.invalidateQueries({ queryKey: ["batches"] });
+    },
+  });
+
+  const togglePinChannel = useMutation({
+    mutationFn: (channelId: string) => api.post(`/channels/${channelId}/pin`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-pinned"] }),
+  });
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "users", label: "Users", icon: <Users className="w-4 h-4" /> },
@@ -211,33 +228,136 @@ export default function AdminPage() {
         {tab === "batches" && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <div><h2 className="text-xl font-bold text-primary">Course Batches</h2><p className="text-dim text-sm mt-1">Manage learning environments and student enrollments.</p></div>
-              <button onClick={() => setShowCreateBatch(true)} className="btn-primary flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all"><Plus className="w-5 h-5" />New Batch</button>
+              <div>
+                <h2 className="text-xl font-bold text-primary flex items-center gap-2">
+                  <Pin className="w-5 h-5 text-accent-300" />
+                  Pinned Batches & Channels
+                </h2>
+                <p className="text-dim text-sm mt-1">
+                  Quick access to your pinned items. Pin batches/channels from their pages or below.
+                </p>
+              </div>
+              <button onClick={() => setShowCreateBatch(true)} className="btn-primary flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all">
+                <Plus className="w-5 h-5" />New Batch
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {batchesData?.map((b: any) => (
-                <div key={b.id} className="card card-hover p-6 group">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="w-12 h-12 rounded-xl bg-accent-100 flex items-center justify-center text-accent-300"><Shield className="w-6 h-6" /></div>
-                    <span className={`chip text-[10px] ${b.type === 'public' ? 'chip-learner' : 'chip-mod'}`}>{b.type}</span>
-                  </div>
-                  <h3 className="text-primary font-bold text-lg mb-2">{b.name}</h3>
-                  <p className="text-muted text-sm line-clamp-2 min-h-[2.5rem]">{b.description || "No description provided for this batch."}</p>
+            {/* Pinned Batches */}
+            {pinnedData?.pinnedBatches?.length > 0 && (
+              <div>
+                <h3 className="t-overline text-dim mb-3">Pinned Batches</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pinnedData.pinnedBatches.map((b: any) => (
+                    <div key={b.id} className="card card-hover p-5 group">
+                      <div className="flex justify-between items-start mb-3">
+                        <Link to={`/batch/${b.id}`} className="flex items-center gap-2 flex-1 min-w-0">
+                          <div className="w-10 h-10 rounded-lg bg-accent-100 flex items-center justify-center text-accent-300">
+                            <Shield className="w-5 h-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-primary font-bold text-base truncate group-hover:text-accent-300 transition-colors">{b.name}</h3>
+                            <span className="text-[11px] text-dim">{b._count?.channels || 0} channels · {b._count?.memberships || 0} members</span>
+                          </div>
+                        </Link>
+                        <button
+                          onClick={() => togglePinBatch.mutate(b.id)}
+                          className="p-1.5 text-accent-400 hover:text-red-400 transition-colors"
+                          title="Unpin batch"
+                        >
+                          <PinOff className="w-4 h-4" />
+                        </button>
+                      </div>
 
-                  <div className="flex items-center gap-4 mt-6 pt-6 border-t border-hairline text-dim">
-                    <div className="flex items-center gap-1.5"><Users className="w-4 h-4" /><span className="text-xs font-medium">{b._count?.memberships || 0} Members</span></div>
-                    <div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span className="text-xs font-medium">{b._count?.messages || 0} Messages</span></div>
-                  </div>
-
-                  <button
-                    onClick={() => setShowManageMembers(b.id)}
-                    className="btn-surface w-full mt-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2"
-                  >
-                    <UserPlus className="w-4 h-4" />Manage Members
-                  </button>
+                      {/* Channels under this batch */}
+                      <div className="space-y-1 border-t border-hairline pt-2 mt-2">
+                        {b.channels?.slice(0, 5).map((ch: any) => (
+                          <Link
+                            key={ch.id}
+                            to={`/batch/${b.id}/channel/${ch.id}`}
+                            className="flex items-center gap-2 px-2 py-1 rounded hover:bg-surface-100 text-sm text-muted hover:text-primary transition-colors"
+                          >
+                            <Hash className="w-3 h-3 text-dim" />
+                            <span className="flex-1 truncate">{ch.name}</span>
+                            {ch.is_pinned && <Pin className="w-2.5 h-2.5 text-accent-400" />}
+                            <span className="text-[10px] text-dim">{ch._count?.messages || 0}</span>
+                          </Link>
+                        ))}
+                        {b.channels?.length > 5 && (
+                          <Link to={`/batch/${b.id}`} className="text-[11px] text-accent-300 hover:underline px-2 flex items-center gap-1">
+                            View all {b.channels.length} channels <ArrowRight className="w-3 h-3" />
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+            )}
+
+            {/* Pinned Channels (whose batch is not pinned) */}
+            {pinnedData?.pinnedChannelGroups?.length > 0 && (
+              <div>
+                <h3 className="t-overline text-dim mb-3">Pinned Channels</h3>
+                <div className="space-y-3">
+                  {pinnedData.pinnedChannelGroups.map((g: any) => (
+                    <div key={g.batch.id} className="card p-4">
+                      <Link to={`/batch/${g.batch.id}`} className="text-sm font-semibold text-primary hover:text-accent-300 transition-colors flex items-center gap-2 mb-2">
+                        <Shield className="w-4 h-4 text-dim" /> {g.batch.name}
+                        <span className="chip text-[9px] chip-muted">{g.batch.type}</span>
+                      </Link>
+                      <div className="space-y-1 ml-6">
+                        {g.channels.map((ch: any) => (
+                          <div key={ch.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-surface-100 group/ch">
+                            <Link to={`/batch/${g.batch.id}/channel/${ch.id}`} className="flex items-center gap-2 flex-1 text-sm text-muted hover:text-primary transition-colors">
+                              <Hash className="w-3 h-3 text-dim" />
+                              <span className="truncate flex-1">{ch.name}</span>
+                              <span className="text-[10px] text-dim">{ch._count?.messages || 0} msgs</span>
+                            </Link>
+                            <button
+                              onClick={() => togglePinChannel.mutate(ch.id)}
+                              className="opacity-0 group-hover/ch:opacity-100 p-1 text-accent-400 hover:text-red-400 transition-all"
+                              title="Unpin channel"
+                            >
+                              <PinOff className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Empty state with quick pin from all batches */}
+            {(!pinnedData?.pinnedBatches?.length && !pinnedData?.pinnedChannelGroups?.length) && (
+              <div className="card p-8 text-center">
+                <Pin className="w-10 h-10 text-faint mx-auto mb-3" />
+                <h3 className="text-lg font-bold text-muted">No pinned items</h3>
+                <p className="text-dim text-sm mb-4">Pin batches or channels for quick access here.</p>
+              </div>
+            )}
+
+            {/* All batches → quick pin */}
+            <div>
+              <h3 className="t-overline text-dim mb-3">All Batches (pin to add to your quick-access)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {allBatchesData?.map((b: any) => (
+                  <div key={b.id} className="card p-3 flex items-center gap-3">
+                    <Shield className="w-4 h-4 text-dim shrink-0" />
+                    <Link to={`/batch/${b.id}`} className="flex-1 min-w-0 text-sm text-primary hover:text-accent-300 transition-colors truncate">
+                      {b.name}
+                    </Link>
+                    <button
+                      onClick={() => togglePinBatch.mutate(b.id)}
+                      className={`p-1.5 transition-colors ${b.is_pinned ? "text-accent-400 hover:text-red-400" : "text-faint hover:text-accent-400"}`}
+                      title={b.is_pinned ? "Unpin" : "Pin"}
+                    >
+                      {b.is_pinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -366,7 +486,7 @@ export default function AdminPage() {
                 <div className="space-y-3 flex-1">
                   <div className="flex items-center gap-2">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter ${q.priority === "high" ? "bg-red-500 text-white" : q.priority === "medium" ? "bg-amber-500 text-black" : "bg-surface-200 text-dim"}`}>{q.priority} Priority</span>
-                    <span className="text-dim text-xs font-medium">Reported in <span className="text-accent-300">#{q.batch?.name}</span></span>
+                    <span className="text-dim text-xs font-medium">Reported in <span className="text-accent-300">#{q.channel?.name}</span> ({q.channel?.batch?.name})</span>
                   </div>
                   <div className="bg-surface-100 rounded-xl p-4 border border-hairline italic text-muted text-sm">"{q.message?.content}"</div>
                   <div className="flex items-center gap-4 text-xs">
@@ -397,7 +517,6 @@ export default function AdminPage() {
       <Modal open={showBroadcast} onClose={() => setShowBroadcast(false)} size="lg">
         <ModalHeader title="Broadcast Announcement" onClose={() => setShowBroadcast(false)} icon={<Megaphone className="w-5 h-5 text-accent-300" />} />
         <ModalBody>
-          <p className="text-xs text-dim">This message will be sent to <strong className="text-accent-300">ALL batches</strong> as a system announcement.</p>
           <FormTextarea
             label="Message"
             value={broadcastContent}
@@ -405,25 +524,135 @@ export default function AdminPage() {
             rows={4}
             placeholder="Type your announcement here..."
           />
+
+          {/* Target picker */}
+          <div className="mt-4">
+            <p className="t-overline text-dim mb-2">Send to</p>
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={() => { setBroadcastAll(true); setBroadcastTargets(new Set()); }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${broadcastAll ? "bg-accent-100 text-accent-300 border-accent-200" : "bg-surface-100 text-dim border-hairline hover:text-primary"}`}
+              >
+                All channels
+              </button>
+              <button
+                onClick={() => setBroadcastAll(false)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${!broadcastAll ? "bg-accent-100 text-accent-300 border-accent-200" : "bg-surface-100 text-dim border-hairline hover:text-primary"}`}
+              >
+                Specific channels
+              </button>
+            </div>
+
+            {!broadcastAll && (
+              <div className="card p-3 max-h-64 overflow-y-auto custom-scrollbar">
+                {allBatchesData?.map((b: any) => (
+                  <BroadcastBatchPicker
+                    key={b.id}
+                    batch={b}
+                    selected={broadcastTargets}
+                    onToggle={(channelId) => {
+                      const next = new Set(broadcastTargets);
+                      if (next.has(channelId)) next.delete(channelId);
+                      else next.add(channelId);
+                      setBroadcastTargets(next);
+                    }}
+                  />
+                ))}
+                {(!allBatchesData || allBatchesData.length === 0) && (
+                  <p className="text-dim text-xs text-center py-4">No batches available</p>
+                )}
+                <div className="border-t border-hairline mt-2 pt-2 text-[11px] text-dim flex items-center justify-between">
+                  <span>{broadcastTargets.size} channel(s) selected</span>
+                  <button
+                    onClick={() => setBroadcastTargets(new Set())}
+                    disabled={broadcastTargets.size === 0}
+                    className="text-accent-300 hover:underline disabled:opacity-40"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </ModalBody>
         <ModalFooter className="justify-end">
           <button onClick={() => setShowBroadcast(false)} className="px-4 py-2 text-sm text-dim hover:text-primary transition-colors">Cancel</button>
           <button
-            disabled={!broadcastContent.trim()}
+            disabled={!broadcastContent.trim() || (!broadcastAll && broadcastTargets.size === 0)}
             onClick={async () => {
               try {
-                const res = await api.post("/admin/broadcast", { content: broadcastContent.trim() });
-                toast.success(`Broadcast sent to ${res.data.batchCount} batches!`);
+                const body: any = { content: broadcastContent.trim() };
+                if (!broadcastAll) body.channelIds = Array.from(broadcastTargets);
+                const res = await api.post("/admin/broadcast", body);
+                toast.success(`Broadcast sent to ${res.data.channelCount} channels!`);
                 setBroadcastContent("");
+                setBroadcastTargets(new Set());
+                setBroadcastAll(true);
                 setShowBroadcast(false);
               } catch (err) { toast.error("Failed to send broadcast"); }
             }}
             className="btn-primary px-4 py-2 text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
-            Send to All Batches
+            Send broadcast
           </button>
         </ModalFooter>
       </Modal>
     </PageShell>
+  );
+}
+
+
+
+/** Per-batch expandable channel picker for the broadcast modal. */
+function BroadcastBatchPicker({
+  batch,
+  selected,
+  onToggle,
+}: {
+  batch: any;
+  selected: Set<string>;
+  onToggle: (channelId: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const { data: channels } = useQuery({
+    queryKey: ["broadcast-channels", batch.id],
+    queryFn: async () => (await api.get(`/batches/${batch.id}/channels`)).data,
+    enabled: expanded,
+  });
+
+  const selectedInBatch = channels?.filter((c: any) => selected.has(c.id)).length || 0;
+
+  return (
+    <div className="border-b border-hairline last:border-0 py-1.5">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center gap-2 px-2 py-1 hover:bg-surface-100 rounded text-left"
+      >
+        <span className="text-dim text-xs w-3">{expanded ? "−" : "+"}</span>
+        <Shield className="w-3.5 h-3.5 text-dim" />
+        <span className="flex-1 text-sm text-primary truncate">{batch.name}</span>
+        {selectedInBatch > 0 && (
+          <span className="chip chip-accent text-[9px]">{selectedInBatch}</span>
+        )}
+      </button>
+      {expanded && (
+        <div className="ml-7 mt-1 space-y-0.5">
+          {channels?.length === 0 && <p className="text-[11px] text-faint px-2">No channels</p>}
+          {channels?.map((c: any) => (
+            <label key={c.id} className="flex items-center gap-2 px-2 py-1 hover:bg-surface-100 rounded cursor-pointer text-sm">
+              <input
+                type="checkbox"
+                checked={selected.has(c.id)}
+                onChange={() => onToggle(c.id)}
+                className="rounded"
+              />
+              <Hash className="w-3 h-3 text-dim" />
+              <span className="flex-1 truncate text-muted">{c.name}</span>
+              {c.is_pinned && <Pin className="w-2.5 h-2.5 text-accent-400" />}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

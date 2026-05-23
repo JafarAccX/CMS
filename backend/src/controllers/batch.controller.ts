@@ -25,7 +25,7 @@ export async function createBatch(req: Request, res: Response, next: NextFunctio
 export async function getBatch(req: Request, res: Response, next: NextFunction) {
   try {
     const batchId = requireParam(req.params.id, "id");
-    const batch = await batchService.getBatchById(batchId);
+    const batch = await batchService.getBatchById(batchId, req.user!.id);
     res.status(200).json(batch);
   } catch (err) {
     next(err);

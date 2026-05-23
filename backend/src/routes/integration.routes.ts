@@ -54,6 +54,9 @@ router.post("/crm-enroll", async (req, res) => {
           description: `Automatically created from CRM enrollment for ${batchName}`,
         },
       });
+      await prisma.channel.create({
+        data: { batch_id: batch.id, name: "channel1", created_by: defaultAdmin.id },
+      });
     }
 
     // 4. Add User to Batch

@@ -9,7 +9,7 @@ import { useSocket } from "../hooks/useSocket";
 import {
   Lock, MessageSquare, Users, LogOut, Shield, BookOpen, User,
   MessageCircle, Zap, Hash, Sparkles, ArrowRight, Calendar,
-  ChevronDown, Search
+  ChevronDown, ChevronRight, Search, Folder
 } from "lucide-react";
 import NotificationDropdown from "../components/NotificationDropdown";
 
@@ -21,11 +21,21 @@ export default function DashboardPage() {
   const setNotifications = useNotificationStore((s) => s.setNotifications);
   const navigate = useNavigate();
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  // Learners see a batch-switcher view of "Active rooms"; everyone else sees pinned-only.
+  const isLearner = user?.role === "learner";
+  const [activeBatchId, setActiveBatchId] = useState<string | null>(() =>
+    localStorage.getItem("dashboard.activeBatchId")
+  );
   useSocket();
 
   const { data: batchData } = useQuery({
     queryKey: ["batches"],
     queryFn: async () => { const { data } = await api.get("/batches"); return data; },
+  });
+
+  const { data: pinnedData } = useQuery({
+    queryKey: ["pinned-rooms"],
+    queryFn: async () => (await api.get("/pinned")).data as { pinnedBatches: any[]; pinnedChannels: any[] },
   });
 
   const { data: notifData } = useQuery({
@@ -37,14 +47,48 @@ export default function DashboardPage() {
   useEffect(() => { if (notifData) setNotifications(notifData); }, [notifData]);
 
   const generalBatches = batches.filter((b) => b.type === "general");
-  const myBatches = batches.filter((b) => b.type !== "general" && b.hasAccess);
   const lockedBatches = batches.filter((b) => !b.hasAccess && b.type !== "general");
+  // Sidebar: batches user can navigate into (member of, or general access)
+  const sidebarBatches = batches.filter(
+    (b) => b.userMembership !== null || b.type === "general"
+  );
+  // "Active rooms" = pinned batches + pinned channels (user-scoped, from /pinned)
+  const pinnedBatches = pinnedData?.pinnedBatches || [];
+  const pinnedChannels = pinnedData?.pinnedChannels || [];
+  const activeRoomCount = pinnedBatches.length + pinnedChannels.length;
+
+  // ── Learner-only: batch switcher state ──────────────────────
+  // Auto-pick first sidebar batch if none selected (or stored one is gone).
+  useEffect(() => {
+    if (!isLearner || sidebarBatches.length === 0) return;
+    const stillExists = activeBatchId && sidebarBatches.some((b) => b.id === activeBatchId);
+    if (!stillExists) {
+      const next = sidebarBatches[0].id;
+      setActiveBatchId(next);
+      localStorage.setItem("dashboard.activeBatchId", next);
+    }
+  }, [isLearner, sidebarBatches, activeBatchId]);
+
+  const handleSwitchBatch = (id: string) => {
+    setActiveBatchId(id);
+    localStorage.setItem("dashboard.activeBatchId", id);
+  };
+
+  const activeBatch = isLearner
+    ? sidebarBatches.find((b) => b.id === activeBatchId) || null
+    : null;
+
+  const { data: activeBatchChannels } = useQuery({
+    queryKey: ["dashboard-channels", activeBatchId],
+    queryFn: async () => (await api.get(`/batches/${activeBatchId}/channels`)).data,
+    enabled: isLearner && !!activeBatchId,
+  });
 
   const handleLogout = async () => { await logout(); navigate("/login"); };
 
   const nav = [
     { key: "home", label: "Home", icon: <Zap className="w-[15px] h-[15px]" />, active: true },
-    { key: "rooms", label: "Rooms", icon: <Hash className="w-[15px] h-[15px]" />, count: batches.filter(b => b.hasAccess).length },
+    { key: "rooms", label: "Rooms", icon: <Hash className="w-[15px] h-[15px]" />, count: sidebarBatches.length },
     { key: "dm", label: "Direct", icon: <MessageCircle className="w-[15px] h-[15px]" />, href: "/dm" },
     { key: "lib", label: "Library", icon: <BookOpen className="w-[15px] h-[15px]" /> },
     { key: "cal", label: "Calendar", icon: <Calendar className="w-[15px] h-[15px]" /> },
@@ -100,26 +144,19 @@ export default function DashboardPage() {
 
         <div className="h-px bg-hairline mx-3 my-2" />
 
-        {/* Channels */}
+        {/* Batches (expandable to show channels) */}
         <div className="flex-1 overflow-auto custom-scrollbar px-2">
           <div className="flex items-center px-2 py-1.5">
-            <span className="t-overline flex-1">Channels</span>
+            <span className="t-overline flex-1">Batches</span>
           </div>
-          {batches.filter(b => b.hasAccess).map(b => (
-            <Link
-              key={b.id}
-              to={`/batch/${b.id}`}
-              className="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-[7px] text-[13px] mb-px transition-all text-muted hover:text-primary hover:bg-surface-100"
-            >
-              <Hash className="w-[13px] h-[13px] text-dim" />
-              <span className="flex-1 truncate">{b.name}</span>
-              {b._count?.messages > 0 && (
-                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-accent-400 text-white text-[10px] font-bold flex items-center justify-center">
-                  {b._count.messages > 99 ? "99+" : b._count.messages}
-                </span>
-              )}
-            </Link>
+          {sidebarBatches.map((b) => (
+            <SidebarBatch key={b.id} batch={b} />
           ))}
+          {sidebarBatches.length === 0 && (
+            <p className="text-faint text-[11.5px] px-2.5 py-3">
+              No batches yet. Enroll in a course to get started.
+            </p>
+          )}
         </div>
 
         {/* Profile */}
@@ -177,7 +214,7 @@ export default function DashboardPage() {
                     <span className="text-faint">·</span>
                     <span className="text-[11px] text-accent-300 font-medium flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-accent-400" />
-                      {myBatches.length + generalBatches.length} channels available
+                      {activeRoomCount} pinned room{activeRoomCount === 1 ? "" : "s"}
                     </span>
                   </>
                 )}
@@ -212,14 +249,96 @@ export default function DashboardPage() {
                   </section>
                 )}
 
-                {/* My batches */}
-                {myBatches.length > 0 && (
+                {/* Active rooms — learners get a batch-scoped switcher,
+                    everyone else sees pinned batches + pinned channels. */}
+                {isLearner ? (
                   <section className="mb-8">
-                    <SectionLabel kicker="Active" title="Your rooms" right={`${myBatches.length} rooms`} />
+                    <SectionLabel
+                      kicker="Active"
+                      title="Your rooms"
+                      right={activeBatch ? `in ${activeBatch.name}` : undefined}
+                    />
+
+                    {sidebarBatches.length > 0 ? (
+                      <>
+                        {/* Batch switcher pills */}
+                        <div className="flex gap-1.5 mb-4 overflow-x-auto custom-scrollbar pb-1">
+                          {sidebarBatches.map((b) => {
+                            const isActive = b.id === activeBatchId;
+                            return (
+                              <button
+                                key={b.id}
+                                onClick={() => handleSwitchBatch(b.id)}
+                                className={`shrink-0 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold transition-all border flex items-center gap-1.5 ${
+                                  isActive
+                                    ? "bg-accent-100 text-accent-300 border-accent-200"
+                                    : "bg-surface-50 text-dim border-hairline hover:text-primary hover:bg-surface-100"
+                                }`}
+                                title={b.name}
+                              >
+                                <Hash className="w-3 h-3" />
+                                <span className="max-w-[140px] truncate">{b.name}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Channels of the selected batch */}
+                        {activeBatchChannels && activeBatchChannels.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {activeBatchChannels.map((c: any) => (
+                              <ChannelTile
+                                key={c.id}
+                                channel={{
+                                  ...c,
+                                  batch: { id: activeBatchId!, name: activeBatch?.name || "" },
+                                }}
+                              />
+                            ))}
+                          </div>
+                        ) : activeBatchChannels ? (
+                          <div className="card p-8 text-center">
+                            <Hash className="w-8 h-8 text-faint mx-auto mb-3" />
+                            <p className="text-dim text-sm">No channels in this batch yet.</p>
+                          </div>
+                        ) : (
+                          <div className="card p-6 text-center">
+                            <p className="text-dim text-xs">Loading…</p>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="card p-8 text-center">
+                        <Hash className="w-8 h-8 text-faint mx-auto mb-3" />
+                        <p className="text-dim text-sm">You're not enrolled in any batch yet.</p>
+                      </div>
+                    )}
+                  </section>
+                ) : activeRoomCount > 0 ? (
+                  <section className="mb-8">
+                    <SectionLabel
+                      kicker="Active"
+                      title="Your rooms"
+                      right={`${activeRoomCount} pinned`}
+                    />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {myBatches.map(b => (
-                        <RoomTile key={b.id} batch={b} />
+                      {pinnedBatches.map((b: any) => (
+                        <RoomTile key={`b-${b.id}`} batch={b} />
                       ))}
+                      {pinnedChannels.map((c: any) => (
+                        <ChannelTile key={`c-${c.id}`} channel={c} />
+                      ))}
+                    </div>
+                  </section>
+                ) : (
+                  <section className="mb-8">
+                    <SectionLabel kicker="Active" title="Your rooms" />
+                    <div className="card p-8 text-center">
+                      <Hash className="w-8 h-8 text-faint mx-auto mb-3" />
+                      <p className="text-dim text-sm">No pinned rooms yet.</p>
+                      <p className="text-faint text-xs mt-1">
+                        Admins can pin batches or channels to feature them here.
+                      </p>
                     </div>
                   </section>
                 )}
@@ -247,8 +366,8 @@ export default function DashboardPage() {
               <aside>
                 <SectionLabel kicker="This week" title="At a glance" />
                 <div className="grid grid-cols-2 gap-3 mb-5">
-                  <StatCard n={String(myBatches.length + generalBatches.length).padStart(2, "0")} label="channels" sub="available" />
-                  <StatCard n={String(myBatches.length).padStart(2, "0")} label="enrolled" sub="your batches" />
+                  <StatCard n={String(activeRoomCount).padStart(2, "0")} label="pinned" sub="active rooms" highlight />
+                  <StatCard n={String(sidebarBatches.length).padStart(2, "0")} label="batches" sub="accessible" />
                   <StatCard n={String(generalBatches.length).padStart(2, "0")} label="general" sub="open to all" />
                 </div>
 
@@ -309,7 +428,31 @@ function RoomTile({ batch }: { batch: any }) {
       <p className="text-[12.5px] text-muted truncate mb-2.5">{batch.description || "No description"}</p>
       <div className="flex items-center gap-4 text-[11px] text-dim">
         <span className="flex items-center gap-1"><Users className="w-3 h-3" />{batch._count?.memberships || 0} members</span>
-        <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" />{batch._count?.messages || 0} msgs</span>
+        <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" />{batch._count?.channels || 0} channels</span>
+      </div>
+    </Link>
+  );
+}
+
+function ChannelTile({ channel }: { channel: any }) {
+  return (
+    <Link
+      to={`/batch/${channel.batch.id}/channel/${channel.id}`}
+      className="card card-hover p-3.5 cursor-pointer block"
+    >
+      <div className="flex items-center gap-2 mb-2.5">
+        <Hash className="w-3.5 h-3.5 text-accent-400" />
+        <span className="text-sm font-semibold text-primary flex-1 truncate">{channel.name}</span>
+        <span className="chip chip-accent text-[9px]">channel</span>
+      </div>
+      <p className="text-[12.5px] text-muted truncate mb-2.5">
+        in {channel.batch?.name}
+      </p>
+      <div className="flex items-center gap-4 text-[11px] text-dim">
+        <span className="flex items-center gap-1">
+          <MessageSquare className="w-3 h-3" />
+          {channel._count?.messages || 0} messages
+        </span>
       </div>
     </Link>
   );
@@ -332,5 +475,72 @@ function QuickLink({ icon, label, href }: { icon: React.ReactNode; label: string
       <span className="text-[12.5px] text-primary font-medium flex-1 truncate">{label}</span>
       <ArrowRight className="w-3 h-3 text-dim" />
     </Link>
+  );
+}
+
+
+
+/**
+ * Sidebar batch row that expands on click to reveal its channels.
+ * Lazy-fetches channels on first expand.
+ */
+function SidebarBatch({ batch }: { batch: any }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const { data: channels } = useQuery({
+    queryKey: ["batch-channels", batch.id],
+    queryFn: async () => (await api.get(`/batches/${batch.id}/channels`)).data,
+    enabled: expanded,
+  });
+
+  return (
+    <div className="mb-px">
+      <div className="flex items-center w-full rounded-[7px] text-[13px] transition-all text-muted hover:bg-surface-100">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="px-1.5 py-1.5 text-dim hover:text-primary"
+          aria-label={expanded ? "Collapse" : "Expand"}
+        >
+          {expanded ? (
+            <ChevronDown className="w-3 h-3" />
+          ) : (
+            <ChevronRight className="w-3 h-3" />
+          )}
+        </button>
+        <Link
+          to={`/batch/${batch.id}`}
+          className="flex items-center gap-2 flex-1 py-1.5 pr-2.5 hover:text-primary truncate"
+        >
+          <Folder className="w-[13px] h-[13px] text-dim shrink-0" />
+          <span className="flex-1 truncate">{batch.name}</span>
+          {(batch._count?.channels ?? 0) > 0 && (
+            <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-surface-200 text-muted text-[10px] font-bold flex items-center justify-center">
+              {batch._count?.channels}
+            </span>
+          )}
+        </Link>
+      </div>
+      {expanded && (
+        <div className="ml-5 border-l border-hairline pl-1.5 mt-px">
+          {!channels && (
+            <p className="text-[11px] text-faint px-2 py-1">Loading…</p>
+          )}
+          {channels?.length === 0 && (
+            <p className="text-[11px] text-faint px-2 py-1">No channels</p>
+          )}
+          {channels?.map((c: any) => (
+            <Link
+              key={c.id}
+              to={`/batch/${batch.id}/channel/${c.id}`}
+              className="flex items-center gap-2 px-2 py-1 rounded-[6px] text-[12.5px] text-muted hover:text-primary hover:bg-surface-100 transition-colors"
+            >
+              <Hash className="w-3 h-3 text-dim shrink-0" />
+              <span className="truncate flex-1">{c.name}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

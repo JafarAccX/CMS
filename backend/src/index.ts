@@ -14,11 +14,19 @@ import { initSockets } from "./sockets/index.js";
 const app = express();
 const server = http.createServer(app);
 
+const allowedOrigins = process.env.CLIENT_ORIGIN
+  ? process.env.CLIENT_ORIGIN.split(",").map((o) => o.trim())
+  : ["http://localhost:5173"];
+
+console.log("CLIENT_ORIGIN from env:", process.env.CLIENT_ORIGIN);
+console.log("Parsed allowed origins:", allowedOrigins);
+
 // Socket.io
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
+
     credentials: true,
   },
 });
@@ -28,7 +36,7 @@ app.set("io", io);
 // Middlewares
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
+    origin: allowedOrigins,
     credentials: true,
   })
 );

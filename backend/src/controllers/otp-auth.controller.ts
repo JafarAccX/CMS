@@ -273,6 +273,9 @@ async function syncBatchMemberships(
           description: `Auto-synced from CRM (Course: ${enr.Batch.Course ?? "—"})`,
         },
       });
+      await prisma.channel.create({
+        data: { batch_id: batch.id, name: "channel1", created_by: defaultAdmin.id },
+      });
     }
 
     await prisma.membership.upsert({

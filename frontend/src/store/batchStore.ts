@@ -6,10 +6,11 @@ interface Batch {
   description?: string;
   type: string;
   is_paid: boolean;
+  is_pinned?: boolean;
   hasAccess: boolean;
   userMembership: { user_id: string; role_in_batch: string } | null;
   batch_settings: { allow_guests: boolean; max_members: number | null; is_archived: boolean } | null;
-  _count: { messages: number; memberships: number };
+  _count: { channels?: number; messages?: number; memberships: number };
 }
 
 interface BatchState {

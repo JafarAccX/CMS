@@ -3,7 +3,8 @@ import { useAuthStore } from "./store/authStore";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
-import BatchChatPage from "./pages/BatchChatPage";
+import BatchPage from "./pages/BatchPage";
+import ChannelChatPage from "./pages/ChannelChatPage";
 import AdminPage from "./pages/AdminPage";
 import MentorPage from "./pages/MentorPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -33,7 +34,8 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-        <Route path="/batch/:id" element={<ProtectedRoute><BatchChatPage /></ProtectedRoute>} />
+        <Route path="/batch/:id" element={<ProtectedRoute><BatchPage /></ProtectedRoute>} />
+        <Route path="/batch/:batchId/channel/:channelId" element={<ProtectedRoute><ChannelChatPage /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute><RoleRoute roles={["admin"]}><AdminPage /></RoleRoute></ProtectedRoute>} />
         <Route path="/mentor" element={<ProtectedRoute><RoleRoute roles={["mentor"]}><MentorPage /></RoleRoute></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />

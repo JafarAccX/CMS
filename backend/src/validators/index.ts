@@ -38,6 +38,15 @@ export const updateBatchSchema = z.object({
 });
 
 
+// ─── Channels ──────────────────────────────────────────────
+export const createChannelSchema = z.object({
+  name: z.string().min(1).max(80),
+});
+
+export const renameChannelSchema = z.object({
+  name: z.string().min(1).max(80),
+});
+
 // ─── Members ───────────────────────────────────────────────
 export const addMemberSchema = z.object({
   user_id: z.string().uuid(),
@@ -50,7 +59,7 @@ export const updateMemberRoleSchema = z.object({
 
 // ─── Messages ──────────────────────────────────────────────
 export const sendMessageSchema = z.object({
-  batch_id: z.string().uuid(),
+  channel_id: z.string().uuid(),
   content: z.string().min(1).max(5000),
   message_type: z.enum(["text", "file", "system"]).optional(),
   parent_id: z.string().uuid().optional(),
@@ -85,6 +94,12 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(8).max(128),
 });
 
+// ─── Broadcast ─────────────────────────────────────────────
+export const broadcastSchema = z.object({
+  content: z.string().min(1).max(5000),
+  channelIds: z.array(z.string().uuid()).optional(), // if omitted → all channels
+});
+
 // ─── Socket events ─────────────────────────────────────────
 const attachmentSchema = z.object({
   file_url: z.string(),
@@ -94,7 +109,7 @@ const attachmentSchema = z.object({
 });
 
 export const socketSendMessageSchema = z.object({
-  batchId: z.string().uuid(),
+  channelId: z.string().uuid(),
   content: z.string().max(5000).optional(),
   messageType: z.enum(["text", "file", "system"]).optional(),
   parentId: z.string().uuid().optional(),
@@ -104,8 +119,8 @@ export const socketSendMessageSchema = z.object({
   message: "Message must have either content or attachments",
 });
 
-export const socketJoinBatchSchema = z.object({
-  batchId: z.string().uuid(),
+export const socketJoinChannelSchema = z.object({
+  channelId: z.string().uuid(),
 });
 
 export const socketSendDmSchema = z.object({
@@ -126,9 +141,12 @@ export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateBatchInput = z.infer<typeof createBatchSchema>;
 export type UpdateBatchInput = z.infer<typeof updateBatchSchema>;
+export type CreateChannelInput = z.infer<typeof createChannelSchema>;
+export type RenameChannelInput = z.infer<typeof renameChannelSchema>;
 export type AddMemberInput = z.infer<typeof addMemberSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 export type FlagMessageInput = z.infer<typeof flagMessageSchema>;
 export type UpdateModQueueInput = z.infer<typeof updateModQueueSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type BroadcastInput = z.infer<typeof broadcastSchema>;

@@ -76,30 +76,84 @@ export async function listAdminLogs(page = 1, limit = 20, actionType?: string) {
 }
 
 export async function getAdminStats() {
-  const [totalUsers, totalMentors, totalLearners, totalBatches] = await Promise.all([
+  const [totalUsers, totalMentors, totalLearners, totalBatches, totalChannels] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { role: "mentor" } }),
     prisma.user.count({ where: { role: "learner" } }),
     prisma.batch.count(),
+    prisma.channel.count(),
   ]);
 
-  return { totalUsers, totalMentors, totalLearners, totalBatches };
+  return { totalUsers, totalMentors, totalLearners, totalBatches, totalChannels };
 }
 
-export async function broadcastMessage(content: string, senderId: string) {
-  // Get all non-archived batches
-  const batches = await prisma.batch.findMany({
-    where: {
-      batch_settings: { is_archived: false }
+/**
+ * Admin panel: list ONLY pinned batches (with their channels) and pinned channels
+ * whose parent batch is NOT pinned (grouped by batch).
+ */
+export async function listPinnedForAdmin() {
+  const pinnedBatches = await prisma.batch.findMany({
+    where: { is_pinned: true },
+    orderBy: { created_at: "asc" },
+    include: {
+      batch_settings: true,
+      _count: { select: { channels: true, memberships: true } },
+      channels: {
+        orderBy: [{ is_pinned: "desc" }, { created_at: "asc" }],
+        include: { _count: { select: { messages: true } } },
+      },
     },
-    select: { id: true, name: true }
   });
 
+  const pinnedChannels = await prisma.channel.findMany({
+    where: {
+      is_pinned: true,
+      batch: { is_pinned: false },
+    },
+    orderBy: { created_at: "asc" },
+    include: {
+      _count: { select: { messages: true } },
+      batch: { select: { id: true, name: true, type: true } },
+    },
+  });
+
+  const groups = new Map<string, { batch: any; channels: any[] }>();
+  for (const ch of pinnedChannels) {
+    const key = ch.batch.id;
+    if (!groups.has(key)) groups.set(key, { batch: ch.batch, channels: [] });
+    groups.get(key)!.channels.push(ch);
+  }
+
+  return {
+    pinnedBatches,
+    pinnedChannelGroups: Array.from(groups.values()),
+  };
+}
+
+/**
+ * Broadcast a system message to selected channels (or all channels in non-archived
+ * batches when no channelIds are provided).
+ */
+export async function broadcastMessage(content: string, senderId: string, channelIds?: string[]) {
+  let channels: { id: string; batch_id: string; name: string }[];
+
+  if (channelIds && channelIds.length > 0) {
+    channels = await prisma.channel.findMany({
+      where: { id: { in: channelIds } },
+      select: { id: true, batch_id: true, name: true },
+    });
+  } else {
+    channels = await prisma.channel.findMany({
+      where: { batch: { batch_settings: { is_archived: false } } },
+      select: { id: true, batch_id: true, name: true },
+    });
+  }
+
   const messages = [];
-  for (const batch of batches) {
+  for (const ch of channels) {
     const msg = await prisma.message.create({
       data: {
-        batch_id: batch.id,
+        channel_id: ch.id,
         sender_id: senderId,
         content: `📢 **BROADCAST**: ${content}`,
         message_type: "system",
@@ -110,9 +164,13 @@ export async function broadcastMessage(content: string, senderId: string) {
         reactions: { select: { id: true, emoji: true, user_id: true, user: { select: { username: true } } } },
       },
     });
-    messages.push({ ...msg, batchId: batch.id });
+    messages.push({ ...msg, channelId: ch.id });
   }
 
-  await logAdminAction(senderId, null, "broadcast_message", { content, batchCount: batches.length });
+  await logAdminAction(senderId, null, "broadcast_message", {
+    content,
+    channelCount: channels.length,
+    targeted: !!(channelIds && channelIds.length > 0),
+  });
   return messages;
 }

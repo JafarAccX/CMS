@@ -103,22 +103,32 @@ export async function fixCrmBatchTypes(_req: Request, res: Response, next: NextF
 
 export async function broadcast(req: Request, res: Response, next: NextFunction) {
   try {
-    const { content } = req.body;
+    const { content, channelIds } = req.body;
     if (!content || !content.trim()) {
       res.status(400).json({ error: "Broadcast content is required" });
       return;
     }
-    const messages = await adminService.broadcastMessage(content.trim(), req.user!.id);
-    
-    // Emit to each batch room via Socket.io
+    const ids = Array.isArray(channelIds) && channelIds.length > 0 ? channelIds : undefined;
+    const messages = await adminService.broadcastMessage(content.trim(), req.user!.id, ids);
+
+    // Emit to each channel room via Socket.io
     const io = req.app.get("io");
     if (io) {
       for (const msg of messages) {
-        io.to(msg.batchId).emit("receive_message", msg);
+        io.to(`channel:${msg.channelId}`).emit("receive_message", msg);
       }
     }
 
-    res.status(200).json({ success: true, batchCount: messages.length });
+    res.status(200).json({ success: true, channelCount: messages.length });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function listPinned(_req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await adminService.listPinnedForAdmin();
+    res.status(200).json(result);
   } catch (err) {
     next(err);
   }

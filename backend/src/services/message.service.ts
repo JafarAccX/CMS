@@ -3,24 +3,35 @@ import { NotFoundError, ForbiddenError } from "../utils/errors.js";
 import { canAccessBatch, canSendMessage, canModerate } from "../utils/permissions.js";
 import { logAdminAction } from "./admin.service.js";
 
-export async function listMessages(batchId: string, userId: string, cursor?: string, limit = 50) {
-  const [user, batch, membership] = await Promise.all([
+/**
+ * Resolve a channel + parent batch + caller's membership for permission checks.
+ */
+async function loadChannelContext(channelId: string, userId: string) {
+  const channel = await prisma.channel.findUnique({
+    where: { id: channelId },
+    include: { batch: { include: { batch_settings: true } } },
+  });
+  if (!channel) throw new NotFoundError("Channel not found");
+
+  const [user, membership] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId } }),
-    prisma.batch.findUniqueOrThrow({
-      where: { id: batchId },
-      include: { batch_settings: true },
-    }),
     prisma.membership.findUnique({
-      where: { user_id_batch_id: { user_id: userId, batch_id: batchId } },
+      where: { user_id_batch_id: { user_id: userId, batch_id: channel.batch_id } },
     }),
   ]);
 
-  if (!canAccessBatch(user, batch, membership)) {
-    throw new ForbiddenError("You do not have access to this batch");
+  return { channel, user, membership };
+}
+
+export async function listMessages(channelId: string, userId: string, cursor?: string, limit = 50) {
+  const { channel, user, membership } = await loadChannelContext(channelId, userId);
+
+  if (!canAccessBatch(user, channel.batch, membership)) {
+    throw new ForbiddenError("You do not have access to this channel");
   }
 
   const messages = await prisma.message.findMany({
-    where: { batch_id: batchId },
+    where: { channel_id: channelId },
     take: limit,
     ...(cursor && {
       skip: 1,
@@ -48,47 +59,37 @@ export async function listMessages(batchId: string, userId: string, cursor?: str
   const nextCursor = messages.length === limit ? messages[messages.length - 1].id : null;
 
   return {
-    messages: messages.reverse(), // return in chronological order
+    messages: messages.reverse(),
     nextCursor,
     hasMore: messages.length === limit,
   };
 }
 
 export async function createMessage(
-  batchId: string,
+  channelId: string,
   senderId: string,
   content: string,
   messageType: "text" | "file" | "system" = "text",
   parentId?: string,
   attachments?: { file_url: string; file_name: string; file_size: number; mime_type: string }[]
 ) {
-  // Validate sender + batch access
-  const [user, batch, membership] = await Promise.all([
-    prisma.user.findUniqueOrThrow({ where: { id: senderId } }),
-    prisma.batch.findUniqueOrThrow({
-      where: { id: batchId },
-      include: { batch_settings: true },
-    }),
-    prisma.membership.findUnique({
-      where: { user_id_batch_id: { user_id: senderId, batch_id: batchId } },
-    }),
-  ]);
+  const { channel, user, membership } = await loadChannelContext(channelId, senderId);
 
-  if (!canSendMessage(user, batch, membership)) {
-    throw new ForbiddenError("You cannot send messages in this batch");
+  if (!canSendMessage(user, channel.batch, membership)) {
+    throw new ForbiddenError("You cannot send messages in this channel");
   }
 
   // Validate parent message if threading
   if (parentId) {
     const parent = await prisma.message.findUnique({ where: { id: parentId } });
-    if (!parent || parent.batch_id !== batchId) {
-      throw new NotFoundError("Parent message not found in this batch");
+    if (!parent || parent.channel_id !== channelId) {
+      throw new NotFoundError("Parent message not found in this channel");
     }
   }
 
   const message = await prisma.message.create({
     data: {
-      batch_id: batchId,
+      channel_id: channelId,
       sender_id: senderId,
       content,
       message_type: messageType,
@@ -115,8 +116,8 @@ export async function createMessage(
     },
   });
 
-  // Handle mentions
-  const mentionedIds = await parseMentions(content, batchId);
+  // Handle mentions (resolved against the parent batch's members)
+  const mentionedIds = await parseMentions(content, channel.batch_id);
   for (const targetId of mentionedIds) {
     if (targetId === senderId) continue;
     await prisma.notification.create({
@@ -128,7 +129,6 @@ export async function createMessage(
         content_preview: content,
       },
     }).catch(err => console.error("Mention notification error:", err));
-
   }
 
   return message;
@@ -138,13 +138,13 @@ export async function createMessage(
 export async function softDeleteMessage(messageId: string, userId: string) {
   const message = await prisma.message.findUnique({
     where: { id: messageId },
-    include: { batch: { include: { batch_settings: true } } },
+    include: { channel: { include: { batch: { include: { batch_settings: true } } } } },
   });
   if (!message) throw new NotFoundError("Message not found");
 
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const membership = await prisma.membership.findUnique({
-    where: { user_id_batch_id: { user_id: userId, batch_id: message.batch_id } },
+    where: { user_id_batch_id: { user_id: userId, batch_id: message.channel.batch_id } },
   });
 
   // Sender, moderator, or admin can soft delete
@@ -161,7 +161,8 @@ export async function softDeleteMessage(messageId: string, userId: string) {
 
   if (!isSender) {
     await logAdminAction(userId, messageId, "delete_message", {
-      batchId: message.batch_id,
+      channelId: message.channel_id,
+      batchId: message.channel.batch_id,
     });
   }
 
@@ -184,19 +185,22 @@ export async function hardDeleteMessage(messageId: string, actorId: string) {
   await prisma.message.delete({ where: { id: messageId } });
 
   await logAdminAction(actorId, messageId, "hard_delete_message", {
-    batchId: message.batch_id,
+    channelId: message.channel_id,
   });
 
   return { success: true };
 }
 
 export async function pinMessage(messageId: string, userId: string) {
-  const message = await prisma.message.findUnique({ where: { id: messageId } });
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { channel: true },
+  });
   if (!message) throw new NotFoundError("Message not found");
 
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const membership = await prisma.membership.findUnique({
-    where: { user_id_batch_id: { user_id: userId, batch_id: message.batch_id } },
+    where: { user_id_batch_id: { user_id: userId, batch_id: message.channel.batch_id } },
   });
 
   if (!canModerate(user, membership)) {
@@ -205,7 +209,7 @@ export async function pinMessage(messageId: string, userId: string) {
 
   const pinned = await prisma.pinnedMessage.create({
     data: {
-      batch_id: message.batch_id,
+      channel_id: message.channel_id,
       message_id: messageId,
       pinned_by: userId,
     },
@@ -224,11 +228,12 @@ export async function unpinMessage(messageId: string, userId: string) {
 
   const pinned = await prisma.pinnedMessage.findFirst({
     where: { message_id: messageId },
+    include: { channel: true },
   });
   if (!pinned) throw new NotFoundError("Pinned message not found");
 
   const membership = await prisma.membership.findUnique({
-    where: { user_id_batch_id: { user_id: userId, batch_id: pinned.batch_id } },
+    where: { user_id_batch_id: { user_id: userId, batch_id: pinned.channel.batch_id } },
   });
 
   if (!canModerate(user, membership)) {
@@ -250,7 +255,7 @@ export async function flagMessage(
 
   const queueItem = await prisma.modQueue.create({
     data: {
-      batch_id: message.batch_id,
+      channel_id: message.channel_id,
       message_id: messageId,
       reported_by: reportedBy,
       priority,
@@ -267,9 +272,9 @@ export async function flagMessage(
   return queueItem;
 }
 
-export async function getPinnedMessages(batchId: string) {
+export async function getPinnedMessages(channelId: string) {
   return prisma.pinnedMessage.findMany({
-    where: { batch_id: batchId },
+    where: { channel_id: channelId },
     include: {
       message: {
         include: { sender: { select: { id: true, username: true } } },
@@ -282,6 +287,7 @@ export async function getPinnedMessages(batchId: string) {
 
 /**
  * Parse @mentions from message content and return user IDs.
+ * Mentions are resolved against the parent batch's members (channels share members with their batch).
  */
 export async function parseMentions(content: string, batchId: string): Promise<string[]> {
   const mentionRegex = /@([a-zA-Z0-9_.-]+)/g;
@@ -294,7 +300,6 @@ export async function parseMentions(content: string, batchId: string): Promise<s
 
   if (mentions.length === 0) return [];
 
-  // Find users who are members of this batch and were mentioned
   const users = await prisma.user.findMany({
     where: {
       username: { in: mentions },

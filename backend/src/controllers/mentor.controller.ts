@@ -9,7 +9,7 @@ export async function listAssignedBatches(req: Request, res: Response, next: Nex
       include: {
         batch: {
           include: {
-            _count: { select: { memberships: true, messages: true } },
+            _count: { select: { memberships: true, channels: true } },
           },
         },
       },

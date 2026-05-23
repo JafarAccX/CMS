@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 interface Message {
   id: string;
-  batch_id: string;
+  channel_id: string;
   sender_id: string;
   content: string;
   message_type: string;
@@ -19,69 +19,68 @@ interface Message {
 
 interface MessageState {
   messages: Record<string, Message[]>;
-  setMessages: (batchId: string, msgs: Message[]) => void;
-  appendMessage: (batchId: string, msg: Message) => void;
-  prependMessages: (batchId: string, msgs: Message[]) => void;
-  softDelete: (batchId: string, messageId: string) => void;
-  addOptimisticMessage: (batchId: string, msg: Message) => void;
-  removeOptimisticMessage: (batchId: string, tempId: string) => void;
-  updateReactions: (batchId: string, messageId: string, reactions: any[]) => void;
+  setMessages: (channelId: string, msgs: Message[]) => void;
+  appendMessage: (channelId: string, msg: Message) => void;
+  prependMessages: (channelId: string, msgs: Message[]) => void;
+  softDelete: (channelId: string, messageId: string) => void;
+  addOptimisticMessage: (channelId: string, msg: Message) => void;
+  removeOptimisticMessage: (channelId: string, tempId: string) => void;
+  updateReactions: (channelId: string, messageId: string, reactions: any[]) => void;
 }
 
 export const useMessageStore = create<MessageState>()((set) => ({
   messages: {},
 
-  setMessages: (batchId, msgs) =>
-    set((state) => ({ messages: { ...state.messages, [batchId]: msgs } })),
+  setMessages: (channelId, msgs) =>
+    set((state) => ({ messages: { ...state.messages, [channelId]: msgs } })),
 
-  appendMessage: (batchId, msg) =>
+  appendMessage: (channelId, msg) =>
     set((state) => {
-      const current = state.messages[batchId] || [];
-      // If we receive the real message, remove any matching optimistic message
+      const current = state.messages[channelId] || [];
       const filtered = current.filter((m) => !m.isOptimistic || m.tempId !== msg.tempId);
       if (filtered.some((m) => m.id === msg.id)) return state;
-      return { messages: { ...state.messages, [batchId]: [...filtered, msg] } };
+      return { messages: { ...state.messages, [channelId]: [...filtered, msg] } };
     }),
 
-  addOptimisticMessage: (batchId, msg) =>
+  addOptimisticMessage: (channelId, msg) =>
     set((state) => ({
       messages: {
         ...state.messages,
-        [batchId]: [...(state.messages[batchId] || []), { ...msg, isOptimistic: true }],
+        [channelId]: [...(state.messages[channelId] || []), { ...msg, isOptimistic: true }],
       },
     })),
 
-  removeOptimisticMessage: (batchId, tempId) =>
+  removeOptimisticMessage: (channelId, tempId) =>
     set((state) => ({
       messages: {
         ...state.messages,
-        [batchId]: (state.messages[batchId] || []).filter((m) => m.tempId !== tempId),
+        [channelId]: (state.messages[channelId] || []).filter((m) => m.tempId !== tempId),
       },
     })),
 
-  prependMessages: (batchId, msgs) =>
+  prependMessages: (channelId, msgs) =>
     set((state) => ({
       messages: {
         ...state.messages,
-        [batchId]: [...msgs, ...(state.messages[batchId] || [])],
+        [channelId]: [...msgs, ...(state.messages[channelId] || [])],
       },
     })),
 
-  softDelete: (batchId, messageId) =>
+  softDelete: (channelId, messageId) =>
     set((state) => ({
       messages: {
         ...state.messages,
-        [batchId]: (state.messages[batchId] || []).map((m) =>
+        [channelId]: (state.messages[channelId] || []).map((m) =>
           m.id === messageId ? { ...m, is_deleted: true, content: "" } : m
         ),
       },
     })),
 
-  updateReactions: (batchId, messageId, reactions) =>
+  updateReactions: (channelId, messageId, reactions) =>
     set((state) => ({
       messages: {
         ...state.messages,
-        [batchId]: (state.messages[batchId] || []).map((m) =>
+        [channelId]: (state.messages[channelId] || []).map((m) =>
           m.id === messageId ? { ...m, reactions } : m
         ),
       },

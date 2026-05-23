@@ -5,16 +5,16 @@ import { requireParam } from "../utils/params.js";
 
 export async function listMessages(req: Request, res: Response, next: NextFunction) {
   try {
-    const batchId = req.query.batch_id as string;
+    const channelId = (req.query.channel_id as string) || (req.query.channelId as string);
     const cursor = req.query.cursor as string;
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
 
-    if (!batchId) {
-      res.status(400).json({ error: "batch_id is required" });
+    if (!channelId) {
+      res.status(400).json({ error: "channel_id is required" });
       return;
     }
 
-    const result = await messageService.listMessages(batchId, req.user!.id, cursor, limit);
+    const result = await messageService.listMessages(channelId, req.user!.id, cursor, limit);
     res.status(200).json(result);
   } catch (err) {
     next(err);
@@ -39,7 +39,7 @@ export async function createMessage(req: Request, res: Response, next: NextFunct
     }
 
     const message = await messageService.createMessage(
-      data.batch_id,
+      data.channel_id,
       req.user!.id,
       data.content,
       data.message_type || (attachments.length > 0 ? "file" : "text"),

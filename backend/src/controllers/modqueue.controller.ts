@@ -5,8 +5,9 @@ import { requireParam } from "../utils/params.js";
 
 export async function listModQueue(req: Request, res: Response, next: NextFunction) {
   try {
-    const batchId = req.query.batch_id as string;
-    const queue = await modqueueService.listModQueue(batchId, req.user!.id);
+    const batchId = req.query.batch_id as string | undefined;
+    const channelId = req.query.channel_id as string | undefined;
+    const queue = await modqueueService.listModQueue({ batchId, channelId }, req.user!.id);
     res.status(200).json(queue);
   } catch (err) {
     next(err);

@@ -100,6 +100,7 @@ model User {
   memberships         Membership[]
   messages            Message[]          @relation("SenderMessages")
   batches_created     Batch[]            @relation("BatchCreator")
+  channels_created    Channel[]          @relation("ChannelCreator")
   subscription        Subscription?
   admin_logs          AdminLog[]         @relation("ActorLogs")
   notifications       Notification[]
@@ -132,6 +133,7 @@ model Batch {
   description String?
   type        BatchType @default(general)
   is_paid     Boolean   @default(false)
+  is_pinned   Boolean   @default(false)
   created_by  String    @db.Uuid
   created_at  DateTime  @default(now())
 
@@ -139,11 +141,28 @@ model Batch {
   creator         User            @relation("BatchCreator", fields: [created_by], references: [id])
   batch_settings  BatchSettings?
   memberships     Membership[]
+  channels        Channel[]
+
+  @@map("batches")
+}
+
+model Channel {
+  id         String   @id @default(uuid()) @db.Uuid
+  batch_id   String   @db.Uuid
+  name       String
+  is_pinned  Boolean  @default(false)
+  created_by String   @db.Uuid
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  batch           Batch           @relation(fields: [batch_id], references: [id], onDelete: Cascade)
+  creator         User            @relation("ChannelCreator", fields: [created_by], references: [id])
   messages        Message[]
   pinned_messages PinnedMessage[]
   mod_queue       ModQueue[]
 
-  @@map("batches")
+  @@index([batch_id])
+  @@map("channels")
 }
 
 model BatchSettings {
@@ -174,7 +193,7 @@ model Membership {
 
 model Message {
   id           String      @id @default(uuid()) @db.Uuid
-  batch_id     String      @db.Uuid
+  channel_id   String      @db.Uuid
   sender_id    String      @db.Uuid
   content      String
   message_type MessageType @default(text)
@@ -183,15 +202,16 @@ model Message {
   parent_id    String?     @db.Uuid
   created_at   DateTime    @default(now())
 
-  batch       Batch              @relation(fields: [batch_id], references: [id])
-  sender      User               @relation("SenderMessages", fields: [sender_id], references: [id])
-  parent      Message?           @relation("ThreadReplies", fields: [parent_id], references: [id])
-  replies     Message[]          @relation("ThreadReplies")
+  channel     Channel             @relation(fields: [channel_id], references: [id], onDelete: Cascade)
+  sender      User                @relation("SenderMessages", fields: [sender_id], references: [id])
+  parent      Message?            @relation("ThreadReplies", fields: [parent_id], references: [id])
+  replies     Message[]           @relation("ThreadReplies")
   attachments MessageAttachment[]
   pinned      PinnedMessage[]
   mod_queue   ModQueue[]
   reactions   MessageReaction[]
 
+  @@index([channel_id])
   @@map("messages")
 }
 
@@ -252,12 +272,12 @@ model Notification {
 
 model PinnedMessage {
   id         String   @id @default(uuid()) @db.Uuid
-  batch_id   String   @db.Uuid
+  channel_id String   @db.Uuid
   message_id String   @db.Uuid
   pinned_by  String   @db.Uuid
   pinned_at  DateTime @default(now())
 
-  batch   Batch   @relation(fields: [batch_id], references: [id])
+  channel Channel @relation(fields: [channel_id], references: [id], onDelete: Cascade)
   message Message @relation(fields: [message_id], references: [id])
   pinner  User    @relation(fields: [pinned_by], references: [id])
 
@@ -266,7 +286,7 @@ model PinnedMessage {
 
 model ModQueue {
   id          String           @id @default(uuid()) @db.Uuid
-  batch_id    String           @db.Uuid
+  channel_id  String           @db.Uuid
   message_id  String           @db.Uuid
   reported_by String           @db.Uuid
   status      ModQueueStatus   @default(pending)
@@ -276,7 +296,7 @@ model ModQueue {
   created_at  DateTime         @default(now())
   updated_at  DateTime         @updatedAt
 
-  batch    Batch    @relation(fields: [batch_id], references: [id])
+  channel  Channel  @relation(fields: [channel_id], references: [id], onDelete: Cascade)
   message  Message  @relation(fields: [message_id], references: [id])
   reporter User     @relation("Reporter", fields: [reported_by], references: [id])
   reviewer User?    @relation("Reviewer", fields: [reviewed_by], references: [id])

@@ -3,11 +3,14 @@ import { NotFoundError, ForbiddenError } from "../utils/errors.js";
 import { canModerate, canEscalate } from "../utils/permissions.js";
 import { logAdminAction } from "./admin.service.js";
 
-export async function listModQueue(batchId?: string, _userId?: string) {
-
+/**
+ * List mod-queue items. Optional filters by channel or batch.
+ */
+export async function listModQueue(filters?: { channelId?: string; batchId?: string }, _userId?: string) {
   return prisma.modQueue.findMany({
     where: {
-      ...(batchId && { batch_id: batchId }),
+      ...(filters?.channelId && { channel_id: filters.channelId }),
+      ...(filters?.batchId && { channel: { batch_id: filters.batchId } }),
     },
     include: {
       message: {
@@ -15,7 +18,13 @@ export async function listModQueue(batchId?: string, _userId?: string) {
       },
       reporter: { select: { id: true, username: true } },
       reviewer: { select: { id: true, username: true } },
-      batch: { select: { id: true, name: true } },
+      channel: {
+        select: {
+          id: true,
+          name: true,
+          batch: { select: { id: true, name: true } },
+        },
+      },
     },
     orderBy: [
       { priority: "desc" },
@@ -32,12 +41,13 @@ export async function updateModQueueItem(
 ) {
   const queueItem = await prisma.modQueue.findUnique({
     where: { id: queueId },
+    include: { channel: true },
   });
   if (!queueItem) throw new NotFoundError("Mod queue item not found");
 
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const membership = await prisma.membership.findUnique({
-    where: { user_id_batch_id: { user_id: userId, batch_id: queueItem.batch_id } },
+    where: { user_id_batch_id: { user_id: userId, batch_id: queueItem.channel.batch_id } },
   });
 
   if (!canModerate(user, membership)) {
@@ -65,7 +75,8 @@ export async function updateModQueueItem(
   });
 
   await logAdminAction(userId, queueId, `mod_queue_${status}`, {
-    batchId: queueItem.batch_id,
+    channelId: queueItem.channel_id,
+    batchId: queueItem.channel.batch_id,
     messageId: queueItem.message_id,
   });
 
