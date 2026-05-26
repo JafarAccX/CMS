@@ -14,9 +14,13 @@ import { initSockets } from "./sockets/index.js";
 const app = express();
 const server = http.createServer(app);
 
-const allowedOrigins = process.env.CLIENT_ORIGIN
+const envOrigins = process.env.CLIENT_ORIGIN
   ? process.env.CLIENT_ORIGIN.split(",").map((o) => o.trim())
   : ["http://localhost:5173"];
+
+const allowedOrigins = Array.from(
+  new Set([...envOrigins, "http://localhost:5173", "http://localhost:5174", "http://localhost:5175"])
+);
 
 console.log("CLIENT_ORIGIN from env:", process.env.CLIENT_ORIGIN);
 console.log("Parsed allowed origins:", allowedOrigins);

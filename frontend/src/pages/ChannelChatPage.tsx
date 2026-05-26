@@ -375,7 +375,9 @@ export default function ChannelChatPage() {
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 border-b border-hairline bg-surface-50/80 backdrop-blur flex items-center justify-between px-5 shrink-0 z-20">
+        <header
+          className="h-16 border-b border-hairline flex items-center justify-between px-6 shrink-0 z-20"
+          style={{ backgroundColor: "rgba(10,12,17,0.6)", backdropFilter: "blur(24px)" }}>
           <div className="flex items-center gap-2.5">
             <button onClick={() => setIsMobileSidebarOpen(true)} className="p-2 -ml-2 text-dim hover:text-primary lg:hidden">
               <Hash className="w-6 h-6" />
