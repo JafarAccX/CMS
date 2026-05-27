@@ -1,236 +1,439 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import type { KeyboardEvent } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { ArrowLeft, MessageCircle, MoreVertical, Paperclip, Phone, Plus, Search, Send, Smile, Video, X } from "lucide-react";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { useDmStore } from "../store/dmStore";
 import { useUiStore } from "../store/uiStore";
 import { useSocket } from "../hooks/useSocket";
-import { format } from "date-fns";
-import { MessageCircle, Search, Send, Paperclip, ImageIcon, File as FileIcon, X, Loader2, Users, Info, Plus, Check, CheckCheck, Mic, Square, Smile } from "lucide-react";
-import { toast } from "react-hot-toast";
-import { UserProfileSidebar } from "../components/UserProfileSidebar";
-import NotificationDropdown from "../components/NotificationDropdown";
 import TypingIndicator from "../components/TypingIndicator";
-import OnlineStatusDot from "../components/OnlineStatusDot";
+import { figmaGradient } from "../components/FigmaShared";
+
+const roleBadge: Record<string, { bg: string; color: string; label: string }> = {
+  mentor: { bg: "rgba(0,94,100,0.2)", color: "rgb(0,219,232)", label: "MENTOR" },
+  admin: { bg: "rgba(79,124,255,0.15)", color: "#afc6ff", label: "ADMIN" },
+  learner: { bg: "rgba(59,73,94,0.2)", color: "#94a3b8", label: "LEARNER" },
+};
+
+const avatarColors = [
+  "linear-gradient(140deg,#7fe6f0,#2bb8d4 60%,#0e7490)",
+  "linear-gradient(140deg,#ff9d8c,#f56b56 60%,#c9442f)",
+  "linear-gradient(140deg,#b78bff,#7c5cff 60%,#5b3ee0)",
+  "linear-gradient(140deg,#6ee7c7,#14b89a 60%,#0e7e6a)",
+  "linear-gradient(140deg,#ffd58a,#e5a64a 60%,#aa6f1a)",
+  "linear-gradient(140deg,#8aa3ff,#4f6bff 60%,#3940cc)",
+];
+
+function badgeFor(role?: string) {
+  return roleBadge[(role || "learner").toLowerCase()] || roleBadge.learner;
+}
+
+function avatarFor(user: { id?: string; role?: string }, index = 0) {
+  const role = (user.role || "").toLowerCase();
+  if (role === "mentor") return avatarColors[0];
+  if (role === "admin") return avatarColors[1];
+  const seed = user.id ? Array.from(user.id).reduce((sum, char) => sum + char.charCodeAt(0), 0) : index;
+  return avatarColors[seed % avatarColors.length];
+}
+
+function timeLabel(value?: string) {
+  if (!value) return "";
+  try {
+    const date = new Date(value);
+    const diff = Date.now() - date.getTime();
+    const minute = 60 * 1000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+    if (diff < hour) return `${Math.max(1, Math.floor(diff / minute))}m`;
+    if (diff < day) return `${Math.floor(diff / hour)}h`;
+    if (diff < day * 2) return "Yesterday";
+    return format(date, "EEE");
+  } catch {
+    return "";
+  }
+}
+
+function ContactRow({
+  conversation,
+  index,
+  online,
+  active,
+}: {
+  conversation: any;
+  index: number;
+  online: boolean;
+  active: boolean;
+}) {
+  const other = conversation.otherUser;
+  const unread = conversation.unreadCount > 0;
+
+  return (
+    <Link to={`/dm/${conversation.id}`} style={{ textDecoration: "none", display: "block" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "10px 12px",
+          borderRadius: 10,
+          background: active ? "rgba(59,130,255,0.1)" : "transparent",
+          cursor: "pointer",
+          position: "relative",
+          transition: "background 0.14s",
+        }}
+        onMouseEnter={(event) => {
+          if (!active) event.currentTarget.style.background = "rgba(255,255,255,0.04)";
+        }}
+        onMouseLeave={(event) => {
+          if (!active) event.currentTarget.style.background = "transparent";
+        }}
+      >
+        {active && (
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: 3,
+              height: 32,
+              borderRadius: "0 4px 4px 0",
+              background: figmaGradient,
+              boxShadow: "0 0 8px rgba(59,130,255,0.5)",
+            }}
+          />
+        )}
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              background: avatarFor(other, index),
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              fontSize: 15,
+              fontWeight: 700,
+            }}
+          >
+            {other.username?.[0]?.toUpperCase()}
+          </div>
+          {online && (
+            <span
+              style={{
+                position: "absolute",
+                right: 0,
+                bottom: 0,
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                background: "rgb(53,221,61)",
+                border: "2px solid #05070a",
+                boxShadow: "0 0 5px rgba(53,221,61,0.5)",
+              }}
+            />
+          )}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+            <span style={{ color: "#e0e3e6", fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {other.username}
+            </span>
+            <span style={{ color: "#424c64", fontSize: 11, marginLeft: 8, flexShrink: 0 }}>
+              {timeLabel(conversation.updated_at || conversation.lastMessage?.created_at)}
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <p style={{ flex: 1, color: "#6c7793", fontSize: 12, lineHeight: "18px", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", maxWidth: 230 }}>
+              {conversation.lastMessage?.content || `Message ${other.username}`}
+            </p>
+            {unread && (
+              <span
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: "50%",
+                  background: figmaGradient,
+                  color: "#05070a",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  marginLeft: 6,
+                }}
+              >
+                {conversation.unreadCount}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function StartCard({ onNew }: { onNew: () => void }) {
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20 }}>
+      <div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(59,130,255,0.08)", border: "1px solid rgba(59,130,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <MessageCircle size={42} color="rgba(59,130,255,0.42)" strokeWidth={1.4} />
+      </div>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: "#e0e3e6", marginBottom: 8 }}>Your Messages</div>
+        <div style={{ fontSize: 14, color: "#6c7793", lineHeight: 1.6, maxWidth: 280 }}>Send private messages to mentors, learners, and team members.</div>
+      </div>
+      <button
+        type="button"
+        onClick={onNew}
+        style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 8, border: "none", cursor: "pointer", background: figmaGradient, boxShadow: "0 0 14px rgba(59,130,255,0.3)", color: "#05070a", fontSize: 13, fontWeight: 600 }}
+      >
+        <Plus size={14} />
+        New Message
+      </button>
+    </div>
+  );
+}
+
+function MessageBubble({ message, isMe, activeConv, userId }: { message: any; isMe: boolean; activeConv: any; userId?: string }) {
+  const senderName = isMe ? "Me" : message.sender?.username || activeConv.otherUser.username;
+  const avatarUser = isMe ? { id: userId, role: "admin" } : activeConv.otherUser;
+
+  return (
+    <div style={{ display: "flex", gap: 12, flexDirection: isMe ? "row-reverse" : "row", marginBottom: 16 }}>
+      {!isMe && (
+        <div style={{ width: 36, height: 36, borderRadius: "50%", background: avatarFor(avatarUser), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
+          {senderName?.[0]?.toUpperCase()}
+        </div>
+      )}
+      <div className="dm-message-bubble" style={{ maxWidth: "62%", display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
+        {!isMe && <span style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 4 }}>{senderName}</span>}
+        <div
+          style={{
+            borderRadius: isMe ? "16px 0 16px 16px" : "0 16px 16px 16px",
+            background: isMe ? "linear-gradient(135deg,rgba(59,130,255,0.25),rgba(0,219,232,0.15))" : "linear-gradient(rgb(10,14,20),rgb(12,24,37))",
+            border: `1px solid ${isMe ? "rgba(59,130,255,0.3)" : "rgb(30,41,59)"}`,
+            padding: "10px 14px",
+            color: "#e0e3e6",
+            fontSize: 14,
+            lineHeight: 1.6,
+            opacity: message.isOptimistic ? 0.62 : 1,
+          }}
+        >
+          {message.content}
+        </div>
+        <span style={{ fontSize: 10, color: "#424c64", marginTop: 4 }}>{format(new Date(message.created_at), "hh:mm a")}</span>
+      </div>
+    </div>
+  );
+}
+
+function RightUtilityPanel({ activeConv, online }: { activeConv: any; online: boolean }) {
+  const badge = badgeFor(activeConv.otherUser.role);
+  const files = ["hooks-patterns.pdf", "design-system.fig", "notes.md"];
+
+  return (
+    <aside className="dm-right-panel" style={{ width: 280, flexShrink: 0, borderLeft: "1px solid rgba(255,255,255,0.07)", background: "rgba(10,13,18,0.7)", backdropFilter: "blur(12px)", padding: "24px 20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 24, position: "relative", zIndex: 2 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, paddingBottom: 20, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ width: 56, height: 56, borderRadius: "50%", background: avatarFor(activeConv.otherUser), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: "#fff", boxShadow: "0 0 20px rgba(59,130,255,0.2)" }}>
+          {activeConv.otherUser.username?.[0]?.toUpperCase()}
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#e0e3e6" }}>{activeConv.otherUser.username}</div>
+          <span style={{ display: "inline-flex", marginTop: 5, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: badge.bg, color: badge.color, border: `1px solid ${badge.color}33` }}>
+            {badge.label}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: online ? "rgb(53,221,61)" : "#424c64", boxShadow: online ? "0 0 5px rgba(53,221,61,0.5)" : "none" }} />
+          <span style={{ fontSize: 12, color: online ? "rgb(53,221,61)" : "#6c7793" }}>{online ? "Online" : "Offline"}</span>
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#6c7793", marginBottom: 12, paddingBottom: 6, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>Today</div>
+        {[
+          { color: "rgb(59,130,255)", title: "1:1 Mentoring", sub: "with Alex Johnson", time: "2:00 PM" },
+          { color: "rgb(0,219,232)", title: "Course Outline V2", sub: "Pending Approval", action: "Review" },
+        ].map((item) => (
+          <div key={item.title} style={{ borderRadius: 10, background: "rgb(10,12,17)", border: "1px solid rgba(255,255,255,0.08)", padding: "14px 14px 14px 18px", marginBottom: 8, position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, background: item.color, boxShadow: `0 0 10px ${item.color}80` }} />
+            {item.time && <div style={{ fontSize: 10, color: "#6c7793", marginBottom: 2 }}>{item.time}</div>}
+            {item.sub && <div style={{ fontSize: 10, color: item.color, marginBottom: 2 }}>{item.sub}</div>}
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{item.title}</div>
+            {item.action && <button type="button" style={{ marginTop: 6, fontSize: 11, color: item.color, background: "none", border: "none", cursor: "pointer", padding: 0 }}>{item.action} -&gt;</button>}
+          </div>
+        ))}
+      </div>
+
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#6c7793", marginBottom: 12, paddingBottom: 6, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>Shared Files</div>
+        {files.map((file) => (
+          <div key={file} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, marginBottom: 4 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: "rgba(59,130,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "#afc6ff", flexShrink: 0 }}>
+              {file.split(".").pop()?.toUpperCase()}
+            </div>
+            <span style={{ fontSize: 12, color: "#94a3b8", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file}</span>
+          </div>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+function ConversationDrawer({
+  users,
+  search,
+  onSearch,
+  onClose,
+  onStart,
+}: {
+  users: any[];
+  search: string;
+  onSearch: (value: string) => void;
+  onClose: () => void;
+  onStart: (id: string) => void;
+}) {
+  return (
+    <aside
+      className="dm-drawer"
+      style={{
+        width: 330,
+        position: "absolute",
+        right: 14,
+        top: 14,
+        bottom: 14,
+        zIndex: 20,
+        background: "rgba(10,13,18,0.98)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 10,
+        boxShadow: "-30px 0 70px rgba(0,0,0,0.35)",
+        padding: "18px 18px 12px",
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <h2 style={{ color: "#e0e3e6", fontSize: 16, fontWeight: 700 }}>Start your conversation with</h2>
+        <button type="button" onClick={onClose} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", display: "flex" }}>
+          <X size={16} />
+        </button>
+      </div>
+      <div style={{ position: "relative", marginBottom: 14 }}>
+        <Search size={13} color="#424c64" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+        <input
+          value={search}
+          onChange={(event) => onSearch(event.target.value)}
+          placeholder="Find a conversation..."
+          style={{ width: "100%", height: 30, borderRadius: 5, background: "rgb(7,9,13)", border: "1px solid rgb(30,41,59)", color: "#e0e3e6", fontSize: 11, padding: "0 58px 0 30px", fontFamily: "Poppins" }}
+        />
+        <div style={{ position: "absolute", right: 7, top: "50%", transform: "translateY(-50%)", display: "flex", gap: 3 }}>
+          {["Cmd", "K"].map((key) => (
+            <span key={key} style={{ height: 16, minWidth: 16, borderRadius: 3, background: "rgba(50,53,56,0.5)", color: "#424c64", fontSize: 7, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>
+              {key}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, overflowY: "auto", flex: 1, minHeight: 0 }}>
+        {users.map((item, index) => {
+          const badge = badgeFor(item.role);
+          return (
+            <button key={item.id} type="button" onClick={() => onStart(item.id)} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "7px 4px", border: "none", background: "transparent", color: "#e0e3e6", cursor: "pointer", textAlign: "left" }}>
+              <div style={{ width: 28, height: 28, borderRadius: "50%", background: avatarFor(item, index), display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, fontWeight: 700 }}>
+                {item.username?.[0]?.toUpperCase()}
+              </div>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700 }}>{item.username}</span>
+                  <span style={{ borderRadius: 3, padding: "1px 4px", background: badge.bg, color: badge.color, fontSize: 7, fontWeight: 700 }}>{badge.label}</span>
+                </span>
+                <span style={{ display: "block", fontSize: 10, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.email}</span>
+              </span>
+              <span style={{ color: "#94a3b8", fontSize: 15 }}>-&gt;</span>
+            </button>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
 
 export default function DmPage() {
   const { conversationId } = useParams<{ conversationId: string }>();
-  const user = useAuthStore((s) => s.user);
-  const conversations = useDmStore((s) => s.conversations);
-  const setConversations = useDmStore((s) => s.setConversations);
-  const messages = useDmStore((s) => s.messages);
-  const setMessages = useDmStore((s) => s.setMessages);
-  const dmTypingUsers = useUiStore((s) => s.dmTypingUsers);
-  const onlineUsers = useUiStore((s) => s.onlineUsers);
-  const { joinDm, leaveDm, sendDm, startDmTyping, stopDmTyping, markDmRead } = useSocket();
-
-  const [input, setInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
-  const [showUserPicker, setShowUserPicker] = useState(false);
-  const [files, setFiles] = useState<File[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
+  const conversations = useDmStore((state) => state.conversations);
+  const setConversations = useDmStore((state) => state.setConversations);
+  const messages = useDmStore((state) => state.messages);
+  const setMessages = useDmStore((state) => state.setMessages);
+  const dmTypingUsers = useUiStore((state) => state.dmTypingUsers);
+  const onlineUsers = useUiStore((state) => state.onlineUsers);
+  const { joinDm, leaveDm, sendDm, startDmTyping, stopDmTyping, markDmRead } = useSocket();
+  const [input, setInput] = useState("");
+  const [conversationSearch, setConversationSearch] = useState("");
+  const [userSearch, setUserSearch] = useState("");
+  const [showDrawer, setShowDrawer] = useState(false);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
+  const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch conversations
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [conversationId, showDrawer]);
+
   const { data: convData, refetch: refetchConvs } = useQuery({
     queryKey: ["dm-conversations"],
     queryFn: async () => (await api.get("/dm/conversations")).data,
   });
-  useEffect(() => { if (convData) setConversations(convData); }, [convData]);
+  useEffect(() => { if (convData) setConversations(convData); }, [convData, setConversations]);
 
-  // Fetch messages for active conversation
   const { data: msgData } = useQuery({
     queryKey: ["dm-messages", conversationId],
     queryFn: async () => (await api.get(`/dm/conversations/${conversationId}/messages`)).data,
     enabled: !!conversationId,
   });
-  useEffect(() => { if (msgData && conversationId) setMessages(conversationId, msgData.messages); }, [msgData, conversationId]);
+  useEffect(() => { if (msgData && conversationId) setMessages(conversationId, msgData.messages); }, [msgData, conversationId, setMessages]);
 
-  // Fetch users for new conversation
-  const { data: dmUsers } = useQuery({
+  const { data: dmUsers = [] } = useQuery<any[]>({
     queryKey: ["dm-users"],
     queryFn: async () => (await api.get("/dm/users")).data,
-    enabled: showUserPicker,
+    enabled: showDrawer,
   });
 
-  // Socket room join/leave + mark read
   useEffect(() => {
-    if (conversationId) {
-      joinDm(conversationId);
-      markDmRead(conversationId);
-      return () => { leaveDm(conversationId); };
-    }
-  }, [conversationId]);
+    if (!conversationId) return;
+    joinDm(conversationId);
+    markDmRead(conversationId);
+    return () => { leaveDm(conversationId); };
+  }, [conversationId, joinDm, leaveDm, markDmRead]);
 
-  // Auto-scroll
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages[conversationId!]]);
+  useEffect(() => {
+    const container = messagesScrollRef.current;
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+  }, [messages, conversationId]);
 
-  const activeConv = conversations.find((c) => c.id === conversationId);
-  const convMessages = (conversationId ? messages[conversationId] : []) || [];
-  const currentDmTyping = conversationId ? (dmTypingUsers[conversationId] || []) : [];
-
-  const handleSend = async () => {
-    if ((!input.trim() && files.length === 0) || !conversationId || !user || isUploading) return;
-    
-    setIsUploading(true);
-    let uploadedAttachments: any[] = [];
-    
-    try {
-      if (files.length > 0) {
-        const formData = new FormData();
-        files.forEach(f => formData.append("files", f));
-        const res = await api.post("/upload", formData, {
-          headers: { "Content-Type": "multipart/form-data" }
-        });
-        uploadedAttachments = res.data.files;
-      }
-      
-      const content = input.trim();
-      const tempId = Math.random().toString(36).substring(7);
-      
-      useDmStore.getState().addOptimisticMessage(conversationId, {
-        id: tempId,
-        tempId,
-        conversation_id: conversationId,
-        sender_id: user?.id || "",
-        content,
-        is_read: false,
-        created_at: new Date().toISOString(),
-        sender: { id: user?.id || "", username: user?.username || "You", role: user?.role || "learner" },
-        attachments: uploadedAttachments
-      });
-
-      sendDm(conversationId, content, tempId, uploadedAttachments);
-      refetchConvs();
-      setInput("");
-      setFiles([]);
-    } catch (err) {
-      console.error("Upload failed:", err);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  // ── Voice Recording ──────────────────────────────────
-  const startRecording = async () => {
-    if (!conversationId || isUploading) return;
-    
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      toast.error("Recording requires a secure (HTTPS) connection or is not supported by your browser.");
-      return;
-    }
-
-    let stream: MediaStream | null = null;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
-      });
-      
-      const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
-      const supportedType = types.find(t => MediaRecorder.isTypeSupported(t));
-      
-      let recorder: MediaRecorder;
-      try {
-        recorder = new MediaRecorder(stream, supportedType ? { mimeType: supportedType } : undefined);
-      } catch (err) {
-        recorder = new MediaRecorder(stream);
-      }
-
-      chunksRef.current = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      
-      const targetConvId = conversationId;
-      const finalMimeType = recorder.mimeType || 'audio/webm';
-
-      recorder.onstop = async () => {
-        stream?.getTracks().forEach(t => t.stop());
-        const blob = new Blob(chunksRef.current, { type: finalMimeType });
-        if (blob.size < 100) {
-          toast.error("Recording was too short");
-          return;
-        }
-
-        const ext = finalMimeType.includes('mp4') ? 'mp4' : finalMimeType.includes('ogg') ? 'ogg' : 'webm';
-        const file = new window.File([blob], `voice_${Date.now()}.${ext}`, { type: finalMimeType });
-        const formData = new FormData();
-        formData.append('files', file);
-        
-        const tempId = Math.random().toString(36).substring(7);
-
-        try {
-          setIsUploading(true);
-          if (targetConvId && user) {
-            useDmStore.getState().addOptimisticMessage(targetConvId, {
-              id: tempId,
-              tempId,
-              conversation_id: targetConvId,
-              sender_id: user.id,
-              content: "",
-              is_read: false,
-              created_at: new Date().toISOString(),
-              sender: { id: user.id, username: user.username, role: user.role },
-              attachments: [{ id: 'temp-' + tempId, file_url: '', file_name: file.name, file_size: file.size, mime_type: finalMimeType }],
-            });
-          }
-
-          const res = await api.post('/upload', formData, {
-            headers: { "Content-Type": "multipart/form-data" }
-          });
-          if (targetConvId) {
-            sendDm(targetConvId, '', tempId, res.data.files);
-          }
-        } catch (err) { 
-          console.error('Voice upload failed:', err);
-          if (targetConvId) useDmStore.getState().removeOptimisticMessage(targetConvId, tempId);
-          toast.error("Failed to send voice note");
-        }
-        finally { setIsUploading(false); }
-      };
-      
-      recorder.start(1000); // Collect chunks every 1sec
-      mediaRecorderRef.current = recorder;
-      setIsRecording(true);
-      setRecordingTime(0);
-      recordingIntervalRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
-    } catch (err) { 
-      console.error('Mic access error:', err);
-      stream?.getTracks().forEach(t => t.stop());
-      toast.error("Microphone access denied or error occurred");
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      mediaRecorderRef.current.stop();
-    }
-    setIsRecording(false);
-    mediaRecorderRef.current = null;
-    if (recordingIntervalRef.current) {
-      clearInterval(recordingIntervalRef.current);
-      recordingIntervalRef.current = null;
-    }
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const selectedFiles = Array.from(e.target.files);
-      const validFiles = selectedFiles.filter(f => f.size <= 10 * 1024 * 1024);
-      setFiles(prev => [...prev, ...validFiles].slice(0, 10));
-    }
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
+  const activeConv = conversations.find((conversation) => conversation.id === conversationId);
+  const convMessages = conversationId ? messages[conversationId] || [] : [];
+  const currentDmTyping = conversationId ? dmTypingUsers[conversationId] || [] : [];
+  const filteredConversations = conversations.filter((conversation) => {
+    const query = conversationSearch.trim().toLowerCase();
+    return !query || conversation.otherUser.username.toLowerCase().includes(query);
+  });
+  const drawerUsers = dmUsers.filter((item: any) => {
+    const query = userSearch.trim().toLowerCase();
+    return !query || item.username?.toLowerCase().includes(query) || item.email?.toLowerCase().includes(query);
+  });
 
   const handleTyping = () => {
     if (!conversationId) return;
@@ -239,301 +442,172 @@ export default function DmPage() {
     typingTimeout.current = setTimeout(() => stopDmTyping(conversationId), 2000);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  const handleSend = () => {
+    if (!input.trim() || !conversationId || !user) return;
+    const tempId = Math.random().toString(36).slice(2);
+    useDmStore.getState().addOptimisticMessage(conversationId, {
+      id: tempId,
+      tempId,
+      conversation_id: conversationId,
+      sender_id: user.id,
+      content: input.trim(),
+      is_read: false,
+      created_at: new Date().toISOString(),
+      sender: { id: user.id, username: user.username, role: user.role },
+      attachments: [],
+    });
+    sendDm(conversationId, input.trim(), tempId, []);
+    setInput("");
+    refetchConvs();
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      handleSend();
+    }
   };
 
   const startNewConversation = async (targetUserId: string) => {
-    try {
-      const { data } = await api.post("/dm/conversations", { targetUserId });
-      setShowUserPicker(false);
-      refetchConvs();
-      navigate(`/dm/${data.id}`);
-    } catch {}
+    const { data } = await api.post("/dm/conversations", { targetUserId });
+    setShowDrawer(false);
+    refetchConvs();
+    navigate(`/dm/${data.id}`);
   };
 
-  const filteredUsers = dmUsers?.filter((u: any) =>
-    u.username.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase())
-  ) || [];
-
-  const rc = (role: string) => role === "admin" ? "text-[oklch(0.70_0.15_25)]" : role === "mentor" ? "text-[oklch(0.78_0.12_215)]" : role === "moderator" ? "text-[oklch(0.70_0.16_290)]" : "text-muted";
+  const activeOnline = activeConv ? onlineUsers.has(activeConv.otherUser.id) : false;
 
   return (
-    <div className="h-screen flex bg-surface text-primary relative overflow-hidden">
-      {/* Mobile Sidebar Overlay */}
-      {isMobileSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-surface/80 backdrop-blur-sm z-30 lg:hidden"
-          onClick={() => setIsMobileSidebarOpen(false)}
-        />
-      )}
+    <div className="dm-layout" style={{ height: "100%", minHeight: 0, width: "100%", display: "flex", background: "#05070a", color: "#e0e3e6", overflow: "hidden", position: "relative" }}>
+      <aside className={`dm-contact-panel ${activeConv ? "dm-contact-panel--has-active" : ""}`} style={{ width: 384, flexShrink: 0, background: "rgba(16,20,22,0.5)", borderRight: "1px solid rgba(66,71,84,0.15)", backdropFilter: "blur(12px)", display: "flex", flexDirection: "column", position: "relative", zIndex: 2 }}>
+        <div style={{ padding: "24px 24px 16px", borderBottom: "1px solid rgba(66,71,84,0.1)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <button type="button" onClick={() => navigate(-1)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.6)", display: "flex", padding: 4, cursor: "pointer" }}>
+                <ArrowLeft size={16} />
+              </button>
+              <h1 style={{ fontSize: 20, fontWeight: 700, color: "#e0e3e6", letterSpacing: "-0.02em" }}>Direct Messages</h1>
+            </div>
+            <button type="button" onClick={() => setShowDrawer(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 6, border: "1px solid rgba(66,71,84,0.25)", background: "rgba(50,53,56,0.3)", color: "#e0e3e6", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", cursor: "pointer" }}>
+              <Plus size={10} />
+              New
+            </button>
+          </div>
 
-      {/* Left — Conversation List */}
-      <aside className={`
-        ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}
-        lg:translate-x-0 fixed lg:relative inset-y-0 left-0 z-40
-        w-80 bg-surface-50 border-r border-hairline flex flex-col shrink-0
-        transition-transform duration-300 ease-in-out lg:flex
-      `}>
-        <div className="px-6 py-4 border-b border-hairline flex items-center justify-between">
-          <div className="text-sm font-semibold text-primary">Direct messages</div>
-          <button onClick={() => setShowUserPicker(true)} className="btn-surface flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[13px] font-medium" title="New message">
-            <Plus className="w-3.5 h-3.5" /> New message
-          </button>
-        </div>
-        <div className="px-3.5 pt-3 pb-2">
-          <div className="h-8 px-2.5 bg-surface-100 border border-hairline rounded-lg flex items-center gap-2 text-dim">
-            <Search className="w-[13px] h-[13px]" />
-            <span className="text-[12.5px]">Find a conversation…</span>
+          <div style={{ position: "relative" }}>
+            <Search size={16} color="#424c64" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
+            <input
+              value={conversationSearch}
+              onChange={(event) => setConversationSearch(event.target.value)}
+              placeholder="Find a conversation..."
+              style={{ width: "100%", height: 42, borderRadius: 8, border: "1px solid rgb(30,41,59)", background: "rgb(7,9,13)", color: "#e0e3e6", fontFamily: "Poppins", fontSize: 14, padding: "0 72px 0 40px" }}
+            />
+            <div style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", display: "flex", gap: 3 }}>
+              {["Cmd", "K"].map((key) => (
+                <span key={key} style={{ minWidth: 20, height: 22, borderRadius: 4, background: "rgba(50,53,56,0.5)", border: "1px solid rgba(66,71,84,0.2)", color: "#424c64", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{key}</span>
+              ))}
+            </div>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-0.5">
-          {conversations.map((c) => (
-            <Link key={c.id} to={`/dm/${c.id}`} onClick={() => setIsMobileSidebarOpen(false)} className={`flex items-center gap-3 px-2.5 py-2.5 rounded-[10px] transition-all mb-px ${c.id === conversationId ? "bg-accent-100 border border-accent-200" : "hover:bg-surface-100 border border-transparent"}`}>
-              <div className="relative shrink-0">
-                <span className="avatar w-[38px] h-[38px] text-[13px]">
-                  {c.otherUser.username[0].toUpperCase()}
-                </span>
-                <OnlineStatusDot isOnline={onlineUsers.has(c.otherUser.id)} size="sm" className="absolute -bottom-0.5 -right-0.5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-1.5">
-                  <span className={`text-[12.5px] font-semibold truncate flex-1 ${c.id === conversationId ? "text-accent-300" : "text-primary"}`}>{c.otherUser.username}</span>
-                  {c.otherUser.role === "mentor" && <span className="chip chip-mentor text-[9px]">M</span>}
-                </div>
-                {c.lastMessage && <p className="text-[12.5px] text-dim truncate mt-0.5">{c.lastMessage.content}</p>}
-              </div>
-              {c.unreadCount > 0 && <span className="min-w-[18px] h-[18px] px-1.5 bg-accent-400 text-white rounded-full text-[10px] font-bold flex items-center justify-center">{c.unreadCount}</span>}
-            </Link>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px" }}>
+          <div style={{ color: "#6c7793", fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", padding: "8px 4px 6px", marginBottom: 2 }}>Recent</div>
+          {filteredConversations.map((conversation, index) => (
+            <ContactRow key={conversation.id} conversation={conversation} index={index} online={onlineUsers.has(conversation.otherUser.id)} active={conversation.id === conversationId} />
           ))}
-          {conversations.length === 0 && <p className="text-faint text-sm text-center py-8">No conversations yet</p>}
+          {filteredConversations.length === 0 && <p style={{ color: "#424c64", fontSize: 12, textAlign: "center", paddingTop: 24 }}>No conversations yet</p>}
         </div>
       </aside>
 
-      {/* Center — Chat */}
-      <main className="flex-1 flex flex-col min-w-0">
-        {conversationId && activeConv ? (
+      <main className="dm-main" style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", position: "relative", zIndex: 1 }}>
+        {activeConv ? (
           <>
-            <header className="h-[60px] border-b border-hairline bg-surface-50/80 backdrop-blur flex items-center px-6 gap-3 shrink-0">
-              <button
-                onClick={() => setIsMobileSidebarOpen(true)}
-                className="p-2 -ml-2 text-dim hover:text-primary lg:hidden"
-              >
-                <MessageCircle className="w-5 h-5" />
+            <header className="dm-main-header" style={{ height: 64, flexShrink: 0, background: "rgba(10,12,17,0.6)", borderBottom: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(24px)", display: "flex", alignItems: "center", padding: "0 24px", gap: 16 }}>
+              <button type="button" className="dm-chat-back" onClick={() => navigate("/dm")} style={{ background: "transparent", border: "none", color: "#94a3b8", display: "none", padding: 4 }}>
+                <ArrowLeft size={17} />
               </button>
-              <div
-                className="flex items-center gap-3 cursor-pointer group flex-1 min-w-0"
-                onClick={() => setShowProfile(true)}
-              >
-                <div className="relative">
-                  <span className="avatar avatar-indigo w-9 h-9 text-[13px] group-hover:scale-105 transition-transform">
-                    {activeConv.otherUser.username[0].toUpperCase()}
-                  </span>
-                  <OnlineStatusDot isOnline={onlineUsers.has(activeConv.otherUser.id)} size="sm" className="absolute -bottom-0.5 -right-0.5" />
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                <div style={{ width: 38, height: 38, borderRadius: "50%", background: avatarFor(activeConv.otherUser), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#fff" }}>
+                  {activeConv.otherUser.username?.[0]?.toUpperCase()}
                 </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-[19px] font-semibold truncate group-hover:text-accent-300 transition-colors" style={{ letterSpacing: "-0.012em" }}>{activeConv.otherUser.username}</h2>
-                    {activeConv.otherUser.role === "mentor" && <span className="chip chip-mentor">mentor</span>}
-                  </div>
-                  <p className="text-[11px] text-dim font-normal">{onlineUsers.has(activeConv.otherUser.id) ? "Online · typically replies within an hour" : "Offline"}</p>
-                </div>
+                {activeOnline && <div style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: "rgb(53,221,61)", border: "2px solid #05070a" }} />}
               </div>
-              <div className="flex items-center gap-1.5">
-                <NotificationDropdown />
-                <button className="btn-ghost p-2 rounded-lg" aria-label="Search messages"><Search className="w-4 h-4" /></button>
-                <button
-                  onClick={() => setShowProfile(!showProfile)}
-                  className={`btn-ghost p-2 rounded-lg ${showProfile ? 'bg-accent-100 text-accent-300' : ''}`}
-                  aria-label={showProfile ? "Hide profile" : "Show profile"}
-                >
-                  <Info className="w-4 h-4" />
-                </button>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: "#e0e3e6" }}>{activeConv.otherUser.username}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: badgeFor(activeConv.otherUser.role).bg, color: badgeFor(activeConv.otherUser.role).color, border: `1px solid ${badgeFor(activeConv.otherUser.role).color}33` }}>
+                    {badgeFor(activeConv.otherUser.role).label}
+                  </span>
+                </div>
+                <span style={{ fontSize: 12, color: activeOnline ? "rgb(53,221,61)" : "#6c7793" }}>{activeOnline ? "Online" : "Offline"}</span>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {[<Phone size={16} />, <Video size={16} />, <MoreVertical size={16} />].map((icon, index) => (
+                  <button key={index} type="button" style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8" }}>
+                    {icon}
+                  </button>
+                ))}
               </div>
             </header>
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-4 space-y-1">
-              {convMessages.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-16 text-center text-faint">
-                  <div className="w-14 h-14 rounded-full bg-surface-100 flex items-center justify-center mb-3">
-                    <MessageCircle className="w-6 h-6 opacity-30" />
-                  </div>
-                  <p className="text-sm text-dim">No messages yet</p>
-                  <p className="text-xs text-faint mt-1">Say hello or drop a file to get the conversation started.</p>
-                </div>
-              )}
-              {convMessages.map((msg) => {
-                const isMe = String(msg.sender_id).toLowerCase() === String(user?.id).toLowerCase();
-                
-                return (
-                  <div key={msg.id} className={`flex gap-3 py-1 msg-enter ${isMe ? "justify-end" : ""} ${msg.isOptimistic ? "is-optimistic" : ""}`}>
-                    {!isMe && (
-                      <span className="avatar avatar-indigo w-8 h-8 text-xs shrink-0 mt-0.5">
-                        {msg.sender.username[0].toUpperCase()}
-                      </span>
-                    )}
-                    <div className={`max-w-[65%] ${isMe ? "order-first" : ""}`}>
-                      <div className={`px-3.5 py-2.5 rounded-2xl text-[13.5px] leading-relaxed ${isMe ? "bg-gradient-to-b from-accent-300 via-accent-400 to-accent-600 text-white rounded-br-sm shadow-[0_4px_14px_-4px_rgba(79,124,255,0.45)]" : "bg-surface-100 text-primary border border-hairline rounded-bl-sm"}`}>
-                        <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                        {msg.attachments && msg.attachments.length > 0 && (
-                          <div className="mt-2 flex flex-col gap-2">
-                            {msg.attachments.map((a: any) => {
-                              const isImage = a.mime_type?.startsWith('image/');
-                              const isAudio = a.mime_type?.startsWith('audio/');
-                              
-                              if (isAudio) return (
-                                <div key={a.id} className="flex items-center gap-2 p-2 bg-surface-100 rounded-lg border border-hairline">
-                                  <Mic className="w-4 h-4 text-accent-400 shrink-0" />
-                                  {a.file_url ? (
-                                    <audio controls className="h-8 w-44" src={`${import.meta.env.VITE_SOCKET_URL}${a.file_url}`} />
-                                  ) : (
-                                    <div className="flex items-center gap-2 px-2 text-[10px] text-dim">
-                                      <Loader2 className="w-3 h-3 animate-spin" />
-                                      Sending...
-                                    </div>
-                                  )}
-                                </div>
-                              );
 
-                              return isImage ? (
-                                <a key={a.id} href={`${import.meta.env.VITE_SOCKET_URL}${a.file_url}`} target="_blank" rel="noreferrer" className="block w-48 h-auto overflow-hidden rounded-lg hover:opacity-90 transition-opacity">
-                                  <img src={`${import.meta.env.VITE_SOCKET_URL}${a.file_url}`} alt={a.file_name} className="w-full h-auto object-cover" />
-                                </a>
-                              ) : (
-                                <a key={a.id} href={`${import.meta.env.VITE_SOCKET_URL}${a.file_url}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 p-2 bg-surface-100 hover:bg-surface-200 transition-colors border border-hairline rounded-lg text-sm text-accent-200 self-start w-48">
-                                  <FileIcon className="w-4 h-4 shrink-0" />
-                                  <span className="truncate">{a.file_name}</span>
-                                </a>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                      <div className={`flex items-center gap-1 mt-0.5 ${isMe ? "justify-end" : ""}`}>
-                        <p className="text-[10px] text-dim">{format(new Date(msg.created_at), "HH:mm")}</p>
-                        {isMe && (
-                          msg.is_read
-                            ? <CheckCheck className="w-3.5 h-3.5 text-accent-300" />
-                            : <Check className="w-3.5 h-3.5 text-faint" />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              <div ref={messagesEndRef} />
+            <div ref={messagesScrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "24px 24px 8px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 20px" }}>
+                <div style={{ flex: 1, height: 1, background: "rgb(30,41,59)" }} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#424c64", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>Today</span>
+                <div style={{ flex: 1, height: 1, background: "rgb(30,41,59)" }} />
+              </div>
+              {convMessages.map((message) => (
+                <MessageBubble key={message.id} message={message} isMe={String(message.sender_id).toLowerCase() === String(user?.id).toLowerCase()} activeConv={activeConv} userId={user?.id} />
+              ))}
             </div>
-            <TypingIndicator users={currentDmTyping} />
-            <div className="p-4 border-t border-hairline flex flex-col gap-2">
-              {/* Voice Recording Indicator */}
-              {isRecording && (
-                <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 animate-pulse">
-                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                  <span className="text-red-400 text-sm font-medium">Recording... {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}</span>
-                  <button onClick={stopRecording} className="ml-auto p-1.5 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-red-400 transition-colors">
-                    <Square className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
 
-              {files.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-1">
-                  {files.map((file, i) => (
-                    <div key={i} className="flex items-center gap-2 bg-accent-100 text-accent-200 border border-accent-200 px-3 py-1.5 rounded-lg text-sm">
-                      {file.type.startsWith('image/') ? <ImageIcon className="w-4 h-4" /> : <FileIcon className="w-4 h-4" />}
-                      <span className="truncate max-w-[150px]">{file.name}</span>
-                      <button onClick={() => setFiles(files.filter((_, idx) => idx !== i))} className="p-0.5 hover:bg-accent-200 rounded" aria-label="Remove file"><X className="w-3.5 h-3.5" /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="bg-surface-100 border border-hairline-strong rounded-xl shadow-inner-highlight overflow-hidden">
-                <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleFileSelect} accept="*/*" />
-                <div className="px-3.5 py-3">
-                  <textarea
-                    ref={textareaRef}
-                    value={input}
-                    onChange={(e) => { setInput(e.target.value); handleTyping(); }}
-                    onKeyDown={handleKeyDown}
-                    rows={1}
-                    placeholder={`Message ${activeConv?.otherUser?.username || ""}…`}
-                    className="w-full bg-transparent text-primary placeholder-faint resize-none focus:outline-none text-[13.5px] leading-relaxed"
-                    disabled={isUploading}
-                  />
-                </div>
-                <div className="flex items-center gap-1 px-2 py-1.5 border-t border-hairline">
-                  <button onClick={() => fileInputRef.current?.click()} className="btn-ghost p-1.5 rounded-lg" disabled={isUploading} aria-label="Attach file">
-                    <Paperclip className="w-4 h-4" />
+            <TypingIndicator users={currentDmTyping} />
+            <div style={{ padding: "12px 20px 20px", flexShrink: 0 }}>
+              <div style={{ borderRadius: 12, background: "rgba(5,7,10,0.3)", border: "1px solid rgba(255,255,255,0.05)", backdropFilter: "blur(20px)", padding: 4 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px" }}>
+                  <button type="button" style={{ color: "#6c7793", background: "none", border: "none", cursor: "pointer", display: "flex", padding: 4 }}>
+                    <Paperclip size={15} />
                   </button>
-                  <button className="btn-ghost p-1.5 rounded-lg" aria-label="Insert emoji"><Smile className="w-4 h-4" /></button>
-                  {!isRecording && (
-                    <button onClick={startRecording} className="btn-ghost p-1.5 rounded-lg" title="Record voice note">
-                      <Mic className="w-4 h-4" />
-                    </button>
-                  )}
-                  <span className="flex-1" />
-                  <button onClick={handleSend} disabled={(!input.trim() && files.length === 0) || isUploading} className="btn-primary flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[13px] disabled:opacity-40">
-                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Send className="w-3.5 h-3.5" /> Send</>}
+                  <textarea
+                    value={input}
+                    onChange={(event) => {
+                      setInput(event.target.value);
+                      handleTyping();
+                    }}
+                    onKeyDown={handleKeyDown}
+                    placeholder={`Message ${activeConv.otherUser.username}...`}
+                    rows={1}
+                    style={{ flex: 1, resize: "none", background: "none", border: "none", color: "#e0e3e6", fontSize: 14, lineHeight: 1.6, padding: "0 4px", fontFamily: "Poppins" }}
+                  />
+                  <button type="button" style={{ color: "#6c7793", background: "none", border: "none", cursor: "pointer", display: "flex", padding: 4 }}>
+                    <Smile size={16} />
+                  </button>
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 12px 8px" }}>
+                  <button type="button" onClick={handleSend} disabled={!input.trim()} style={{ display: "flex", alignItems: "center", gap: 6, border: "none", borderRadius: 6, background: figmaGradient, color: "#05070a", padding: "6px 16px", fontSize: 12, fontWeight: 600, cursor: input.trim() ? "pointer" : "not-allowed", opacity: input.trim() ? 1 : 0.5 }}>
+                    <Send size={14} />
+                    Send
                   </button>
                 </div>
               </div>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-faint bg-surface-50/10">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-surface-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <MessageCircle className="w-8 h-8 opacity-20" />
-              </div>
-              <p className="text-sm">Select a conversation to start chatting</p>
-              <button onClick={() => setShowUserPicker(true)} className="btn-primary mt-4 px-4 py-2 text-sm font-medium rounded-lg transition-all">
-                Start a conversation
-              </button>
-            </div>
-          </div>
+          <StartCard onNew={() => setShowDrawer(true)} />
+        )}
+
+        {showDrawer && (
+          <ConversationDrawer
+            users={drawerUsers}
+            search={userSearch}
+            onSearch={setUserSearch}
+            onClose={() => setShowDrawer(false)}
+            onStart={startNewConversation}
+          />
         )}
       </main>
 
-      {/* Profile Sidebar */}
-      {showProfile && activeConv && (
-        <UserProfileSidebar 
-          user={activeConv.otherUser} 
-          isOnline={onlineUsers.has(activeConv.otherUser.id)}
-          onClose={() => setShowProfile(false)} 
-          onMessage={() => setShowProfile(false)} 
-        />
-      )}
-
-      {/* User Picker Modal */}
-      {showUserPicker && (
-        <div className="fixed inset-0 bg-surface/80 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowUserPicker(false)}>
-          <div className="bg-surface-50 border border-hairline rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-primary"><Users className="w-5 h-5 text-accent-300" />New Conversation</h3>
-            <div className="relative mb-4">
-              <Search className="w-4 h-4 text-faint absolute left-3 top-1/2 -translate-y-1/2" />
-              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search users..." className="w-full pl-10 pr-4 py-2.5 bg-surface-100 border border-hairline-strong rounded-lg text-primary placeholder-faint focus:outline-none focus:ring-2 focus:ring-accent-400/30 text-sm" />
-            </div>
-            <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-1">
-              {filteredUsers.map((u: any) => (
-                <button key={u.id} onClick={() => startNewConversation(u.id)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-100 transition-all text-left">
-                  <div className="relative">
-                    <span className="avatar avatar-indigo w-8 h-8 text-xs">
-                      {u.username[0].toUpperCase()}
-                    </span>
-                    <OnlineStatusDot isOnline={onlineUsers.has(u.id)} size="sm" className="absolute -bottom-0.5 -right-0.5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-sm text-primary font-medium">{u.username}</span>
-                    <span className={`ml-2 text-[10px] uppercase ${rc(u.role)}`}>{u.role}</span>
-                    <p className="text-xs text-faint truncate">{u.email}</p>
-                  </div>
-                </button>
-              ))}
-              {filteredUsers.length === 0 && <p className="text-faint text-sm text-center py-4">No users found</p>}
-            </div>
-          </div>
-        </div>
-      )}
+      {activeConv && <RightUtilityPanel activeConv={activeConv} online={activeOnline} />}
     </div>
   );
 }

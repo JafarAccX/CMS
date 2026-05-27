@@ -9,7 +9,9 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Modal, ModalHeader, ModalBody, ModalFooter } from "../components/Modal";
-import { FormField, FormTextarea, FormSelect } from "../components/FormField";
+import { FormTextarea } from "../components/FormField";
+import NewUserModal from "../components/NewUserModal";
+import CreateBatchModal, { type CreateBatchPayload } from "../components/CreateBatchModal";
 
 type Tab = "users" | "batches" | "logs" | "modqueue";
 
@@ -50,7 +52,6 @@ export default function AdminPage() {
   const [showManageMembers] = useState<string | null>(null);
   const [userFilter, setUserFilter] = useState<string>("all");
   const [userSearch, setUserSearch] = useState("");
-  const [newBatch, setNewBatch] = useState({ name: "", description: "", type: "public", is_paid: false });
   const [newUser, setNewUser] = useState({ username: "", email: "", phone: "", password: "", role: "learner" });
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [broadcastContent, setBroadcastContent] = useState("");
@@ -68,7 +69,27 @@ export default function AdminPage() {
 
   const banMutation = useMutation({ mutationFn: (id: string) => api.patch(`/admin/users/${id}/ban`), onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }) });
   const roleMutation = useMutation({ mutationFn: ({ id, role }: { id: string; role: string }) => api.patch(`/admin/users/${id}/role`, { role }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-users"] }); toast.success("Role updated"); } });
-  const createBatchMutation = useMutation({ mutationFn: (data: typeof newBatch) => api.post("/batches", data), onSuccess: () => { qc.invalidateQueries({ queryKey: ["batches"] }); setShowCreateBatch(false); setNewBatch({ name: "", description: "", type: "public", is_paid: false }); toast.success("Batch created"); } });
+  const createBatchMutation = useMutation({
+    mutationFn: async (payload: CreateBatchPayload) => {
+      const { data } = await api.post("/batches", {
+        name: payload.name.trim(),
+        description: payload.description.trim(),
+        type: payload.is_paid ? "paid" : payload.type,
+        is_paid: payload.is_paid,
+      });
+
+      const extraChannels = payload.channels.filter((channel) => channel && channel !== "general");
+      await Promise.allSettled(extraChannels.map((channel) => api.post(`/batches/${data.id}/channels`, { name: channel })));
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["batches"] });
+      qc.invalidateQueries({ queryKey: ["admin-stats"] });
+      setShowCreateBatch(false);
+      toast.success("Batch created");
+    },
+    onError: (error: any) => toast.error(error?.response?.data?.error || "Failed to create batch"),
+  });
   const createUserMutation = useMutation({ mutationFn: (data: typeof newUser) => api.post("/admin/users", data), onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-users"] }); qc.invalidateQueries({ queryKey: ["admin-stats"] }); setShowCreateUser(false); setNewUser({ username: "", email: "", phone: "", password: "", role: "learner" }); toast.success("User created successfully"); } });
   const resolveMutation = useMutation({ mutationFn: ({ id, status }: { id: string; status: string }) => api.patch(`/mod-queue/${id}`, { status }), onSuccess: () => qc.invalidateQueries({ queryKey: ["mod-queue"] }) });
   const togglePinBatch = useMutation({ mutationFn: (batchId: string) => api.post(`/batches/${batchId}/pin`), onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-pinned"] }); qc.invalidateQueries({ queryKey: ["batches"] }); } });
@@ -89,11 +110,11 @@ export default function AdminPage() {
   return (
     <>
       {/* ── Glassmorphic Header ── */}
-      <header className="h-16 flex-shrink-0 border-b border-hairline flex items-center px-8 gap-4 sticky top-0 z-20"
+      <header className="app-topbar h-16 flex-shrink-0 border-b border-hairline flex items-center px-8 gap-4 sticky top-0 z-20"
         style={{ backgroundColor: "rgba(10,12,17,0.6)", backdropFilter: "blur(24px)" }}>
         <h1 className="text-xl font-bold text-primary tracking-tight">Dashboard</h1>
         <div className="flex-1 flex justify-center">
-          <div className="relative w-[480px]">
+          <div className="app-topbar-search relative w-[480px]">
             <div className="w-full h-10 rounded-md flex items-center px-10 border border-hairline" style={{ backgroundColor: "rgb(10,13,18)" }}>
               <span className="text-sm text-faint select-none">Ask AI or search workspace… (Cmd+K)</span>
             </div>
@@ -101,7 +122,7 @@ export default function AdminPage() {
             <Sparkles className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-accent-400 pointer-events-none" />
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="app-topbar-actions flex items-center gap-2">
           <button onClick={() => setShowBroadcast(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-black"
             style={{ background: "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)", boxShadow: "0 0 10px rgba(59,130,255,0.3)" }}>
@@ -109,12 +130,12 @@ export default function AdminPage() {
           </button>
           <button className="w-8 h-8 flex items-center justify-center rounded-lg text-dim hover:text-primary transition-colors"><Settings className="w-4 h-4" /></button>
           <div className="w-px h-5 bg-hairline mx-1" />
-          <div className="w-8 h-8 rounded-full bg-[rgb(45,103,107)] border border-hairline" />
+          <Link to="/profile" aria-label="Open profile" className="w-8 h-8 rounded-full bg-[rgb(45,103,107)] border border-hairline cursor-pointer" />
         </div>
       </header>
 
       {/* ── Scrollable Content ── */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-8 py-8">
+      <div className="page-scroll-content flex-1 overflow-y-auto custom-scrollbar px-8 py-8">
         {/* Admin Insights */}
         <p className="t-overline text-dim mb-4">ADMIN INSIGHTS</p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -130,7 +151,7 @@ export default function AdminPage() {
         </div>
 
         {/* Controls row */}
-        <div className="rounded-xl border border-[rgb(30,41,59)] p-3 flex items-center justify-between mb-0"
+        <div className="responsive-controls rounded-xl border border-[rgb(30,41,59)] p-3 flex items-center justify-between mb-0"
           style={{ backgroundColor: "rgb(16,21,29)" }}>
           {/* Tabs */}
           <div className="flex items-center gap-1 p-1.5 rounded-lg border border-[rgb(30,41,59)]" style={{ backgroundColor: "rgb(5,7,10)" }}>
@@ -178,7 +199,7 @@ export default function AdminPage() {
 
         {/* ── Users Tab ── */}
         {tab === "users" && (
-          <div className="rounded-b-xl border border-[rgb(30,41,59)] border-t-0 overflow-hidden" style={{ backgroundColor: "rgb(10,13,18)" }}>
+          <div className="responsive-table-wrap rounded-b-xl border border-[rgb(30,41,59)] border-t-0 overflow-hidden" style={{ backgroundColor: "rgb(10,13,18)" }}>
             <table className="w-full border-collapse text-sm min-w-[760px]">
               <thead>
                 <tr className="border-b border-[rgb(30,41,59)]">
@@ -328,7 +349,7 @@ export default function AdminPage() {
 
         {/* ── Logs Tab ── */}
         {tab === "logs" && (
-          <div className="rounded-b-xl border border-[rgb(30,41,59)] border-t-0 overflow-hidden" style={{ backgroundColor: "rgb(10,13,18)" }}>
+          <div className="responsive-table-wrap rounded-b-xl border border-[rgb(30,41,59)] border-t-0 overflow-hidden" style={{ backgroundColor: "rgb(10,13,18)" }}>
             <div className="px-6 py-4 border-b border-[rgb(30,41,59)]"><h3 className="t-overline text-dim">Administrative Audit Logs</h3></div>
             <table className="w-full text-sm min-w-[700px]">
               <thead><tr className="border-b border-[rgb(30,41,59)]">
@@ -384,46 +405,23 @@ export default function AdminPage() {
       </div>
 
       {/* ── Modals ── */}
-      <Modal open={showCreateBatch} onClose={() => setShowCreateBatch(false)}>
-        <ModalHeader title="Create New Batch" onClose={() => setShowCreateBatch(false)} />
-        <ModalBody>
-          <FormField label="Batch Name" value={newBatch.name} onChange={e => setNewBatch({ ...newBatch, name: e.target.value })} placeholder="e.g. React Deep Dive 2024" />
-          <FormTextarea label="Description" value={newBatch.description} onChange={e => setNewBatch({ ...newBatch, description: e.target.value })} placeholder="Briefly describe the batch's focus..." className="h-24" />
-          <div className="grid grid-cols-2 gap-4">
-            <FormSelect label="Visibility" value={newBatch.type} onChange={e => setNewBatch({ ...newBatch, type: e.target.value })}>
-              <option value="public">Public</option><option value="private">Private</option><option value="hidden">Hidden</option>
-            </FormSelect>
-            <div className="flex flex-col justify-end pb-3">
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <div className={`w-5 h-5 rounded border transition-all flex items-center justify-center ${newBatch.is_paid ? "bg-accent-400 border-accent-400" : "border-hairline-strong"}`} onClick={() => setNewBatch({ ...newBatch, is_paid: !newBatch.is_paid })}>
-                  {newBatch.is_paid && <Check className="w-3 h-3 text-white font-bold" />}
-                </div>
-                <span className="text-sm font-medium text-muted">Paid Access</span>
-              </label>
-            </div>
-          </div>
-        </ModalBody>
-        <ModalFooter>
-          <button onClick={() => setShowCreateBatch(false)} className="flex-1 py-3 text-sm font-bold text-dim hover:text-primary">Cancel</button>
-          <button onClick={() => createBatchMutation.mutate(newBatch)} disabled={!newBatch.name} className="btn-primary flex-2 px-8 py-3 rounded-xl font-bold disabled:opacity-50">Create Batch</button>
-        </ModalFooter>
-      </Modal>
+      {showCreateBatch && (
+        <CreateBatchModal
+          onClose={() => setShowCreateBatch(false)}
+          onSubmit={(payload) => createBatchMutation.mutate(payload)}
+          pending={createBatchMutation.isPending}
+        />
+      )}
 
-      <Modal open={showCreateUser} onClose={() => setShowCreateUser(false)}>
-        <ModalHeader title="Create New User" onClose={() => setShowCreateUser(false)} />
-        <ModalBody>
-          <FormField label="Username" type="text" value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} placeholder="johndoe" />
-          <FormField label="Email Address" type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="john@example.com" />
-          <FormField label="Phone Number" type="tel" value={newUser.phone} onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })} placeholder="+91 98765 43210" />
-          <FormField label="Initial Password" type="text" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="Set password..." className="font-mono" />
-          <FormSelect label="Initial Role" value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}>
-            <option value="learner">Learner</option><option value="mentor">Mentor</option><option value="admin">Administrator</option>
-          </FormSelect>
-          <button onClick={() => createUserMutation.mutate(newUser)} disabled={createUserMutation.isPending || !newUser.username || !newUser.email || !newUser.phone || !newUser.password} className="btn-primary w-full py-3.5 rounded-xl font-bold disabled:opacity-50 mt-2">
-            {createUserMutation.isPending ? "Creating…" : "Create User Account"}
-          </button>
-        </ModalBody>
-      </Modal>
+      {showCreateUser && (
+        <NewUserModal
+          form={newUser}
+          pending={createUserMutation.isPending}
+          onChange={setNewUser}
+          onClose={() => setShowCreateUser(false)}
+          onSubmit={() => createUserMutation.mutate(newUser)}
+        />
+      )}
 
       <Modal open={showBroadcast} onClose={() => setShowBroadcast(false)}>
         <ModalHeader title="Broadcast Announcement" onClose={() => setShowBroadcast(false)} icon={<Megaphone className="w-5 h-5 text-accent-300" />} />

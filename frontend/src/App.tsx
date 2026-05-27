@@ -7,6 +7,7 @@ import AppShell from "./components/AppShell";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
+import BatchesPage from "./pages/BatchesPage";
 import BatchPage from "./pages/BatchPage";
 import ChannelChatPage from "./pages/ChannelChatPage";
 import AdminPage from "./pages/AdminPage";
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/" element={<Shell><DashboardPage /></Shell>} />
+        <Route path="/batches" element={<Shell><BatchesPage /></Shell>} />
         <Route path="/batch/:id" element={<Shell><BatchPage /></Shell>} />
         <Route path="/batch/:batchId/channel/:channelId" element={<Shell><ChannelChatPage /></Shell>} />
         <Route path="/admin" element={<Shell><RoleRoute roles={["admin"]}><AdminPage /></RoleRoute></Shell>} />

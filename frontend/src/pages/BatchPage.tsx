@@ -36,7 +36,7 @@ export default function BatchPage() {
   return (
     <>
       {/* ── Glassmorphic header ── */}
-      <header className="h-16 flex-shrink-0 border-b border-hairline flex items-center px-8 gap-4 sticky top-0 z-20"
+      <header className="app-topbar h-16 flex-shrink-0 border-b border-hairline flex items-center px-8 gap-4 sticky top-0 z-20"
         style={{ backgroundColor: "rgba(10,12,17,0.6)", backdropFilter: "blur(24px)" }}>
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-2 text-dim hover:text-primary text-sm transition-colors">
@@ -47,7 +47,7 @@ export default function BatchPage() {
           {batch?.is_pinned && <span className="chip chip-accent text-[9px] flex items-center gap-1"><Pin className="w-2.5 h-2.5" />Pinned</span>}
         </div>
         <div className="flex-1 flex justify-center">
-          <div className="relative w-[480px]">
+          <div className="app-topbar-search relative w-[480px]">
             <div className="w-full h-10 rounded-md flex items-center px-10 border border-hairline" style={{ backgroundColor: "rgb(10,13,18)" }}>
               <span className="text-sm text-faint select-none">Ask AI or search workspace… (Cmd+K)</span>
             </div>
@@ -57,7 +57,7 @@ export default function BatchPage() {
             <Sparkles className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-accent-400 pointer-events-none" />
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="app-topbar-actions flex items-center gap-2">
           <button className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-black"
             style={{ background: "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)", boxShadow: "0 0 10px rgba(59,130,255,0.3)" }}>
             <Sparkles className="w-3.5 h-3.5" /> Ask Mentor
@@ -65,12 +65,12 @@ export default function BatchPage() {
           <NotificationDropdown />
           <button className="w-8 h-8 flex items-center justify-center rounded-lg text-dim hover:text-primary transition-colors"><Settings className="w-4 h-4" /></button>
           <div className="w-px h-5 bg-hairline mx-1" />
-          <div className="w-8 h-8 rounded-full bg-[rgb(45,103,107)] border border-hairline" />
+          <Link to="/profile" aria-label="Open profile" className="w-8 h-8 rounded-full bg-[rgb(45,103,107)] border border-hairline cursor-pointer" />
         </div>
       </header>
 
       {/* ── Scrollable content ── */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="page-scroll-content flex-1 overflow-y-auto custom-scrollbar">
         <div className="max-w-4xl mx-auto px-8 py-8">
 
           {/* Batch info hero */}

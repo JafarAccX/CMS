@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import api from "../api/client";
@@ -7,87 +8,236 @@ import { useBatchStore } from "../store/batchStore";
 import { useNotificationStore } from "../store/notificationStore";
 import { useSocket } from "../hooks/useSocket";
 import {
-  Hash, MessageSquare, Users, Lock, Shield, BookOpen,
-  ArrowRight, Sparkles,
-  Video, Calendar, Settings,
+  ArrowRight,
+  BookOpen,
+  Calendar,
+  Folder,
+  Hash,
+  MessageSquare,
+  Shield,
+  TrendingUp,
+  Users,
+  Video,
 } from "lucide-react";
-import NotificationDropdown from "../components/NotificationDropdown";
+import { FigmaAvatarStack, FigmaOverline, FigmaStatCard, FigmaTopBar, figmaGradient } from "../components/FigmaShared";
 
-// ── Stat card ─────────────────────────────────────────────────────
-function StatCard({ icon, value, label, iconBg }: { icon: React.ReactNode; value: string; label: string; iconBg: string }) {
-  return (
-    <div className="relative overflow-hidden rounded-xl border border-hairline p-5 flex-1 min-w-0" style={{ backgroundColor: "rgb(10,13,18)" }}>
-      <div className="pointer-events-none absolute -right-4 -top-10 w-24 h-24 rounded-full opacity-20 blur-2xl"
-        style={{ background: "linear-gradient(rgb(62,56,224),rgb(0,219,232))" }} />
-      <div className="flex items-center gap-4 mb-3 relative">
-        <div className="w-8 h-8 rounded flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: iconBg }}>
-          <span style={{ background: "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", display: "flex" }}>{icon}</span>
-        </div>
-        <span className="text-2xl font-bold text-white leading-none">{value}</span>
-      </div>
-      <p className="text-[11px] font-semibold tracking-widest text-muted uppercase relative">{label}</p>
-    </div>
-  );
+const avatarColors = ["#3b82ff", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#00dbe8"];
+
+function colorsForBatch(index: number, count: number) {
+  const amount = Math.max(2, Math.min(4, count || 3));
+  return Array.from({ length: amount }, (_, offset) => avatarColors[(index + offset) % avatarColors.length]);
 }
 
-// ── Room row ──────────────────────────────────────────────────────
-function RoomRow({ batch }: { batch: any }) {
+function RoomRow({ batch, index }: { batch: any; index: number }) {
   const members = batch._count?.memberships || 0;
   const channels = batch._count?.channels || 0;
+  const isOpen = batch.type === "general" || batch.type === "public";
+  const href = batch.hasAccess || isOpen ? `/batch/${batch.id}` : "/subscription";
+
   return (
-    <Link
-      to={batch.hasAccess ? `/batch/${batch.id}` : "#"}
-      className="block rounded-xl border border-hairline p-4 transition-all hover:-translate-y-px hover:border-hairline-strong group"
-      style={{ backgroundColor: "rgb(10,12,17)" }}
-    >
-      <div className="flex items-center gap-4">
-        <div className="w-10 h-10 rounded-lg border border-hairline flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: "rgb(5,7,10)" }}>
-          <span className="text-[16px] text-muted font-medium leading-none">#</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[14px] font-semibold text-primary group-hover:text-accent-300 transition-colors">{batch.name}</span>
-            <span className="text-[10px] border border-hairline px-1.5 py-0.5 rounded text-dim" style={{ backgroundColor: "rgb(5,7,10)" }}>
-              {batch.type}
-            </span>
+    <Link to={href} style={{ textDecoration: "none", display: "block" }}>
+      <div
+        style={{
+          borderRadius: 12,
+          backgroundColor: "rgb(10,12,17)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          padding: "16px 20px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          transition: "background 0.14s, border-color 0.14s",
+          cursor: "pointer",
+          marginBottom: 8,
+        }}
+        onMouseEnter={(event) => {
+          event.currentTarget.style.background = "rgb(13,17,24)";
+          event.currentTarget.style.borderColor = "rgba(255,255,255,0.14)";
+        }}
+        onMouseLeave={(event) => {
+          event.currentTarget.style.background = "rgb(10,12,17)";
+          event.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 8,
+              backgroundColor: "rgb(5,7,10)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ fontSize: 16, color: "#94a3b8", fontWeight: 500 }}>#</span>
           </div>
-          <p className="text-[13px] text-muted truncate">{batch.description || "No description"}</p>
-          <div className="flex items-center gap-4 mt-1 text-[11px] text-dim">
-            <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" />{channels} channels</span>
-            <span className="flex items-center gap-1"><Users className="w-3 h-3" />{members} members</span>
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 ml-1" style={{ boxShadow: "0 0 5px rgba(53,221,61,0.5)" }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+              <span style={{ fontSize: 14, fontWeight: 500, color: "#e0e3e6" }}>{batch.name}</span>
+              <span
+                style={{
+                  fontSize: 10,
+                  color: "#94a3b8",
+                  background: "rgb(5,7,10)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 4,
+                  padding: "1px 6px",
+                  textTransform: "capitalize",
+                }}
+              >
+                {isOpen ? "Open" : "Course"}
+              </span>
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                color: "#94a3b8",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                maxWidth: 380,
+              }}
+            >
+              {batch.description || "Welcome to this learning room."}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+              <span style={{ fontSize: 12, color: "#6c7793", fontWeight: 500 }}>
+                {channels || members || 0} messages
+              </span>
+              {(batch.hasAccess || isOpen) && (
+                <div
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: "rgb(43,206,52)",
+                    boxShadow: "0 0 5px rgba(43,206,52,0.5)",
+                  }}
+                />
+              )}
+            </div>
           </div>
         </div>
-        <ArrowRight className="w-4 h-4 text-dim group-hover:text-accent-400 transition-colors flex-shrink-0" />
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
+          <FigmaAvatarStack colors={colorsForBatch(index, members)} />
+          <button
+            type="button"
+            style={{
+              padding: "6px 14px",
+              borderRadius: 6,
+              border: "1px solid rgb(30,41,59)",
+              background: "transparent",
+              color: "#94a3b8",
+              fontSize: 12,
+              fontFamily: "Poppins",
+              cursor: "pointer",
+              transition: "all 0.14s",
+              whiteSpace: "nowrap",
+            }}
+            onMouseEnter={(event) => {
+              event.currentTarget.style.background = "rgba(59,130,255,0.1)";
+              event.currentTarget.style.color = "#afc6ff";
+              event.currentTarget.style.borderColor = "rgba(59,130,255,0.3)";
+            }}
+            onMouseLeave={(event) => {
+              event.currentTarget.style.background = "transparent";
+              event.currentTarget.style.color = "#94a3b8";
+              event.currentTarget.style.borderColor = "rgb(30,41,59)";
+            }}
+          >
+            {isOpen ? "Join" : "Open"} -&gt;
+          </button>
+        </div>
       </div>
     </Link>
   );
 }
 
-// ── Mentorship card ───────────────────────────────────────────────
 function MentorshipCard() {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-hairline p-5" style={{ backgroundColor: "rgb(10,13,18)" }}>
-      <div className="pointer-events-none absolute right-0 top-0 w-20 h-20 rounded-full opacity-10 blur-xl"
-        style={{ background: "linear-gradient(rgb(0,219,232),rgb(59,130,255))" }} />
-      <div className="flex items-center justify-between mb-4">
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center border"
-          style={{ backgroundColor: "rgba(0,219,232,0.1)", borderColor: "rgba(0,219,232,0.2)" }}>
-          <Video className="w-4 h-4 text-cyan-400" />
+    <div
+      style={{
+        borderRadius: 12,
+        backgroundColor: "rgb(10,13,18)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        padding: 20,
+        overflow: "hidden",
+        position: "relative",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          right: -20,
+          top: -30,
+          width: 80,
+          height: 80,
+          borderRadius: "50%",
+          background: "linear-gradient(rgb(0,219,232) 0%,rgb(59,130,255) 100%)",
+          opacity: 0.15,
+          filter: "blur(20px)",
+        }}
+      />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            backgroundColor: "rgba(0,219,232,0.1)",
+            border: "1px solid rgba(0,219,232,0.2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "rgb(0,219,232)",
+          }}
+        >
+          <Video size={15} />
         </div>
-        <span className="text-[11px] text-dim">Starts 2:00 PM</span>
+        <span style={{ fontSize: 10, color: "#94a3b8" }}>Starts 2:00 PM</span>
       </div>
-      <div className="mb-4">
-        <h3 className="text-[18px] font-semibold text-white leading-tight">Live Session</h3>
-        <p className="text-[13px] text-muted mt-1 leading-relaxed">Advanced Hooks Deep Dive.</p>
+      <div style={{ marginBottom: 4 }}>
+        <div style={{ fontSize: 18, color: "#fff", fontWeight: 600, lineHeight: "27px" }}>Live Session</div>
+        <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: "19.5px", marginTop: 4 }}>
+          Advanced Hooks Deep Dive.
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <div className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold text-white"
-          style={{ background: "linear-gradient(140deg,#7fe6f0,#2bb8d4 60%,#0e7490)" }}>M</div>
-        <span className="text-[12px] text-dim flex-1">with mentor</span>
-        <button className="px-3 py-1.5 rounded-md text-[12px] font-semibold border-none text-black"
-          style={{ background: "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)" }}>
+      <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 8 }}>
+        <div
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: "50%",
+            background: "linear-gradient(140deg,#7fe6f0,#2bb8d4 60%,#0e7490)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 10,
+            fontWeight: 700,
+            color: "#fff",
+          }}
+        >
+          M
+        </div>
+        <span style={{ fontSize: 12, color: "#94a3b8" }}>with mentor</span>
+        <div style={{ flex: 1 }} />
+        <button
+          type="button"
+          style={{
+            padding: "5px 12px",
+            borderRadius: 6,
+            border: "none",
+            background: figmaGradient,
+            color: "#05070a",
+            fontSize: 11,
+            fontWeight: 600,
+            fontFamily: "Poppins",
+            cursor: "pointer",
+          }}
+        >
           Join Now
         </button>
       </div>
@@ -95,36 +245,106 @@ function MentorshipCard() {
   );
 }
 
-// ── Upcoming item ─────────────────────────────────────────────────
-function UpcomingItem({ title, time, type, color }: { title: string; time: string; type: string; color: string }) {
+function UpcomingCard({ title, time, type, color }: { title: string; time: string; type: string; color: string }) {
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg border border-hairline mb-2 transition-all hover:border-hairline-strong"
-      style={{ backgroundColor: "rgb(10,13,18)" }}>
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: `${color}22`, border: `1px solid ${color}44` }}>
-        <Calendar className="w-3.5 h-3.5" style={{ color }} />
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "12px 16px",
+        borderRadius: 10,
+        backgroundColor: "rgb(10,13,18)",
+        border: "1px solid rgba(255,255,255,0.06)",
+        marginBottom: 8,
+      }}
+    >
+      <div
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          backgroundColor: `${color}22`,
+          border: `1px solid ${color}44`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          color,
+        }}
+      >
+        <Calendar size={14} />
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[13px] font-medium text-primary truncate">{title}</p>
-        <p className="text-[11px] text-dim">{time}</p>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 500,
+            color: "#e0e3e6",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {title}
+        </div>
+        <div style={{ fontSize: 11, color: "#6c7793", marginTop: 2 }}>{time}</div>
       </div>
-      <span className="text-[10px] px-2 py-0.5 rounded font-medium"
-        style={{ backgroundColor: `${color}22`, color, border: `1px solid ${color}33` }}>{type}</span>
+      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: `${color}22`, color, border: `1px solid ${color}33` }}>
+        {type}
+      </span>
     </div>
   );
 }
 
-// ── Main DashboardPage ────────────────────────────────────────────
+function QuickLink({ href, icon, label }: { href: string; icon: ReactNode; label: string }) {
+  return (
+    <Link
+      to={href}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "10px 12px",
+        borderRadius: 8,
+        marginBottom: 4,
+        transition: "background 0.14s",
+        color: "#94a3b8",
+        textDecoration: "none",
+      }}
+      onMouseEnter={(event) => { event.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+      onMouseLeave={(event) => { event.currentTarget.style.background = "transparent"; }}
+    >
+      <div
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 7,
+          background: "rgba(59,130,255,0.12)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#4f7cff",
+        }}
+      >
+        {icon}
+      </div>
+      <span style={{ fontSize: 13, color: "#e0e3e6", flex: 1 }}>{label}</span>
+      <ArrowRight size={12} />
+    </Link>
+  );
+}
+
 export default function DashboardPage() {
-  const user = useAuthStore((s) => s.user);
-  const setBatches = useBatchStore((s) => s.setBatches);
-  const batches = useBatchStore((s) => s.batches);
-  const setNotifications = useNotificationStore((s) => s.setNotifications);
+  const user = useAuthStore((state) => state.user);
+  const setBatches = useBatchStore((state) => state.setBatches);
+  const batches = useBatchStore((state) => state.batches);
+  const setNotifications = useNotificationStore((state) => state.setNotifications);
   useSocket();
 
   const { data: batchData } = useQuery({
     queryKey: ["batches"],
-    queryFn: async () => { const { data } = await api.get("/batches"); return data; },
+    queryFn: async () => (await api.get("/batches")).data,
   });
   const { data: pinnedData } = useQuery({
     queryKey: ["pinned-rooms"],
@@ -132,123 +352,91 @@ export default function DashboardPage() {
   });
   const { data: notifData } = useQuery({
     queryKey: ["notifications"],
-    queryFn: async () => { const { data } = await api.get("/notifications"); return data; },
+    queryFn: async () => (await api.get("/notifications")).data,
   });
 
-  useEffect(() => { if (batchData) setBatches(batchData); }, [batchData]);
-  useEffect(() => { if (notifData) setNotifications(notifData); }, [notifData]);
+  useEffect(() => { if (batchData) setBatches(batchData); }, [batchData, setBatches]);
+  useEffect(() => { if (notifData) setNotifications(notifData); }, [notifData, setNotifications]);
 
-  const generalBatches = batches.filter((b) => b.type === "general");
-  const enrolledBatches = batches.filter((b) => b.userMembership !== null);
-  const lockedBatches = batches.filter((b) => !b.hasAccess && b.type !== "general");
-  const pinnedBatches = pinnedData?.pinnedBatches || [];
-
+  const generalBatches = batches.filter((batch) => batch.type === "general");
+  const enrolledBatches = batches.filter((batch) => batch.userMembership !== null);
   const stats = [
-    { icon: <Hash className="w-5 h-5" />, value: String(batchData?.length || 0).padStart(2, "0"), label: "Channels", iconBg: "rgba(89,149,232,0.2)" },
-    { icon: <Users className="w-5 h-5" />, value: String(enrolledBatches.length || 0).padStart(2, "0"), label: "Enrolled Batches", iconBg: "rgba(52,211,153,0.2)" },
-    { icon: <BookOpen className="w-5 h-5" />, value: String(generalBatches.length || 0).padStart(2, "0"), label: "Open to All", iconBg: "rgba(20,184,166,0.2)" },
+    {
+      icon: <Hash size={20} />,
+      value: String(batchData?.length || 0).padStart(2, "0"),
+      label: "Channels Available",
+      iconBg: "rgba(89,149,232,0.2)",
+    },
+    {
+      icon: <TrendingUp size={20} />,
+      value: String(enrolledBatches.length || 0).padStart(2, "0"),
+      label: "Enrolled in Batches",
+      iconBg: "rgba(52,211,153,0.2)",
+    },
+    {
+      icon: <BookOpen size={20} />,
+      value: String(generalBatches.length || 0).padStart(2, "0"),
+      label: "General Open to All",
+      iconBg: "rgba(20,184,166,0.2)",
+    },
   ];
 
-  const displayRooms = [...pinnedBatches, ...generalBatches, ...enrolledBatches]
-    .filter((b, i, arr) => arr.findIndex(x => x.id === b.id) === i)
+  const displayRooms = [...(pinnedData?.pinnedBatches || []), ...generalBatches, ...enrolledBatches]
+    .filter((batch, index, list) => list.findIndex((item) => item.id === batch.id) === index)
     .slice(0, 6);
 
   return (
     <>
-      {/* ── Glassmorphic header ── */}
-      <header className="h-16 flex-shrink-0 border-b border-hairline flex items-center px-8 gap-4 sticky top-0 z-20"
-        style={{ backgroundColor: "rgba(10,12,17,0.6)", backdropFilter: "blur(24px)" }}>
-        <h1 className="text-xl font-bold text-primary tracking-tight">Home</h1>
-        <div className="flex-1 flex justify-center">
-          <div className="relative w-[480px]">
-            <div className="w-full h-10 rounded-md flex items-center px-10 border border-hairline" style={{ backgroundColor: "rgb(10,13,18)" }}>
-              <span className="text-sm text-faint select-none">Ask AI or search workspace… (Cmd+K)</span>
-            </div>
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-faint pointer-events-none">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            </span>
-            <Sparkles className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-accent-400 pointer-events-none" />
+      <FigmaTopBar title="Home" />
+      <div className="dashboard-layout page-scroll-content" style={{ flex: 1, overflowY: "auto", padding: "32px 32px 40px", display: "flex", gap: 32 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <FigmaOverline style={{ marginBottom: 16 }}>Admin Insights</FigmaOverline>
+          <div className="responsive-stat-grid" style={{ display: "flex", gap: 16, marginBottom: 32 }}>
+            {stats.map((stat) => <FigmaStatCard key={stat.label} {...stat} />)}
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <FigmaOverline>Active Rooms</FigmaOverline>
+            <Link to="/batches" style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#4f7cff", textDecoration: "none" }}>
+              View all <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          <div>
+            {displayRooms.length > 0 ? (
+              displayRooms.map((batch, index) => <RoomRow key={batch.id} batch={batch} index={index} />)
+            ) : (
+              <div
+                style={{
+                  borderRadius: 12,
+                  backgroundColor: "rgb(10,12,17)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  padding: 32,
+                  textAlign: "center",
+                  color: "#6c7793",
+                  fontSize: 14,
+                }}
+              >
+                No active rooms yet.
+              </div>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-black"
-            style={{ background: "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)", boxShadow: "0 0 10px rgba(59,130,255,0.3)" }}>
-            <Sparkles className="w-3.5 h-3.5" /> Ask Mentor
-          </button>
-          <NotificationDropdown />
-          <button className="w-8 h-8 flex items-center justify-center rounded-lg text-dim hover:text-primary transition-colors"><Settings className="w-4 h-4" /></button>
-          <div className="w-px h-5 bg-hairline mx-1" />
-          <div className="w-8 h-8 rounded-full bg-[rgb(45,103,107)] border border-hairline" />
-        </div>
-      </header>
 
-      {/* ── Main content ── */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
-        <div className="flex gap-8 px-8 py-8 max-w-[1400px]">
+        <div className="dashboard-side-panel" style={{ width: 300, flexShrink: 0 }}>
+          <FigmaOverline style={{ marginBottom: 16 }}>Mentorship</FigmaOverline>
+          <MentorshipCard />
 
-          {/* Left column */}
-          <div className="flex-1 min-w-0">
-            {/* Stats */}
-            <p className="t-overline text-dim mb-4">ADMIN INSIGHTS</p>
-            <div className="flex gap-4 mb-8">
-              {stats.map((s, i) => <StatCard key={i} {...s} />)}
-            </div>
+          <FigmaOverline style={{ margin: "28px 0 16px" }}>Upcoming</FigmaOverline>
+          <UpcomingCard title="React Hooks Deep Dive" time="Today, 2:00 PM" type="Live" color="rgb(0,219,232)" />
+          <UpcomingCard title="System Design Review" time="Tomorrow, 11:00 AM" type="Session" color="rgb(139,92,246)" />
+          <UpcomingCard title="UI/UX Critique" time="Thu, 3:30 PM" type="Workshop" color="rgb(52,211,153)" />
 
-            {/* Active rooms */}
-            <div className="flex items-center justify-between mb-4">
-              <p className="t-overline text-dim">ACTIVE ROOMS</p>
-              <Link to="/admin" className="text-[12px] text-accent-300 hover:underline flex items-center gap-1">
-                View all <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-            <div className="flex flex-col gap-3">
-              {displayRooms.length > 0
-                ? displayRooms.map((b) => <RoomRow key={b.id} batch={b} />)
-                : <div className="card p-8 text-center"><Hash className="w-8 h-8 text-faint mx-auto mb-3" /><p className="text-dim text-sm">No active rooms yet.</p></div>
-              }
-              {lockedBatches.length > 0 && (
-                <>
-                  <p className="t-overline text-dim mt-4 mb-2">LOCKED</p>
-                  {lockedBatches.slice(0, 2).map(b => (
-                    <div key={b.id} className="card p-4 opacity-50 flex items-center gap-3">
-                      <Lock className="w-4 h-4 text-faint shrink-0" />
-                      <div>
-                        <p className="text-sm font-semibold text-dim truncate">{b.name}</p>
-                        <p className="text-[12px] text-faint">{b.description || "No description"}</p>
-                      </div>
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Right sidebar */}
-          <div className="w-[280px] flex-shrink-0">
-            <p className="t-overline text-dim mb-4">MENTORSHIP</p>
-            <MentorshipCard />
-
-            <p className="t-overline text-dim mt-7 mb-4">UPCOMING</p>
-            <UpcomingItem title="React Hooks Deep Dive" time="Today, 2:00 PM" type="Live" color="rgb(0,219,232)" />
-            <UpcomingItem title="System Design Review" time="Tomorrow, 11:00 AM" type="Session" color="rgb(139,92,246)" />
-            <UpcomingItem title="UI/UX Critique" time="Thu, 3:30 PM" type="Workshop" color="rgb(52,211,153)" />
-
-            <p className="t-overline text-dim mt-7 mb-3">QUICK LINKS</p>
-            <div className="card p-2">
-              {[
-                user?.role === "admin" && { label: "Admin Console", href: "/admin", icon: <Shield className="w-3.5 h-3.5" /> },
-                { label: "Direct Messages", href: "/dm", icon: <MessageSquare className="w-3.5 h-3.5" /> },
-                user?.role === "mentor" && { label: "Mentor Hub", href: "/mentor", icon: <BookOpen className="w-3.5 h-3.5" /> },
-              ].filter(Boolean).map((item: any) => (
-                <Link key={item.label} to={item.href}
-                  className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-surface-100 transition-colors">
-                  <div className="w-7 h-7 rounded-lg bg-accent-100 text-accent-300 flex items-center justify-center flex-shrink-0">{item.icon}</div>
-                  <span className="text-[13px] text-primary font-medium flex-1">{item.label}</span>
-                  <ArrowRight className="w-3 h-3 text-dim" />
-                </Link>
-              ))}
-            </div>
-          </div>
+          <FigmaOverline style={{ margin: "28px 0 16px" }}>Quick Links</FigmaOverline>
+          {user?.role === "admin" && <QuickLink href="/admin" icon={<Shield size={14} />} label="Admin Console" />}
+          {user?.role === "admin" && <QuickLink href="/batches" icon={<Folder size={15} />} label="Manage Batches" />}
+          <QuickLink href="/dm" icon={<MessageSquare size={16} />} label="Direct Messages" />
+          {user?.role === "mentor" && <QuickLink href="/mentor" icon={<Users size={14} />} label="Mentor Hub" />}
         </div>
       </div>
     </>
