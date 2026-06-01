@@ -130,7 +130,7 @@ export default function AppShell({ children }: AppShellProps) {
   const activeBatches = batches.filter((b) => b.userMembership !== null || b.type === "general").slice(0, 5);
 
   return (
-    <div className="h-screen flex bg-surface overflow-hidden relative" style={{ height: "100dvh" }}>
+    <div className="fixed inset-0 flex bg-surface overflow-hidden">
       {/* Decorative orbs */}
       <div className="pointer-events-none absolute right-[-80px] top-[-160px] w-[303px] h-[278px] rounded-full opacity-[0.28] blur-[70px] z-0"
         style={{ background: "linear-gradient(rgb(62,56,224) 0%,rgb(0,219,232) 100%)" }} />

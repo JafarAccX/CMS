@@ -50,7 +50,7 @@ export default function ChannelChatPage() {
   const { joinChannel, leaveChannel, sendMessage, startTyping, stopTyping, toggleReaction } = useSocket();
 
   const [input, setInput] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
 
   const [files, setFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -122,7 +122,12 @@ export default function ChannelChatPage() {
   }, [channelId]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollContainer = messagesScrollRef.current;
+    if (!scrollContainer) return;
+    scrollContainer.scrollTo({
+      top: scrollContainer.scrollHeight,
+      behavior: "smooth",
+    });
   }, [messages[channelId!]]);
 
   const channelMessages = messages[channelId!] || [];
@@ -340,13 +345,13 @@ export default function ChannelChatPage() {
   };
 
   return (
-    <div className="h-screen flex bg-surface text-primary relative overflow-hidden">
+    <div className="flex h-full min-h-0 bg-surface text-primary relative overflow-hidden">
       {isMobileSidebarOpen && (
         <div className="fixed inset-0 bg-surface/80 backdrop-blur-sm z-30 lg:hidden" onClick={() => setIsMobileSidebarOpen(false)} />
       )}
 
       {/* Channel sidebar (this batch's channels) */}
-      <aside className={`${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:relative inset-y-0 left-0 z-40 w-60 bg-surface-50 border-r border-hairline flex flex-col shrink-0 transition-transform duration-300 ease-in-out lg:flex`}>
+      <aside className={`${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:relative inset-y-0 left-0 z-40 w-60 bg-surface-50 border-r border-hairline flex min-h-0 flex-col shrink-0 transition-transform duration-300 ease-in-out lg:flex lg:h-full`}>
         <div className="p-3.5 border-b border-hairline space-y-2">
           <Link to={`/batch/${batchId}`} className="flex items-center gap-2 text-dim hover:text-primary text-sm transition-colors">
             <ArrowLeft className="w-4 h-4" />
@@ -374,7 +379,7 @@ export default function ChannelChatPage() {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex min-h-0 flex-col min-w-0">
         <header
           className="h-16 border-b border-hairline flex items-center justify-between px-6 shrink-0 z-20"
           style={{ backgroundColor: "rgba(10,12,17,0.6)", backdropFilter: "blur(24px)" }}>
@@ -397,7 +402,7 @@ export default function ChannelChatPage() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-4 space-y-1">
+        <div ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto custom-scrollbar px-4 py-4 space-y-1">
           {isGuest && (
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-[10px] p-3 mb-4 text-center">
               <p className="text-amber-300 text-sm">
@@ -522,11 +527,10 @@ export default function ChannelChatPage() {
               </div>
             );
           })}
-          <div ref={messagesEndRef} />
         </div>
         <TypingIndicator users={currentTyping} />
         {canSend ? (
-          <div className="p-4 border-t border-hairline flex flex-col gap-2">
+          <div className="shrink-0 p-4 border-t border-hairline flex flex-col gap-2">
             {replyingTo && (
               <div className="flex items-center gap-2 bg-accent-50 border border-accent-200 rounded-[10px] px-3 py-2">
                 <Reply className="w-4 h-4 text-accent-400 shrink-0" />
@@ -611,7 +615,7 @@ export default function ChannelChatPage() {
             </div>
           </div>
         ) : (
-          <div className="p-4 border-t border-hairline text-center text-dim text-sm">
+          <div className="shrink-0 p-4 border-t border-hairline text-center text-dim text-sm">
             {isGuest ? "Read-only in guest mode. Create an account to participate." : noAccess ? "You don't have access to post in this channel." : "Read-only"}
           </div>
         )}
@@ -620,7 +624,7 @@ export default function ChannelChatPage() {
       {rightPanelOpen && (
         <>
           <div className="fixed inset-0 bg-surface/60 z-30 lg:hidden" onClick={toggleRightPanel} />
-          <aside className="fixed lg:relative right-0 inset-y-0 z-40 w-[268px] bg-surface-50 border-l border-hairline flex flex-col shrink-0 transition-all">
+          <aside className="fixed lg:relative right-0 inset-y-0 z-40 w-[268px] bg-surface-50 border-l border-hairline flex min-h-0 flex-col shrink-0 transition-all lg:h-full">
             <div className="px-4 py-3.5 border-b border-hairline">
               <div className="t-overline mb-1">This room</div>
               <div className="flex items-center gap-2">

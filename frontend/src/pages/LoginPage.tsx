@@ -1,19 +1,21 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { useAuthStore } from "../store/authStore";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  Zap, ArrowRight, Phone, Mail, KeyRound, Lock, RotateCcw, CheckCircle2,
+  ArrowRight,
+  CheckCircle2,
+  Code2,
+  Globe2,
+  KeyRound,
+  Mail,
+  MessageSquare,
+  Phone,
+  RotateCcw,
 } from "lucide-react";
+import { useAuthStore } from "../store/authStore";
 
 type Kind = "email" | "phone" | "unknown";
 type Step = "input" | "verify";
 
-/**
- * Auto-detect what the user typed.
- * - Contains "@" → email
- * - 10 consecutive digits (after stripping non-digits) → phone
- * - otherwise unknown
- */
 function detectKind(raw: string): Kind {
   const value = raw.trim();
   if (!value) return "unknown";
@@ -23,8 +25,8 @@ function detectKind(raw: string): Kind {
   return "unknown";
 }
 
-function isValidEmail(v: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
 function UnifiedLoginForm() {
@@ -43,24 +45,25 @@ function UnifiedLoginForm() {
   const [timer, setTimer] = useState(0);
 
   const kind = useMemo(() => detectKind(identifier), [identifier]);
-
-  // Resend countdown
   useEffect(() => {
-    if (timer <= 0) return;
-    const id = setInterval(() => setTimer((t) => t - 1), 1000);
-    return () => clearInterval(id);
+    if (timer <= 0) return undefined;
+    const id = window.setInterval(() => setTimer((value) => value - 1), 1000);
+    return () => window.clearInterval(id);
   }, [timer]);
 
   const handleEmailSignIn = useCallback(async () => {
     setError("");
+
     if (!isValidEmail(identifier)) {
       setError("Enter a valid email address.");
       return;
     }
+
     if (!password) {
       setError("Enter your password.");
       return;
     }
+
     setLoading(true);
     try {
       await login(identifier.trim(), password, "crm");
@@ -70,15 +73,17 @@ function UnifiedLoginForm() {
     } finally {
       setLoading(false);
     }
-  }, [identifier, password, login, navigate]);
+  }, [identifier, login, navigate, password]);
 
   const handleSendOtp = useCallback(async () => {
     setError("");
     const digits = identifier.replace(/\D/g, "");
+
     if (!/^\d{10}$/.test(digits)) {
       setError("Enter a valid 10-digit mobile number.");
       return;
     }
+
     setLoading(true);
     try {
       const result = await sendOtp(digits, "phone", "crm");
@@ -94,10 +99,12 @@ function UnifiedLoginForm() {
 
   const handleVerifyOtp = useCallback(async () => {
     setError("");
+
     if (!/^\d{6}$/.test(otpCode.trim())) {
       setError("Enter the 6-digit OTP.");
       return;
     }
+
     setLoading(true);
     try {
       const digits = identifier.replace(/\D/g, "");
@@ -108,287 +115,345 @@ function UnifiedLoginForm() {
     } finally {
       setLoading(false);
     }
-  }, [otpCode, identifier, requestId, verifyOtp, navigate]);
+  }, [identifier, navigate, otpCode, requestId, verifyOtp]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (kind === "email") return handleEmailSignIn();
-    if (kind === "phone") return handleSendOtp();
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (kind === "email") {
+      void handleEmailSignIn();
+      return;
+    }
+
+    if (kind === "phone") {
+      void handleSendOtp();
+      return;
+    }
+
+    setError("Enter a valid email address or 10-digit mobile number.");
   };
 
-  // ── OTP verify step ──────────────────────────────────────
   if (step === "verify") {
     return (
-      <div className="flex flex-col gap-4">
-        <div className="bg-accent-100 border border-accent-200 rounded-[10px] p-3 text-[12px] text-accent-300 flex items-start gap-2">
-          <KeyRound className="w-4 h-4 shrink-0 mt-px" />
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void handleVerifyOtp();
+        }}
+        className="flex flex-col gap-6"
+      >
+        <div className="flex items-start gap-3 rounded-lg border border-[rgba(66,71,84,0.5)] bg-[rgba(29,32,34,0.5)] p-4 text-[13px] leading-5 text-[#C2C6D6]">
+          <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-[#AFC6FF]" />
           <span>
-            OTP sent to <span className="font-semibold">+91 {identifier.replace(/\D/g, "")}</span>.
+            OTP sent to <span className="font-semibold text-[#E0E3E6]">+91 {identifier.replace(/\D/g, "")}</span>.
             Enter the 6-digit code below.
           </span>
         </div>
 
-        <div>
-          <label className="block text-[11px] font-medium text-muted mb-1.5">6-digit OTP</label>
+        <div className="flex flex-col gap-2">
+          <div className="flex h-[13px] items-center justify-between">
+            <label htmlFor="otp-code" className="text-[12px] font-medium tracking-[0.52px] text-[#E0E3E6]">
+              Verification code
+            </label>
+          </div>
           <div className="relative">
-            <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" />
+            <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#C2C6D6]" />
             <input
+              id="otp-code"
               type="text"
               inputMode="numeric"
               maxLength={6}
               value={otpCode}
-              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
               placeholder="000000"
               autoFocus
-              className="w-full h-[48px] pl-10 pr-3.5 bg-surface-100 border border-hairline-strong rounded-[10px] text-center text-2xl tracking-[0.5em] font-mono text-primary placeholder-faint focus:outline-none focus:ring-2 focus:ring-accent-400/30 focus:border-accent-400/50 transition-all"
+              className="h-11 w-full rounded-lg border border-[rgba(66,71,84,0.5)] bg-[rgba(29,32,34,0.5)] pl-[42px] pr-3 text-center font-mono text-2xl tracking-[0.45em] text-[#E0E3E6] shadow-[0_1px_2px_rgba(0,0,0,0.05)] placeholder:text-[rgba(194,198,214,0.5)] focus:border-[rgba(59,130,255,0.6)] focus:bg-[rgba(29,32,34,0.85)] focus:outline-none"
             />
           </div>
         </div>
 
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-[10px] p-3">
-            {error}
-          </div>
-        )}
+        {error && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{error}</div>}
 
         <button
-          onClick={handleVerifyOtp}
+          type="submit"
           disabled={loading || otpCode.length < 6}
-          className="btn-primary flex items-center justify-center gap-2 h-[44px] rounded-[10px] text-sm disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-3 rounded-lg border-0 bg-[linear-gradient(82.76deg,#3B82FF_17.65%,#00DBE8_100.33%)] px-6 py-3 text-[13px] font-semibold tracking-[0.52px] text-white shadow-[0_0_18px_rgba(59,130,255,0.25)] transition disabled:cursor-not-allowed disabled:opacity-50 hover:brightness-110"
         >
-          {loading ? "Verifying…" : <>Verify & continue <ArrowRight className="w-3.5 h-3.5" /></>}
+          {loading ? (
+            "Verifying..."
+          ) : (
+            <>
+              Verify and continue
+              <ArrowRight className="h-4 w-4" />
+            </>
+          )}
         </button>
 
         <div className="flex items-center justify-between text-[12px]">
           <button
             type="button"
-            onClick={() => { setStep("input"); setOtpCode(""); setError(""); }}
-            className="text-dim hover:text-muted flex items-center gap-1 transition-colors"
+            onClick={() => {
+              setStep("input");
+              setOtpCode("");
+              setError("");
+            }}
+            className="flex items-center gap-1.5 text-[#94A3B8] transition hover:text-[#E0E3E6]"
           >
-            <RotateCcw className="w-3 h-3" /> Change number
+            <RotateCcw className="h-3.5 w-3.5" />
+            Change number
           </button>
           {timer > 0 ? (
-            <span className="text-faint">Resend in {timer}s</span>
+            <span className="text-[#6C7793]">Resend in {timer}s</span>
           ) : (
-            <button type="button" onClick={handleSendOtp} className="text-accent-300 font-medium">
+            <button type="button" onClick={() => void handleSendOtp()} className="font-medium text-[#AFC6FF]">
               Resend OTP
             </button>
           )}
         </div>
-      </div>
+      </form>
     );
   }
 
-  // ── Input step ───────────────────────────────────────────
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <label className="text-[11px] font-medium text-muted">Email or mobile number</label>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <div className="flex h-[13px] items-center justify-between">
+          <label htmlFor="login-identifier" className="text-[12px] font-medium tracking-[0.52px] text-[#E0E3E6]">
+            Email or mobile number
+          </label>
           {kind !== "unknown" && (
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-accent-300 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" />
-              {kind === "email" ? "Email detected" : "Mobile detected"}
+            <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#AFC6FF]">
+              <CheckCircle2 className="h-3 w-3" />
+              {kind === "email" ? "Email" : "Mobile"}
             </span>
           )}
         </div>
         <div className="relative">
-          {kind === "email" ? (
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent-400 pointer-events-none" />
-          ) : kind === "phone" ? (
-            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent-400 pointer-events-none" />
+          {kind === "phone" ? (
+            <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#C2C6D6]" />
           ) : (
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint pointer-events-none" />
+            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#C2C6D6]" />
           )}
           <input
+            id="login-identifier"
             type="text"
             inputMode={kind === "phone" ? "numeric" : "email"}
             value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
-            required
+            onChange={(event) => {
+              setIdentifier(event.target.value);
+              setError("");
+            }}
             autoFocus
             autoComplete="username"
             placeholder="you@example.com or 9876543210"
-            className="w-full h-[42px] pl-10 pr-3.5 bg-surface-100 border border-hairline-strong rounded-[10px] text-[13.5px] text-primary placeholder-faint focus:outline-none focus:ring-2 focus:ring-accent-400/30 focus:border-accent-400/50 transition-all"
+            className="h-11 w-full rounded-lg border border-[rgba(66,71,84,0.5)] bg-[rgba(29,32,34,0.5)] pl-[42px] pr-3 text-base text-[#E0E3E6] shadow-[0_1px_2px_rgba(0,0,0,0.05)] placeholder:text-[rgba(194,198,214,0.5)] focus:border-[rgba(59,130,255,0.6)] focus:bg-[rgba(29,32,34,0.85)] focus:outline-none"
           />
         </div>
-        <p className="text-[11px] text-faint mt-1.5">
+        <p className="text-[11px] font-semibold leading-[11px] tracking-[0.66px] text-[rgba(194,198,214,0.7)]">
           Email signs in with password. Mobile signs in with OTP.
         </p>
       </div>
 
-      {/* Password — only for email */}
-      {kind === "email" && (
-        <div className="animate-in slide-in-from-top-1 fade-in duration-200">
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="text-[11px] font-medium text-muted">Password</label>
-            <span className="text-[11px] text-accent-300 cursor-pointer font-medium">Forgot?</span>
-          </div>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint pointer-events-none" />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              placeholder="••••••••"
-              className="w-full h-[42px] pl-10 pr-3.5 bg-surface-100 border border-hairline-strong rounded-[10px] text-[13.5px] text-primary placeholder-faint focus:outline-none focus:ring-2 focus:ring-accent-400/30 focus:border-accent-400/50 transition-all"
-            />
-          </div>
+      <div className="flex flex-col gap-2">
+        <div className="flex h-[13px] items-center justify-between">
+          <label htmlFor="login-password" className="text-[12px] font-medium tracking-[0.52px] text-[#E0E3E6]">
+            Password
+          </label>
+          <button type="button" className="text-[12px] font-medium tracking-[0.52px] text-[#E0E3E6] underline">
+            Forgot?
+          </button>
         </div>
-      )}
+        <div className="relative">
+          <input
+            id="login-password"
+            type="password"
+            value={password}
+            onChange={(event) => {
+              setPassword(event.target.value);
+              setError("");
+            }}
+            autoComplete="current-password"
+            placeholder="Password..."
+            className="h-11 w-full rounded-lg border border-[rgba(66,71,84,0.5)] bg-[rgba(29,32,34,0.5)] px-4 text-base text-[#E0E3E6] shadow-[0_1px_2px_rgba(0,0,0,0.05)] placeholder:text-[rgba(194,198,214,0.5)] focus:border-[rgba(59,130,255,0.6)] focus:bg-[rgba(29,32,34,0.85)] focus:outline-none"
+          />
+        </div>
+        <p className="text-[11px] font-semibold leading-[11px] tracking-[0.66px] text-[rgba(194,198,214,0.7)]">
+          Email signs in with password. Mobile signs in with OTP.
+        </p>
+      </div>
 
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-[10px] p-3">
-          {error}
-        </div>
-      )}
+      {error && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{error}</div>}
 
       <button
         type="submit"
-        disabled={loading || kind === "unknown" || (kind === "email" && !password)}
-        className="btn-primary flex items-center justify-center gap-2 h-[44px] rounded-[10px] text-sm mt-1 disabled:opacity-50"
+        disabled={loading}
+        className="flex w-full items-center justify-center gap-3 rounded-lg border-0 bg-[linear-gradient(82.76deg,#3B82FF_17.65%,#00DBE8_100.33%)] px-6 py-3 text-[13px] font-semibold tracking-[0.52px] text-white shadow-[0_0_18px_rgba(59,130,255,0.25)] transition disabled:cursor-wait disabled:opacity-70 hover:brightness-110"
       >
-        {loading
-          ? kind === "email" ? "Signing in…" : "Sending OTP…"
-          : kind === "email"
-            ? <>Sign in <ArrowRight className="w-3.5 h-3.5" /></>
-            : kind === "phone"
-              ? <>Send OTP <ArrowRight className="w-3.5 h-3.5" /></>
-              : <>Continue <ArrowRight className="w-3.5 h-3.5" /></>
-        }
+        {loading ? (
+          kind === "phone" ? "Sending OTP..." : "Signing in..."
+        ) : (
+          <>
+            Continue
+            <ArrowRight className="h-4 w-4" />
+          </>
+        )}
       </button>
+
+      <div className="flex items-center gap-3 py-3">
+        <span className="h-px flex-1 bg-[rgba(66,71,84,0.3)]" />
+        <span className="whitespace-nowrap text-[11px] font-semibold uppercase leading-[11px] tracking-[0.55px] text-[#C2C6D6]">
+          Or continue with
+        </span>
+        <span className="h-px flex-1 bg-[rgba(66,71,84,0.3)]" />
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <SocialButton label="Continue with SSO">
+          <Globe2 className="h-4 w-4" />
+        </SocialButton>
+        <SocialButton label="Continue with developer token">
+          <Code2 className="h-4 w-4" />
+        </SocialButton>
+        <SocialButton label="Continue with chat">
+          <MessageSquare className="h-4 w-4" />
+        </SocialButton>
+      </div>
     </form>
   );
 }
 
-// ─── Main Login Page ──────────────────────────────────────────────────────────
-
-export default function LoginPage() {
+function SocialButton({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex bg-surface relative overflow-hidden">
-      {/* Left — Form panel */}
-      <div className="flex-shrink-0 w-full lg:max-w-[480px] bg-surface-50 lg:border-r border-hairline flex flex-col px-6 sm:px-14 py-12 relative z-10">
-        {/* Logo */}
-        <div className="flex items-center gap-3 mb-12">
-          <div className="w-8 h-8 rounded-[9px] bg-gradient-to-br from-accent-300 via-accent-400 to-accent-600 flex items-center justify-center shadow-btn">
-            <Zap className="w-4 h-4 text-white" strokeWidth={2.4} />
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-primary">AcceleratorX</div>
-            <div className="text-[11px] text-dim font-normal">Learning platform</div>
-          </div>
-        </div>
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      className="flex h-[34.67px] items-center justify-center rounded-lg border border-[rgba(66,71,84,0.5)] bg-transparent text-[#C2C6D6] transition hover:border-[rgba(139,246,255,0.4)] hover:bg-[rgba(29,32,34,0.4)] hover:text-[#E0E3E6]"
+    >
+      {children}
+    </button>
+  );
+}
 
-        <div className="flex-1 flex flex-col justify-center">
-          <div className="t-overline mb-3 text-accent-400">Welcome back</div>
-          <h1 className="font-serif text-4xl font-medium leading-[1.1] tracking-tight text-primary mb-2">
-            Sign in to your<br />workspace.
-          </h1>
-          <p className="text-[13px] text-muted mb-8">
-            Use your registered email or mobile number — we'll pick the right method.
-          </p>
-
-          <UnifiedLoginForm />
-        </div>
-
-        <div className="flex items-center justify-between pt-6 border-t border-hairline text-dim text-xs mt-8">
-          <span>
-            New to AcceleratorX?{" "}
-            <Link to="/register" className="text-accent-300 font-medium cursor-pointer">
-              Request access
-            </Link>
-          </span>
-          <span className="flex gap-3.5">
-            <span className="cursor-pointer hover:text-muted">Privacy</span>
-            <span className="cursor-pointer hover:text-muted">Terms</span>
-          </span>
-        </div>
-      </div>
-
-      {/* Right — Editorial panel */}
-      <div className="hidden lg:flex flex-1 relative flex-col px-14 py-12 overflow-hidden bg-glow">
-        <div className="bg-grid absolute inset-0 opacity-70 pointer-events-none" />
-
-        <div className="absolute -top-28 -right-20 w-[480px] h-[480px] rounded-full pointer-events-none" style={{
-          background: "radial-gradient(circle, rgba(79,124,255,0.28), transparent 60%)",
-          filter: "blur(20px)",
-        }} />
-
-        <div className="flex-1 flex flex-col justify-center relative z-10 max-w-[560px]">
-          <div className="t-overline mb-4 text-accent-300">◆ Cohort 09 · in session</div>
-          <h2
-            className="font-serif text-5xl font-normal leading-[1.1] tracking-tight text-primary mb-6"
-            style={{ textWrap: "balance" as any }}
-          >
-            Where mentors and learners build, ship, and review — together.
-          </h2>
-          <p
-            className="text-[13.5px] text-muted max-w-[460px] mb-10 leading-relaxed"
-            style={{ textWrap: "pretty" as any }}
-          >
-            Real-time batch rooms, structured 1:1s with mentors, sprint reviews, and a shared library of every session. Built for cohort-based learning.
-          </p>
-
-          <div className="flex flex-col gap-2.5 max-w-[520px]">
-            <ActivityCard hue="indigo" initials="PS" who="Priya Shah" role="mentor" text="Posted a sprint brief with updated composition patterns." time="9:42 AM" live />
-            <ActivityCard hue="violet" initials="MC" who="Maya Cortez" role="moderator" text="Sprint review demos at 16:00 IST today. 4 slots left." time="10:02 AM" />
-            <ActivityCard hue="amber" initials="DP" who="Devon Park" role="mentor" text="If you're forwarding refs through a slot, preserve displayName." time="10:14 AM" />
-          </div>
-        </div>
-
-        <div className="relative z-10 pt-8 border-t border-hairline flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="flex">
-              {["indigo", "teal", "violet", "coral", "amber"].map((h, i) => (
-                <span
-                  key={i}
-                  className={`avatar avatar-${h} w-[26px] h-[26px] text-[10px] rounded-full ${i ? "-ml-2" : ""}`}
-                  style={{ border: "2px solid #07090f" }}
-                >
-                  {["PS", "AK", "MC", "JR", "DP"][i]}
-                </span>
-              ))}
-            </div>
-            <div className="text-[12.5px] text-muted">
-              <span className="text-primary font-semibold">142 learners</span> across 3 active cohorts
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 text-dim text-xs">
-            <span
-              className="w-1.5 h-1.5 rounded-full bg-emerald-400"
-              style={{ boxShadow: "0 0 8px oklch(0.74 0.16 150)" }}
-            />
-            All systems operational
-          </div>
-        </div>
-      </div>
+function BrandLogo() {
+  return (
+    <div className="text-[21px] font-semibold leading-none tracking-[-0.04em] text-[#E0E3E6]">
+      Accelerator<span className="text-[#3B82FF]">X</span>
     </div>
   );
 }
 
-function ActivityCard({
-  hue, initials, who, role, text, time, live,
-}: {
-  hue: string; initials: string; who: string; role: string; text: string; time: string; live?: boolean;
-}) {
+function AvatarStack() {
+  const avatars = [
+    { initials: "PS", className: "bg-[#528DFF] text-[#00275F]" },
+    { initials: "AK", className: "bg-[#8D7FFF] text-[#23008D]" },
+    { initials: "MC", className: "bg-[#00DEEB] text-[#005E64]" },
+    { initials: "+", className: "bg-[#323538] text-[#C2C6D6]" },
+  ];
+
   return (
-    <div className="flex gap-3 p-3 bg-surface-50/80 backdrop-blur-lg border border-hairline rounded-xl relative overflow-hidden">
-      {live && (
-        <span className="absolute top-2.5 right-3 flex items-center gap-1 text-[10px] font-semibold text-emerald-400 uppercase tracking-wider">
-          <span className="w-[5px] h-[5px] rounded-full bg-emerald-400 animate-blink" />
-          live
+    <div className="flex">
+      {avatars.map((avatar, index) => (
+        <span
+          key={avatar.initials}
+          className={`flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#191C1E] text-[13px] font-semibold tracking-[0.52px] ${avatar.className} ${index ? "-ml-4" : ""}`}
+        >
+          {avatar.initials}
         </span>
-      )}
-      <span className={`avatar avatar-${hue} w-8 h-8 text-xs`}>{initials}</span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-1.5 mb-0.5">
-          <span className="text-[12.5px] font-semibold text-primary">{who}</span>
-          <span className="text-[11px] text-dim font-normal">· {role} · {time}</span>
-        </div>
-        <div className="text-[12.5px] text-muted" style={{ textWrap: "pretty" as any }}>{text}</div>
-      </div>
+      ))}
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <section className="relative flex h-dvh overflow-hidden bg-[#05070A] font-sans text-[#E0E3E6] max-[900px]:flex-col max-[900px]:overflow-y-auto">
+      <div className="pointer-events-none fixed -right-[130px] -top-[200px] z-0 h-[278px] w-[303px] rounded-full bg-[linear-gradient(180deg,#3E38E0_0%,#00DBE8_100%)] opacity-50 blur-[150px]" />
+      <div className="pointer-events-none fixed -bottom-[200px] -right-[90px] z-0 h-[278px] w-[303px] rounded-full bg-[linear-gradient(180deg,#3E38E0_0%,#00DBE8_100%)] opacity-40 blur-[150px]" />
+
+      <aside className="relative isolate flex min-h-dvh flex-1 basis-[719px] flex-col overflow-hidden bg-[rgba(10,13,18,0.05)] px-14 py-6 shadow-[1px_0_12px_rgba(255,255,255,0.22)] max-[900px]:min-h-[540px] max-[900px]:basis-auto max-[900px]:px-10 max-[640px]:px-6 max-[640px]:py-8">
+        <div className="pointer-events-none absolute left-[18%] top-[20%] h-[500px] w-[500px] rounded-full bg-[rgba(175,198,255,0.05)] blur-[60px]" />
+        <div className="pointer-events-none absolute -left-10 bottom-[-12%] h-[101px] w-[219px] rounded-full bg-[linear-gradient(180deg,#3E38E0_0%,#00DBE8_100%)] opacity-50 blur-[125px]" />
+        <div className="pointer-events-none absolute -left-10 top-[20%] h-[101px] w-[219px] rounded-full bg-[linear-gradient(180deg,#3E38E0_0%,#00DBE8_100%)] opacity-40 blur-[125px]" />
+        <div className="pointer-events-none absolute left-[40%] top-[-9%] h-[101px] w-[219px] -rotate-[30deg] rounded-full bg-[linear-gradient(180deg,#3E38E0_0%,#00DBE8_100%)] opacity-45 blur-[125px]" />
+
+        <div className="relative z-10 flex flex-1 flex-col">
+          <header className="pt-[50px] max-[900px]:pt-0">
+            <BrandLogo />
+            <p className="mt-1.5 text-[10px] font-normal uppercase leading-[15px] tracking-[1px] text-[#94A3B8]">
+              Discussion platform
+            </p>
+          </header>
+
+          <div className="mb-auto mt-[clamp(118px,13vh,150px)] max-w-[586px] max-[900px]:mt-20">
+            <div className="mb-[22.8px] flex items-center gap-3">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-[#8BF6FF] shadow-[0_0_8px_rgba(139,246,255,0.6)]" />
+              <span className="text-[13px] font-semibold uppercase leading-[13px] tracking-[1.3px] text-[#8BF6FF]">
+                Cohort 09 · In session
+              </span>
+            </div>
+
+            <h1 className="mb-[22.8px] max-w-[586px] text-[48px] font-medium leading-[53px] tracking-[-1.2px] text-[#E0E3E6] max-[640px]:text-[36px] max-[640px]:leading-[41px]">
+              Where mentors and learners build, ship, and review together.
+            </h1>
+            <p className="max-w-[525px] text-[18px] font-normal leading-[29px] tracking-[-0.18px] text-[#C2C6D6] max-[640px]:text-base max-[640px]:leading-7">
+              Real-time batch rooms, structured 1:1s with mentors, sprint reviews, and a shared library of every session. Built for high-velocity cohorts.
+            </p>
+          </div>
+
+          <footer className="flex items-center gap-3 pb-4">
+            <AvatarStack />
+            <p className="text-[14px] font-semibold leading-[21px] tracking-[0.14px] text-[#E0E3E6]">
+              142 learners <span className="font-normal text-[#C2C6D6]">across 3 active cohorts</span>
+            </p>
+          </footer>
+        </div>
+      </aside>
+
+      <main className="relative z-10 flex min-h-dvh flex-1 basis-[721px] flex-col bg-[#05070A] max-[900px]:min-h-0 max-[900px]:basis-auto">
+        <div className="flex flex-1 items-start justify-center px-10 pt-[clamp(142px,22vh,222px)] pb-10 max-[900px]:items-center max-[900px]:py-10 max-[640px]:px-6">
+          <div className="w-full max-w-[400px]">
+            <div className="flex flex-col gap-[11.3px] pb-8">
+              <p className="text-[12px] font-semibold uppercase leading-[13px] tracking-[1.3px] text-[#AFC6FF]">
+                Welcome back
+              </p>
+              <h2 className="text-[32px] font-medium leading-[38px] tracking-[-0.64px] text-[#E0E3E6]">
+                Sign in to your workspace.
+              </h2>
+              <p className="max-w-[400px] text-[16px] font-normal leading-[26px] text-[#C2C6D6]">
+                Use your registered email or mobile number we'll pick the right method.
+              </p>
+            </div>
+
+            <UnifiedLoginForm />
+          </div>
+        </div>
+
+        <footer className="relative flex min-h-[102px] items-center justify-between gap-6 border-t border-[rgba(66,71,84,0.2)] px-10 py-10 max-[1100px]:flex-col max-[1100px]:items-start max-[640px]:px-6">
+          <p className="text-[14px] font-normal leading-[21px] tracking-[0.14px] text-[#C2C6D6]">
+            New to AcceleratorX?{" "}
+            <Link to="/register" className="font-semibold text-[#E0E3E6] transition hover:text-[#AFC6FF]">
+              Request access
+            </Link>
+          </p>
+
+          <div className="flex h-[29px] items-center gap-3 rounded-full border border-[rgba(139,246,255,0.1)] bg-[rgba(16,21,29,0.4)] px-4 backdrop-blur-[10px]">
+            <span className="relative h-2.5 w-2.5 rounded-full bg-[#8BF6FF] before:absolute before:inset-0 before:animate-ping before:rounded-full before:bg-[#8BF6FF] before:opacity-75" />
+            <span className="text-[11px] font-semibold uppercase leading-[11px] tracking-[0.55px] text-[#C2C6D6]">
+              All systems operational
+            </span>
+          </div>
+
+          <nav className="flex gap-6">
+            <a href="#" className="text-[14px] font-normal leading-[21px] tracking-[0.14px] text-[#C2C6D6] transition hover:text-[#E0E3E6]">
+              Privacy
+            </a>
+            <a href="#" className="text-[14px] font-normal leading-[21px] tracking-[0.14px] text-[#C2C6D6] transition hover:text-[#E0E3E6]">
+              Terms
+            </a>
+          </nav>
+        </footer>
+      </main>
+    </section>
   );
 }
