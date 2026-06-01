@@ -3,11 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   CheckCircle2,
-  Code2,
-  Globe2,
   KeyRound,
   Mail,
-  MessageSquare,
   Phone,
   RotateCcw,
 } from "lucide-react";
@@ -140,7 +137,7 @@ function UnifiedLoginForm() {
           event.preventDefault();
           void handleVerifyOtp();
         }}
-        className="flex flex-col gap-6"
+        className="flex flex-col gap-5"
       >
         <div className="flex items-start gap-3 rounded-lg border border-[rgba(66,71,84,0.5)] bg-[rgba(29,32,34,0.5)] p-4 text-[13px] leading-5 text-[#C2C6D6]">
           <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-[#AFC6FF]" />
@@ -215,7 +212,7 @@ function UnifiedLoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <div className="flex flex-col gap-2">
         <div className="flex h-[13px] items-center justify-between">
           <label htmlFor="login-identifier" className="text-[12px] font-medium tracking-[0.52px] text-[#E0E3E6]">
@@ -299,39 +296,7 @@ function UnifiedLoginForm() {
         )}
       </button>
 
-      <div className="flex items-center gap-3 py-3">
-        <span className="h-px flex-1 bg-[rgba(66,71,84,0.3)]" />
-        <span className="whitespace-nowrap text-[11px] font-semibold uppercase leading-[11px] tracking-[0.55px] text-[#C2C6D6]">
-          Or continue with
-        </span>
-        <span className="h-px flex-1 bg-[rgba(66,71,84,0.3)]" />
-      </div>
-
-      <div className="grid grid-cols-3 gap-3">
-        <SocialButton label="Continue with SSO">
-          <Globe2 className="h-4 w-4" />
-        </SocialButton>
-        <SocialButton label="Continue with developer token">
-          <Code2 className="h-4 w-4" />
-        </SocialButton>
-        <SocialButton label="Continue with chat">
-          <MessageSquare className="h-4 w-4" />
-        </SocialButton>
-      </div>
     </form>
-  );
-}
-
-function SocialButton({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      className="flex h-[34.67px] items-center justify-center rounded-lg border border-[rgba(66,71,84,0.5)] bg-transparent text-[#C2C6D6] transition hover:border-[rgba(139,246,255,0.4)] hover:bg-[rgba(29,32,34,0.4)] hover:text-[#E0E3E6]"
-    >
-      {children}
-    </button>
   );
 }
 
@@ -348,7 +313,7 @@ function AvatarStack() {
     { initials: "PS", className: "bg-[#528DFF] text-[#00275F]" },
     { initials: "AK", className: "bg-[#8D7FFF] text-[#23008D]" },
     { initials: "MC", className: "bg-[#00DEEB] text-[#005E64]" },
-    { initials: "+", className: "bg-[#323538] text-[#C2C6D6]" },
+    { initials: "+3", className: "bg-[#323538] text-[#C2C6D6]" },
   ];
 
   return (
@@ -368,14 +333,14 @@ function AvatarStack() {
 export default function LoginPage() {
   return (
     <section className="relative flex h-dvh overflow-hidden bg-[#05070A] font-sans text-[#E0E3E6] max-[900px]:flex-col max-[900px]:overflow-y-auto">
-      <div className="pointer-events-none fixed -right-[130px] -top-[200px] z-0 h-[278px] w-[303px] rounded-full bg-[linear-gradient(180deg,#3E38E0_0%,#00DBE8_100%)] opacity-50 blur-[150px]" />
-      <div className="pointer-events-none fixed -bottom-[200px] -right-[90px] z-0 h-[278px] w-[303px] rounded-full bg-[linear-gradient(180deg,#3E38E0_0%,#00DBE8_100%)] opacity-40 blur-[150px]" />
 
-      <aside className="relative isolate flex min-h-dvh flex-1 basis-[719px] flex-col overflow-hidden bg-[rgba(10,13,18,0.05)] px-14 py-6 shadow-[1px_0_12px_rgba(255,255,255,0.22)] max-[900px]:min-h-[540px] max-[900px]:basis-auto max-[900px]:px-10 max-[640px]:px-6 max-[640px]:py-8">
-        <div className="pointer-events-none absolute left-[18%] top-[20%] h-[500px] w-[500px] rounded-full bg-[rgba(175,198,255,0.05)] blur-[60px]" />
-        <div className="pointer-events-none absolute -left-10 bottom-[-12%] h-[101px] w-[219px] rounded-full bg-[linear-gradient(180deg,#3E38E0_0%,#00DBE8_100%)] opacity-50 blur-[125px]" />
-        <div className="pointer-events-none absolute -left-10 top-[20%] h-[101px] w-[219px] rounded-full bg-[linear-gradient(180deg,#3E38E0_0%,#00DBE8_100%)] opacity-40 blur-[125px]" />
-        <div className="pointer-events-none absolute left-[40%] top-[-9%] h-[101px] w-[219px] -rotate-[30deg] rounded-full bg-[linear-gradient(180deg,#3E38E0_0%,#00DBE8_100%)] opacity-45 blur-[125px]" />
+
+      <aside className="relative isolate flex min-h-dvh flex-1 basis-[719px] flex-col overflow-hidden border-r border-[rgba(255,255,255,0.12)] bg-[#05070a] px-14 py-6 max-[900px]:min-h-[540px] max-[900px]:basis-auto max-[900px]:border-r-0 max-[900px]:border-b max-[900px]:border-[rgba(255,255,255,0.12)] max-[900px]:px-10 max-[640px]:px-6 max-[640px]:py-8">
+        {/* Modern glowing gradient mesh matching Figma */}
+        <div className="pointer-events-none absolute right-0 top-0 h-[600px] w-[500px] -translate-y-[20%] translate-x-[10%] rounded-full bg-[radial-gradient(circle_at_center,rgba(59,130,255,0.3)_0%,rgba(0,219,232,0.2)_40%,transparent_70%)] blur-[90px] opacity-85" />
+        <div className="pointer-events-none absolute right-[15%] top-[25%] h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle_at_center,rgba(59,130,255,0.2)_0%,rgba(0,219,232,0.1)_50%,transparent_80%)] blur-[80px] opacity-75" />
+        <div className="pointer-events-none absolute -left-10 bottom-[-10%] h-[250px] w-[250px] rounded-full bg-[radial-gradient(circle_at_center,rgba(59,130,255,0.15)_0%,transparent_70%)] blur-[70px]" />
+        <div className="pointer-events-none absolute left-[15%] top-[15%] h-[350px] w-[350px] rounded-full bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.02)_0%,transparent_70%)] blur-[50px]" />
 
         <div className="relative z-10 flex flex-1 flex-col">
           <header className="pt-[50px] max-[900px]:pt-0">
@@ -411,7 +376,7 @@ export default function LoginPage() {
       </aside>
 
       <main className="relative z-10 flex min-h-dvh flex-1 basis-[721px] flex-col bg-[#05070A] max-[900px]:min-h-0 max-[900px]:basis-auto">
-        <div className="flex flex-1 items-start justify-center px-10 pt-[clamp(142px,22vh,222px)] pb-10 max-[900px]:items-center max-[900px]:py-10 max-[640px]:px-6">
+        <div className="flex flex-1 items-center justify-center px-10 py-10 max-[640px]:px-6">
           <div className="w-full max-w-[400px]">
             <div className="flex flex-col gap-[11.3px] pb-8">
               <p className="text-[12px] font-semibold uppercase leading-[13px] tracking-[1.3px] text-[#AFC6FF]">
