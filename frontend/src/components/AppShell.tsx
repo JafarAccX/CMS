@@ -144,7 +144,10 @@ export default function AppShell({ children }: AppShellProps) {
 
         {/* Logo */}
         <Link to="/" className="block px-6 pb-5 border-b border-hairline hover:bg-white/[0.02] transition-colors">
-          <div className="text-[15px] font-bold text-primary leading-5">
+          <div 
+            className="w-[128px] h-[19px] flex items-center font-bold text-primary text-[19px] leading-none tracking-[-0.04em]"
+            style={{ opacity: 1 }}
+          >
             Accelerator<span className="text-[#3B82FF]">X</span>
           </div>
           <div className="text-[10px] text-muted tracking-[0.1em] uppercase leading-[15px] mt-1.5">Discussion Platform</div>

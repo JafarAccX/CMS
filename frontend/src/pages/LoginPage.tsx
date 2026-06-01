@@ -302,7 +302,10 @@ function UnifiedLoginForm() {
 
 function BrandLogo() {
   return (
-    <div className="text-[21px] font-semibold leading-none tracking-[-0.04em] text-[#E0E3E6]">
+    <div 
+      className="w-[128px] h-[19px] flex items-center font-semibold text-[19px] leading-none tracking-[-0.04em] text-[#E0E3E6]"
+      style={{ opacity: 1 }}
+    >
       Accelerator<span className="text-[#3B82FF]">X</span>
     </div>
   );
