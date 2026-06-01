@@ -143,15 +143,11 @@ export default function AppShell({ children }: AppShellProps) {
         style={{ backgroundColor: "rgba(10,13,18,0.82)", boxShadow: "1px 0 8px rgba(255,255,255,0.15)" }}>
 
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2.5 px-6 pb-5 border-b border-hairline hover:bg-white/[0.02] transition-colors">
-          <div className="w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center text-surface font-bold text-lg shadow-btn"
-            style={{ background: "linear-gradient(rgb(59,130,255) 0%,rgb(0,219,232) 100%)", boxShadow: "0 0 14px rgba(59,130,255,0.35)" }}>
-            A
+        <Link to="/" className="block px-6 pb-5 border-b border-hairline hover:bg-white/[0.02] transition-colors">
+          <div className="text-[15px] font-bold text-primary leading-5">
+            Accelerator<span className="text-[#3B82FF]">X</span>
           </div>
-          <div>
-            <div className="text-[15px] font-bold text-primary leading-5">AcceleratorX</div>
-            <div className="text-[10px] text-muted tracking-[0.1em] uppercase leading-[15px]">Discussion Platform</div>
-          </div>
+          <div className="text-[10px] text-muted tracking-[0.1em] uppercase leading-[15px] mt-1.5">Discussion Platform</div>
         </Link>
 
         {/* Main nav */}
