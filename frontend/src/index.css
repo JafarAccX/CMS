@@ -453,6 +453,12 @@
     display: none !important;
   }
 
+  /* In the empty state, show the full-width contact list on mobile
+     instead of the welcome canvas. */
+  .dm-main--empty {
+    display: none !important;
+  }
+
   .dm-main {
     width: 100% !important;
     flex: 1 1 100% !important;
@@ -485,6 +491,35 @@
 
   .dm-message-bubble {
     max-width: 92% !important;
+  }
+}
+
+/* DM welcome canvas + start-conversation picker */
+@media (max-width: 860px) {
+  .dm-suggested-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dm-welcome-card {
+    padding: 32px !important;
+  }
+
+  .dm-welcome-h1 {
+    font-size: 26px !important;
+    line-height: 32px !important;
+    letter-spacing: -0.04em !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .dm-welcome-card {
+    padding: 28px 22px !important;
+  }
+
+  .dm-picker {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 0 !important;
   }
 }
 
