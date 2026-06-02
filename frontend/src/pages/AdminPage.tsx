@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "../api/client";
 import {
   Users, Shield, FileText, AlertTriangle, Check, Plus, UserPlus,
   Trash2, Megaphone, Pin, PinOff, Hash, Search,
-  Settings, Sparkles,
+  Settings, Sparkles, RefreshCw,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Modal, ModalHeader, ModalBody, ModalFooter } from "../components/Modal";
@@ -14,6 +14,93 @@ import NewUserModal from "../components/NewUserModal";
 import CreateBatchModal, { type CreateBatchPayload } from "../components/CreateBatchModal";
 
 type Tab = "users" | "batches" | "logs" | "modqueue";
+
+type CrmSyncResult = {
+  batches: { created: number; updated: number; skipped: number };
+  students: { created: number; updated: number; memberships: number };
+  mentors: { created: number; updated: number; memberships: number };
+  errors: string[];
+};
+
+type PageItem = number | "ellipsis";
+
+function getPaginationItems(current: number, total: number): PageItem[] {
+  const safeTotal = Math.max(total, 1);
+  if (safeTotal <= 7) return Array.from({ length: safeTotal }, (_, index) => index + 1);
+
+  const items: PageItem[] = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(safeTotal - 1, current + 1);
+
+  if (start > 2) items.push("ellipsis");
+  for (let page = start; page <= end; page += 1) items.push(page);
+  if (end < safeTotal - 1) items.push("ellipsis");
+  items.push(safeTotal);
+  return items;
+}
+
+function PaginationControls({
+  page,
+  totalPages,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) {
+  const safeTotal = Math.max(totalPages, 1);
+  const safePage = Math.min(Math.max(page, 1), safeTotal);
+  const buttonBase =
+    "w-8 h-8 rounded-md flex items-center justify-center text-[13px] font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
+
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        disabled={safePage <= 1}
+        onClick={() => onPageChange(safePage - 1)}
+        className={buttonBase}
+        style={{ border: "1px solid rgb(30,41,59)", background: "rgb(10,13,18)", color: "#94a3b8" }}
+        aria-label="Previous page"
+      >
+        &lt;
+      </button>
+      {getPaginationItems(safePage, safeTotal).map((item, index) =>
+        item === "ellipsis" ? (
+          <span key={`ellipsis-${index}`} className="w-8 h-8 flex items-center justify-center text-dim text-sm">
+            ...
+          </span>
+        ) : (
+          <button
+            type="button"
+            key={item}
+            onClick={() => onPageChange(item)}
+            className={buttonBase}
+            style={{
+              border: "1px solid rgb(30,41,59)",
+              background: item === safePage ? "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)" : "rgb(10,13,18)",
+              color: item === safePage ? "#fff" : "#94a3b8",
+            }}
+            aria-label={`Page ${item}`}
+            aria-current={item === safePage ? "page" : undefined}
+          >
+            {item}
+          </button>
+        )
+      )}
+      <button
+        type="button"
+        disabled={safePage >= safeTotal}
+        onClick={() => onPageChange(safePage + 1)}
+        className={buttonBase}
+        style={{ border: "1px solid rgb(30,41,59)", background: "rgb(10,13,18)", color: "#94a3b8" }}
+        aria-label="Next page"
+      >
+        &gt;
+      </button>
+    </div>
+  );
+}
 
 // ── Stat card ────────────────────────────────────────────────────
 function StatCard({
@@ -52,6 +139,10 @@ export default function AdminPage() {
   const [showManageMembers] = useState<string | null>(null);
   const [userFilter, setUserFilter] = useState<string>("all");
   const [userSearch, setUserSearch] = useState("");
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersLimit] = useState(20);
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsLimit] = useState(20);
   const [newUser, setNewUser] = useState({ username: "", email: "", phone: "", password: "", role: "learner" });
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [broadcastContent, setBroadcastContent] = useState("");
@@ -59,11 +150,29 @@ export default function AdminPage() {
   const [broadcastAll, setBroadcastAll] = useState(true);
 
   const qc = useQueryClient();
-  const { data: usersData } = useQuery({ queryKey: ["admin-users"], queryFn: async () => (await api.get("/admin/users")).data });
+  useEffect(() => {
+    setUsersPage(1);
+  }, [userFilter, userSearch]);
+
+  const { data: usersData } = useQuery({
+    queryKey: ["admin-users", usersPage, usersLimit, userFilter, userSearch],
+    queryFn: async () => (await api.get("/admin/users", {
+      params: {
+        page: usersPage,
+        limit: usersLimit,
+        role: userFilter !== "all" ? userFilter : undefined,
+        search: userSearch.trim() || undefined,
+      },
+    })).data,
+  });
   const { data: pinnedData } = useQuery({ queryKey: ["admin-pinned"], queryFn: async () => (await api.get("/admin/pinned")).data });
   const { data: allBatchesData } = useQuery({ queryKey: ["batches"], queryFn: async () => (await api.get("/batches")).data });
   const { data: statsData } = useQuery({ queryKey: ["admin-stats"], queryFn: async () => (await api.get("/admin/stats")).data });
-  const { data: logsData } = useQuery({ queryKey: ["admin-logs"], queryFn: async () => (await api.get("/admin/logs")).data, enabled: tab === "logs" });
+  const { data: logsData } = useQuery({
+    queryKey: ["admin-logs", logsPage, logsLimit],
+    queryFn: async () => (await api.get("/admin/logs", { params: { page: logsPage, limit: logsLimit } })).data,
+    enabled: tab === "logs",
+  });
   const { data: modData } = useQuery({ queryKey: ["mod-queue"], queryFn: async () => (await api.get("/mod-queue")).data, enabled: tab === "modqueue" });
   useQuery({ queryKey: ["batch-members", showManageMembers], queryFn: async () => (await api.get(`/batches/${showManageMembers}/members`)).data, enabled: !!showManageMembers });
 
@@ -93,6 +202,23 @@ export default function AdminPage() {
   const createUserMutation = useMutation({ mutationFn: (data: typeof newUser) => api.post("/admin/users", data), onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-users"] }); qc.invalidateQueries({ queryKey: ["admin-stats"] }); setShowCreateUser(false); setNewUser({ username: "", email: "", phone: "", password: "", role: "learner" }); toast.success("User created successfully"); } });
   const resolveMutation = useMutation({ mutationFn: ({ id, status }: { id: string; status: string }) => api.patch(`/mod-queue/${id}`, { status }), onSuccess: () => qc.invalidateQueries({ queryKey: ["mod-queue"] }) });
   const togglePinBatch = useMutation({ mutationFn: (batchId: string) => api.post(`/batches/${batchId}/pin`), onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-pinned"] }); qc.invalidateQueries({ queryKey: ["batches"] }); } });
+  const syncCrmMutation = useMutation({
+    mutationFn: async () => (await api.post<CrmSyncResult>("/admin/sync-crm")).data,
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      qc.invalidateQueries({ queryKey: ["admin-stats"] });
+      qc.invalidateQueries({ queryKey: ["batches"] });
+      qc.invalidateQueries({ queryKey: ["admin-pinned"] });
+
+      const warningText = result.errors.length ? ` with ${result.errors.length} warning${result.errors.length === 1 ? "" : "s"}` : "";
+      toast.success(
+        `CRM sync complete${warningText}: ${result.batches.created} batches, ${result.students.created} learners, ${result.mentors.created} mentors created.`
+      );
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.error || "CRM sync failed");
+    },
+  });
 
   const tabs: { key: Tab; label: string; badge?: number }[] = [
     { key: "users", label: "Users" },
@@ -101,11 +227,19 @@ export default function AdminPage() {
     { key: "modqueue", label: "Queue", badge: modData?.length },
   ];
 
-  const filteredUsers = usersData?.users?.filter((u: any) => {
-    const matchFilter = userFilter === "all" || u.role === userFilter;
-    const matchSearch = !userSearch || u.username.toLowerCase().includes(userSearch.toLowerCase()) || u.email.toLowerCase().includes(userSearch.toLowerCase());
-    return matchFilter && matchSearch;
-  });
+  const comingSoon = (label: string) => toast(`${label} coming soon`);
+  const users = usersData?.users ?? [];
+  const usersTotal = usersData?.total ?? 0;
+  const usersCurrentPage = usersData?.page ?? usersPage;
+  const usersTotalPages = usersData?.totalPages ?? 1;
+  const usersStart = usersTotal === 0 ? 0 : (usersCurrentPage - 1) * usersLimit + 1;
+  const usersEnd = Math.min(usersCurrentPage * usersLimit, usersTotal);
+  const logs = logsData?.logs ?? [];
+  const logsTotal = logsData?.total ?? 0;
+  const logsCurrentPage = logsData?.page ?? logsPage;
+  const logsTotalPages = logsData?.totalPages ?? 1;
+  const logsStart = logsTotal === 0 ? 0 : (logsCurrentPage - 1) * logsLimit + 1;
+  const logsEnd = Math.min(logsCurrentPage * logsLimit, logsTotal);
 
   return (
     <>
@@ -115,9 +249,16 @@ export default function AdminPage() {
         <h1 className="text-xl font-bold text-primary tracking-tight">Dashboard</h1>
         <div className="flex-1 flex justify-center">
           <div className="app-topbar-search relative w-[480px]">
-            <div className="w-full h-10 rounded-md flex items-center px-10 border border-hairline" style={{ backgroundColor: "rgb(10,13,18)" }}>
+            <button
+              type="button"
+              onClick={() => comingSoon("Workspace search")}
+              className="w-full h-10 rounded-md flex items-center px-10 border border-hairline text-left"
+              style={{ backgroundColor: "rgb(10,13,18)" }}
+              aria-label="Workspace search"
+              title="Workspace search coming soon"
+            >
               <span className="text-sm text-faint select-none">Ask AI or search workspace… (Cmd+K)</span>
-            </div>
+            </button>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint pointer-events-none" />
             <Sparkles className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-accent-400 pointer-events-none" />
           </div>
@@ -128,7 +269,7 @@ export default function AdminPage() {
             style={{ background: "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)", boxShadow: "0 0 10px rgba(59,130,255,0.3)" }}>
             <Megaphone className="w-3.5 h-3.5" /> Ask Mentor
           </button>
-          <button className="w-8 h-8 flex items-center justify-center rounded-lg text-dim hover:text-primary transition-colors"><Settings className="w-4 h-4" /></button>
+          <button type="button" onClick={() => comingSoon("Settings panel")} className="w-8 h-8 flex items-center justify-center rounded-lg text-dim hover:text-primary transition-colors" aria-label="Settings" title="Settings panel coming soon"><Settings className="w-4 h-4" /></button>
           <div className="w-px h-5 bg-hairline mx-1" />
           <Link to="/profile" aria-label="Open profile" className="w-8 h-8 rounded-full bg-[rgb(45,103,107)] border border-hairline cursor-pointer" />
         </div>
@@ -146,7 +287,7 @@ export default function AdminPage() {
             { label: "Active Batches", value: statsData?.totalBatches, delta: "5% vs last 30 days", iconBg: "rgba(139,92,246,0.2)", icon: <Shield className="w-5 h-5" />, filter: "all" },
           ].map((s, i) => (
             <StatCard key={i} icon={s.icon} value={s.value} label={s.label} delta={s.delta} iconBg={s.iconBg}
-              onClick={() => { setTab("users"); if (s.filter !== "all") setUserFilter(s.filter); }} />
+              onClick={() => { setTab("users"); setUserFilter(s.filter); }} />
           ))}
         </div>
 
@@ -171,6 +312,15 @@ export default function AdminPage() {
 
           {/* Right controls */}
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => syncCrmMutation.mutate()}
+              disabled={syncCrmMutation.isPending}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[13px] font-bold text-primary border border-[rgb(30,41,59)] disabled:opacity-60 disabled:cursor-not-allowed hover:border-accent-300/40 transition-all"
+              style={{ backgroundColor: "rgb(10,13,18)" }}
+            >
+              <RefreshCw className={`w-4 h-4 text-accent-300 ${syncCrmMutation.isPending ? "animate-spin" : ""}`} />
+              {syncCrmMutation.isPending ? "Syncing" : "Sync CRM"}
+            </button>
             <div className="flex items-center gap-1 p-0.5 rounded-md border border-[rgb(30,41,59)]" style={{ backgroundColor: "rgb(5,7,10)" }}>
               {["all", "admin", "mentor", "learner"].map((f) => (
                 <button key={f} onClick={() => setUserFilter(f)}
@@ -208,7 +358,7 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers?.map((u: any) => (
+                {users.map((u: any) => (
                   <tr key={u.id} className="group transition-colors">
                     <td>
                       <div className="flex items-center gap-3">
@@ -263,8 +413,8 @@ export default function AdminPage() {
                         <button onClick={() => banMutation.mutate(u.id)} className="p-1.5 text-dim hover:text-red-400 transition-colors" aria-label={u.is_banned ? "Restore" : "Suspend"}>
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
-                        <button className="p-1.5 text-dim hover:text-accent-400 transition-colors"><FileText className="w-3.5 h-3.5" /></button>
-                        <button className="text-dim hover:text-primary text-xs font-medium transition-colors">Report</button>
+                        <button type="button" onClick={() => comingSoon("Report export")} className="p-1.5 text-dim hover:text-accent-400 transition-colors" aria-label={`Export report for ${u.username}`} title="Report export coming soon"><FileText className="w-3.5 h-3.5" /></button>
+                        <button type="button" onClick={() => comingSoon("User report")} className="text-dim hover:text-primary text-xs font-medium transition-colors" aria-label={`Open report for ${u.username}`} title="User report coming soon">Report</button>
                       </div>
                     </td>
                   </tr>
@@ -273,15 +423,8 @@ export default function AdminPage() {
             </table>
 
             <div className="px-5 py-3.5 border-t border-[rgb(30,41,59)] flex items-center justify-between">
-              <span className="text-xs text-dim">Showing {filteredUsers?.length ?? 0} of {usersData?.users?.length ?? 0} users</span>
-              <div className="flex items-center gap-1">
-                {["‹", "1", "2", "3", "…", "›"].map((p, i) => (
-                  <button key={i} className="w-8 h-8 rounded-md flex items-center justify-center text-[13px] font-medium border transition-colors"
-                    style={{ border: "1px solid rgb(30,41,59)", background: p === "1" ? "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)" : "rgb(10,13,18)", color: p === "1" ? "#fff" : "#94a3b8" }}>
-                    {p}
-                  </button>
-                ))}
-              </div>
+              <span className="text-xs text-dim">Showing {usersStart}-{usersEnd} of {usersTotal} users</span>
+              <PaginationControls page={usersCurrentPage} totalPages={usersTotalPages} onPageChange={setUsersPage} />
             </div>
           </div>
         )}
@@ -355,7 +498,7 @@ export default function AdminPage() {
                 {["Administrator", "Action", "Target", "Timestamp"].map(h => <th key={h} className="px-6 py-3 text-left text-[11px] font-semibold tracking-widest text-dim uppercase">{h}</th>)}
               </tr></thead>
               <tbody className="divide-y divide-[rgb(22,30,42)]">
-                {logsData?.logs?.map((l: any) => (
+                {logs.map((l: any) => (
                   <tr key={l.id} className="hover:bg-white/[0.02] transition-colors">
                     <td className="px-6 py-4 flex items-center gap-2"><span className="avatar avatar-muted w-6 h-6 text-[10px]">{l.actor?.username[0]}</span><span className="text-primary font-medium">{l.actor?.username}</span></td>
                     <td className="px-6 py-4"><span className="chip chip-accent text-[10px]">{l.action_type.replace(/_/g, " ")}</span></td>
@@ -365,6 +508,10 @@ export default function AdminPage() {
                 ))}
               </tbody>
             </table>
+            <div className="px-5 py-3.5 border-t border-[rgb(30,41,59)] flex items-center justify-between">
+              <span className="text-xs text-dim">Showing {logsStart}-{logsEnd} of {logsTotal} logs</span>
+              <PaginationControls page={logsCurrentPage} totalPages={logsTotalPages} onPageChange={setLogsPage} />
+            </div>
           </div>
         )}
 

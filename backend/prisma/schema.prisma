@@ -89,6 +89,8 @@ model User {
   password_hash       String
   role                UserRole           @default(learner)
   provider            Provider           @default(website)
+  crm_customer_id     String?            @unique
+  crm_mentor_id       String?            @unique
   subscription_status SubscriptionStatus @default(free)
   is_banned           Boolean            @default(false)
   bio                 String?            @db.Text
@@ -134,6 +136,16 @@ model Batch {
   type        BatchType @default(general)
   is_paid     Boolean   @default(false)
   is_pinned   Boolean   @default(false)
+  crm_batch_id String?   @unique
+  crm_course   String?
+  crm_course_id String?
+  crm_start_date DateTime?
+  crm_end_date DateTime?
+  crm_active Boolean?
+  crm_deleted Boolean?
+  crm_batch_type String?
+  crm_image String?
+  crm_last_synced_at DateTime?
   created_by  String    @db.Uuid
   created_at  DateTime  @default(now())
 

@@ -1,6 +1,8 @@
 import prisma from "../utils/prisma.js";
 import bcrypt from "bcrypt";
-import type { UserRole } from "@prisma/client";
+import type { Prisma, UserRole } from "@prisma/client";
+
+const USER_ROLES: UserRole[] = ["admin", "mentor", "batch_moderator", "learner", "guest"];
 
 export async function logAdminAction(actorId: string, targetId: string | null, actionType: string, metadata?: any) {
   prisma.adminLog.create({
@@ -8,11 +10,30 @@ export async function logAdminAction(actorId: string, targetId: string | null, a
   }).catch((err) => console.error("Failed to log admin action:", err));
 }
 
-export async function listUsers(page = 1, limit = 20) {
-  const skip = (page - 1) * limit;
+export async function listUsers(page = 1, limit = 20, role?: string, search?: string) {
+  const safePage = Math.max(1, page);
+  const safeLimit = Math.min(Math.max(1, limit), 100);
+  const normalizedRole = role && USER_ROLES.includes(role as UserRole) ? (role as UserRole) : undefined;
+  const normalizedSearch = search?.trim();
+  const where: Prisma.UserWhereInput = {
+    ...(normalizedRole ? { role: normalizedRole } : {}),
+    ...(normalizedSearch
+      ? {
+          OR: [
+            { username: { contains: normalizedSearch, mode: "insensitive" } },
+            { email: { contains: normalizedSearch, mode: "insensitive" } },
+            { phone: { contains: normalizedSearch, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
+
   const [users, total] = await Promise.all([
     prisma.user.findMany({
-      skip, take: limit, orderBy: { created_at: "desc" },
+      where,
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
+      orderBy: { created_at: "desc" },
       select: { 
         id: true, 
         username: true, 
@@ -25,9 +46,9 @@ export async function listUsers(page = 1, limit = 20) {
         memberships: { select: { batch: { select: { name: true } } } }
       },
     }),
-    prisma.user.count(),
+    prisma.user.count({ where }),
   ]);
-  return { users, total, page, totalPages: Math.ceil(total / limit) };
+  return { users, total, page: safePage, totalPages: Math.ceil(total / safeLimit) };
 }
 
 export async function createUser(data: { username: string; email: string; phone: string; password: string; role: string }, actorId: string) {
@@ -63,16 +84,18 @@ export async function updateUserRole(userId: string, role: UserRole, actorId: st
 
 
 export async function listAdminLogs(page = 1, limit = 20, actionType?: string) {
-  const skip = (page - 1) * limit;
+  const safePage = Math.max(1, page);
+  const safeLimit = Math.min(Math.max(1, limit), 100);
+  const skip = (safePage - 1) * safeLimit;
   const where = actionType ? { action_type: actionType } : {};
   const [logs, total] = await Promise.all([
     prisma.adminLog.findMany({
-      where, skip, take: limit, orderBy: { created_at: "desc" },
+      where, skip, take: safeLimit, orderBy: { created_at: "desc" },
       include: { actor: { select: { id: true, username: true } } },
     }),
     prisma.adminLog.count({ where }),
   ]);
-  return { logs, total, page, totalPages: Math.ceil(total / limit) };
+  return { logs, total, page: safePage, totalPages: Math.ceil(total / safeLimit) };
 }
 
 export async function getAdminStats() {

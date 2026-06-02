@@ -49,6 +49,17 @@ export interface CrmBatchSummary {
   Active?: boolean;
 }
 
+export interface CrmBatch extends CrmBatchSummary {
+  Topics?: string | null;
+  Deleted?: boolean | null;
+  IsFree?: boolean | null;
+  CourseId?: string | null;
+  EnrollmentStartDate?: string | null;
+  EnrollmentEndDate?: string | null;
+  Image?: string | null;
+  BatchType?: "TEST" | "FREE" | "PAID" | string | null;
+}
+
 export interface CrmEnrollmentWithBatch {
   Id: string;
   CustId: string;
@@ -58,6 +69,36 @@ export interface CrmEnrollmentWithBatch {
   CompletionStatus: string;
   Batch: CrmBatchSummary;
 }
+
+export interface CrmMentor {
+  Id: string;
+  Name?: string | null;
+  Mobile?: string | number | null;
+  Education?: string | null;
+  ExperienceYear?: string | number | null;
+  Designation?: string | null;
+  Email?: string | null;
+  LinkedInURL?: string | null;
+  Active?: boolean | null;
+  AdditionalInfo?: string | null;
+  Role?: string | null;
+}
+
+export interface CrmBatchMentorAssignment {
+  Id: string;
+  BatchId: string;
+  MentorId: string;
+  Active?: boolean | null;
+  Deleted?: boolean | null;
+}
+
+type CrmPagedResponse<T> = {
+  data?: T[];
+  total?: number;
+  page?: number;
+  limit?: number;
+  totalPages?: number;
+};
 
 // ─── Service-account token cache ───────────────────────────────────────────
 
@@ -137,6 +178,32 @@ async function crmGet<T>(path: string): Promise<T> {
     throw new Error(`CRM GET ${path} failed: ${res.status}`);
   }
   return (await res.json()) as T;
+}
+
+async function fetchAllPages<T>(
+  buildPath: (page: number, limit: number) => string,
+  limit = 100
+): Promise<T[]> {
+  const rows: T[] = [];
+  let page = 1;
+  let totalPages = 1;
+
+  do {
+    const res = await crmGet<CrmPagedResponse<T>>(buildPath(page, limit));
+    const data = res.data ?? [];
+    rows.push(...data);
+
+    if (typeof res.totalPages === "number") {
+      totalPages = Math.max(res.totalPages, 1);
+    } else if (typeof res.total === "number") {
+      totalPages = Math.max(Math.ceil(res.total / limit), 1);
+    } else {
+      totalPages = data.length === limit ? page + 1 : page;
+    }
+    page += 1;
+  } while (page <= totalPages);
+
+  return rows;
 }
 
 // ─── Public API ────────────────────────────────────────────────────────────
@@ -226,6 +293,25 @@ export async function getCustomerEnrollments(
   return res.data ?? [];
 }
 
+export async function listCrmBatches(): Promise<CrmBatch[]> {
+  return fetchAllPages<CrmBatch>(
+    (page, limit) => `/batches?Deleted=false&limit=${limit}&page=${page}`
+  );
+}
+
+export async function listCrmMentors(): Promise<CrmMentor[]> {
+  return fetchAllPages<CrmMentor>(
+    (page, limit) => `/mentors?active=true&limit=${limit}&page=${page}`
+  );
+}
+
+export async function listCrmBatchMentorAssignments(): Promise<CrmBatchMentorAssignment[]> {
+  return fetchAllPages<CrmBatchMentorAssignment>(
+    (page, limit) =>
+      `/batch-mentor-assignments?Active=true&Deleted=false&limit=${limit}&page=${page}`
+  );
+}
+
 /**
  * Fetch all students enrolled in a specific batch from CRM.
  * Uses the CRM's GET /batches/:batchId/students endpoint.
@@ -243,14 +329,28 @@ export interface CrmBatchStudent {
 export async function getBatchStudents(
   batchId: string
 ): Promise<CrmBatchStudent[]> {
+  type RawBatchStudent = CrmBatchStudent & {
+    Customer?: CrmBatchStudent | null;
+  };
   type Resp = {
     batchDetails: unknown;
     totalStudents: number;
-    students: CrmBatchStudent[];
+    students: RawBatchStudent[];
   };
   try {
     const res = await crmGet<Resp>(`/batches/${encodeURIComponent(batchId)}/students`);
-    return res.students ?? [];
+    return (res.students ?? []).map((student) => {
+      const customer = student.Customer ?? student;
+      return {
+        CustId: customer.CustId ?? student.CustId,
+        FirstName: customer.FirstName ?? student.FirstName,
+        LastName: customer.LastName ?? student.LastName,
+        Email: customer.Email ?? student.Email,
+        Mobile: customer.Mobile ?? student.Mobile,
+        CallingCode: customer.CallingCode ?? student.CallingCode,
+        ProfilePicture: customer.ProfilePicture ?? student.ProfilePicture,
+      };
+    });
   } catch {
     return [];
   }

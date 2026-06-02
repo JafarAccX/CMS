@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import * as adminService from "../services/admin.service.js";
+import { syncCrmBatchesAndPeople } from "../services/crm-sync.service.js";
 import * as messageService from "../services/message.service.js";
 import { requireParam } from "../utils/params.js";
 import prisma from "../utils/prisma.js";
@@ -18,7 +19,9 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
   try {
     const page = parseInt(req.query.page as string, 10) || 1;
     const limit = parseInt(req.query.limit as string, 10) || 20;
-    const result = await adminService.listUsers(page, limit);
+    const role = typeof req.query.role === "string" ? req.query.role : undefined;
+    const search = typeof req.query.search === "string" ? req.query.search : undefined;
+    const result = await adminService.listUsers(page, limit, role, search);
     res.status(200).json(result);
   } catch (err) {
     next(err);
@@ -128,6 +131,15 @@ export async function broadcast(req: Request, res: Response, next: NextFunction)
 export async function listPinned(_req: Request, res: Response, next: NextFunction) {
   try {
     const result = await adminService.listPinnedForAdmin();
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function syncCrm(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await syncCrmBatchesAndPeople(req.user!.id);
     res.status(200).json(result);
   } catch (err) {
     next(err);

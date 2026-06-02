@@ -101,6 +101,7 @@ router.patch("/admin/users/:id/ban", requireRole("admin"), adminCtrl.toggleBanUs
 router.patch("/admin/users/:id/role", requireRole("admin"), adminCtrl.updateUserRole);
 router.get("/admin/logs", requireRole("admin"), adminCtrl.listLogs);
 router.get("/admin/pinned", requireRole("admin"), adminCtrl.listPinned);
+router.post("/admin/sync-crm", requireRole("admin"), adminCtrl.syncCrm);
 
 router.delete("/admin/messages/:id", requireRole("admin"), adminCtrl.hardDeleteMessage);
 router.post("/admin/broadcast", requireRole("admin"), adminCtrl.broadcast);
