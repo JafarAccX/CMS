@@ -49,10 +49,10 @@ export default function NewUserModal({ form, pending, onChange, onClose, onSubmi
   const isValid = Boolean(form.username.trim() && form.email.trim() && form.phone.trim() && form.password.trim());
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface/50 p-4 backdrop-blur-lg">
+    <div className="figma-modal-backdrop">
       <div
-        className="relative flex max-h-[92vh] w-full max-w-[671px] flex-col overflow-hidden rounded-2xl shadow-[0_0_50px_-12px_rgba(224,227,230,0.25)]"
-        style={{ background: "linear-gradient(rgba(78,249,240,0.05),rgba(255,255,255,0.05))", backdropFilter: "blur(20px)" }}
+        className="figma-modal-shell relative"
+        style={{ background: "linear-gradient(145deg,rgba(18,27,31,0.96),rgba(7,9,13,0.98))" }}
       >
         <div className="pointer-events-none absolute -left-32 -top-32 h-64 w-64 rounded-full bg-[rgb(82,141,255)] opacity-10 mix-blend-screen" />
 
@@ -96,20 +96,20 @@ export default function NewUserModal({ form, pending, onChange, onClose, onSubmi
 
           <div className="new-user-field-row flex gap-4">
             <Field label="Username">
-              <input value={form.username} onChange={(event) => onChange({ ...form, username: event.target.value })} placeholder="e.g. johndoe" className="form-input" />
+              <input value={form.username} onChange={(event) => onChange({ ...form, username: event.target.value })} placeholder="e.g. johndoe" className="figma-field" />
             </Field>
             <Field label="Email Address">
-              <input type="email" value={form.email} onChange={(event) => onChange({ ...form, email: event.target.value })} placeholder="john@example.com" className="form-input" />
+              <input type="email" value={form.email} onChange={(event) => onChange({ ...form, email: event.target.value })} placeholder="john@example.com" className="figma-field" />
             </Field>
           </div>
 
           <div className="new-user-field-row flex gap-4">
             <Field label="Phone Number">
-              <input type="tel" value={form.phone} onChange={(event) => onChange({ ...form, phone: event.target.value })} placeholder="+91 98765 43210" className="form-input" />
+              <input type="tel" value={form.phone} onChange={(event) => onChange({ ...form, phone: event.target.value })} placeholder="+91 98765 43210" className="figma-field" />
             </Field>
             <Field label="Initial Password">
               <div className="relative">
-                <input type={showPassword ? "text" : "password"} value={form.password} onChange={(event) => onChange({ ...form, password: event.target.value })} placeholder="Set temporary password" className="form-input pr-11" />
+                <input type={showPassword ? "text" : "password"} value={form.password} onChange={(event) => onChange({ ...form, password: event.target.value })} placeholder="Set temporary password" className="figma-field pr-11" />
                 <button onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 flex -translate-y-1/2 text-dim transition-colors hover:text-primary" aria-label={showPassword ? "Hide password" : "Show password"}>
                   {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                 </button>

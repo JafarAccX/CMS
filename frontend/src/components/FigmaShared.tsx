@@ -4,6 +4,12 @@ import { Bell, Search, Settings, Sparkles } from "lucide-react";
 
 export const figmaGradient = "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)";
 export const figmaOrbGradient = "linear-gradient(rgb(62,56,224) 0%,rgb(0,219,232) 100%)";
+export const figmaSurface = "rgb(10,13,18)";
+export const figmaSurfaceElevated = "rgb(16,21,29)";
+export const figmaBorder = "rgba(255,255,255,0.08)";
+export const figmaText = "#e0e3e6";
+export const figmaMuted = "#94a3b8";
+export const figmaDim = "#6c7793";
 
 export function FigmaOrbs() {
   return (
@@ -77,7 +83,7 @@ export function FigmaTopBar({
         height: 64,
         flexShrink: 0,
         backgroundColor: "rgba(10,12,17,0.6)",
-        borderBottom: "1px solid rgba(255,255,255,0.08)",
+        borderBottom: `1px solid ${figmaBorder}`,
         backdropFilter: "blur(24px)",
         WebkitBackdropFilter: "blur(24px)",
         display: "flex",
@@ -92,7 +98,7 @@ export function FigmaTopBar({
         <span style={{ fontWeight: 700, fontSize: 20, color: "#e0e3e6", letterSpacing: "-0.01em" }}>
           {title}
         </span>
-        {subtitle && <span style={{ fontSize: 12, color: "#6c7793", marginLeft: 10 }}>{subtitle}</span>}
+        {subtitle && <span style={{ fontSize: 12, color: figmaDim, marginLeft: 10 }}>{subtitle}</span>}
       </div>
 
       <div className="figma-topbar-search" style={{ flex: 1, display: "flex", justifyContent: "center" }}>
@@ -102,7 +108,7 @@ export function FigmaTopBar({
               position: "absolute",
               inset: 0,
               borderRadius: 6,
-              backgroundColor: "rgb(10,13,18)",
+              backgroundColor: figmaSurface,
               border: "1px solid rgba(255,255,255,0.1)",
               display: "flex",
               alignItems: "center",
@@ -211,12 +217,13 @@ export function FigmaStatCard({
       style={{
         flex: 1,
         minWidth: 0,
-        borderRadius: 12,
+        borderRadius: 8,
         overflow: "hidden",
         position: "relative",
-        backgroundColor: "rgb(10,13,18)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        backgroundColor: figmaSurface,
+        border: `1px solid ${figmaBorder}`,
         padding: "17px 20px",
+        boxShadow: "0 1px 0 rgba(255,255,255,0.05) inset, 0 12px 32px -12px rgba(0,0,0,0.6)",
       }}
     >
       <div
@@ -264,7 +271,7 @@ export function FigmaStatCard({
           fontSize: 12,
           fontWeight: 500,
           letterSpacing: "0.55px",
-          color: "#94a3b8",
+          color: figmaMuted,
           marginBottom: delta ? 6 : 0,
           textTransform: "uppercase",
           position: "relative",
@@ -273,7 +280,7 @@ export function FigmaStatCard({
         {label}
       </div>
       {delta && (
-        <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: "0.55px", color: "#94a3b8", position: "relative" }}>
+        <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: "0.55px", color: figmaMuted, position: "relative" }}>
           {delta}
         </div>
       )}
@@ -288,7 +295,7 @@ export function FigmaOverline({ children, style }: { children: ReactNode; style?
         fontSize: 11,
         fontWeight: 500,
         letterSpacing: "1.1px",
-        color: "#94a3b8",
+        color: figmaMuted,
         textTransform: "uppercase",
         ...style,
       }}

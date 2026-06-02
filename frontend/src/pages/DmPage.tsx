@@ -682,13 +682,16 @@ function RightUtilityPanel({ activeConv, online }: { activeConv: any; online: bo
 
   return (
     <aside
-      className="dm-right-panel"
+      className="dm-right-panel figma-panel custom-scrollbar"
       style={{
         width: 280,
         flexShrink: 0,
-        borderLeft: "1px solid rgba(255,255,255,0.07)",
-        background: "rgba(10,13,18,0.7)",
-        backdropFilter: "blur(12px)",
+        borderRadius: 0,
+        borderTop: 0,
+        borderRight: 0,
+        borderBottom: 0,
+        borderLeft: "1px solid var(--ax-border)",
+        background: "rgba(10,13,18,0.74)",
         padding: "24px 20px",
         overflowY: "auto",
         display: "flex",
@@ -890,16 +893,18 @@ export default function DmPage() {
   const activeOnline = activeConv ? onlineUsers.has(activeConv.otherUser.id) : false;
 
   return (
-    <div className="dm-layout" style={{ height: "100%", minHeight: 0, width: "100%", display: "flex", background: "#05070a", color: "#e0e3e6", overflow: "hidden", position: "relative" }}>
+    <div className="dm-layout" style={{ height: "100%", minHeight: 0, width: "100%", display: "flex", background: "var(--ax-bg)", color: "#e0e3e6", overflow: "hidden", position: "relative" }}>
       <aside
-        className={`dm-contact-panel ${activeConv ? "dm-contact-panel--has-active" : ""}`}
+        className={`dm-contact-panel figma-panel ${activeConv ? "dm-contact-panel--has-active" : ""}`}
         style={{
           width: 384,
           flexShrink: 0,
-          background: "rgba(16,20,22,0.5)",
-          borderRight: "1px solid rgba(66,71,84,0.1)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
+          borderRadius: 0,
+          borderTop: 0,
+          borderLeft: 0,
+          borderBottom: 0,
+          borderRight: "1px solid var(--ax-border)",
+          background: "rgba(10,13,18,0.74)",
           display: "flex",
           flexDirection: "column",
           position: "relative",
@@ -945,10 +950,11 @@ export default function DmPage() {
           <div style={{ position: "relative" }}>
             <Search size={16} color="#424c64" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
             <input
+              className="figma-field"
               value={conversationSearch}
               onChange={(event) => setConversationSearch(event.target.value)}
               placeholder="Find a conversation..."
-              style={{ width: "100%", height: 42, borderRadius: 8, border: "1px solid rgb(30,41,59)", background: "rgb(7,9,13)", color: "#e0e3e6", fontFamily: "Poppins", fontSize: 14, padding: "0 72px 0 40px" }}
+              style={{ height: 42, padding: "0 72px 0 40px" }}
             />
             <div style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", display: "flex", gap: 3 }}>
               {["⌘", "K"].map((key) => (
@@ -958,7 +964,7 @@ export default function DmPage() {
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px", position: "relative", zIndex: 1 }}>
+        <div className="figma-scroll custom-scrollbar" style={{ padding: "8px 12px", position: "relative", zIndex: 1 }}>
           {pinnedConversations.length > 0 && (
             <Section label="Pinned">
               {pinnedConversations.map((conversation, index) => (
@@ -1002,7 +1008,7 @@ export default function DmPage() {
             </div>
           </header>
 
-          <div ref={messagesScrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "24px 24px 8px" }}>
+          <div ref={messagesScrollRef} className="figma-scroll custom-scrollbar" style={{ padding: "24px 24px 8px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 20px" }}>
               <div style={{ flex: 1, height: 1, background: "rgb(30,41,59)" }} />
               <span style={{ fontSize: 11, fontWeight: 700, color: "#424c64", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>Today</span>
@@ -1015,7 +1021,7 @@ export default function DmPage() {
 
           <TypingIndicator users={currentDmTyping} />
           <div style={{ padding: "12px 20px 20px", flexShrink: 0 }}>
-            <div style={{ borderRadius: 12, background: "rgba(5,7,10,0.3)", border: "1px solid rgba(255,255,255,0.05)", backdropFilter: "blur(20px)", padding: 4 }}>
+            <div className="figma-panel" style={{ borderRadius: 12, padding: 4 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px" }}>
                 <button type="button" style={{ color: "#6c7793", background: "none", border: "none", cursor: "pointer", display: "flex", padding: 4 }}>
                   <Paperclip size={15} />

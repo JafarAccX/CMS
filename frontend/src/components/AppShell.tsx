@@ -130,7 +130,7 @@ export default function AppShell({ children }: AppShellProps) {
   const activeBatches = batches.filter((b) => b.userMembership !== null || b.type === "general").slice(0, 5);
 
   return (
-    <div className="fixed inset-0 flex bg-surface overflow-hidden">
+    <div className="fixed inset-0 flex bg-surface overflow-hidden" style={{ background: "var(--ax-bg)" }}>
       {/* Decorative orbs */}
       <div className="pointer-events-none absolute right-[-80px] top-[-160px] w-[303px] h-[278px] rounded-full opacity-[0.28] blur-[70px] z-0"
         style={{ background: "linear-gradient(rgb(62,56,224) 0%,rgb(0,219,232) 100%)" }} />
@@ -140,7 +140,7 @@ export default function AppShell({ children }: AppShellProps) {
       {/* ── Sidebar ── */}
       {!hideGlobalSidebar && (
       <aside className="w-64 flex-shrink-0 hidden lg:flex flex-col border-r border-hairline relative z-10 py-6 overflow-hidden"
-        style={{ backgroundColor: "rgba(10,13,18,0.82)", boxShadow: "1px 0 8px rgba(255,255,255,0.15)" }}>
+        style={{ width: "var(--ax-sidebar-w)", backgroundColor: "rgba(10,13,18,0.82)", boxShadow: "1px 0 8px rgba(255,255,255,0.15)" }}>
 
         {/* Logo */}
         <Link to="/" className="block px-6 pb-5 border-b border-hairline hover:bg-white/[0.02] transition-colors">
@@ -253,7 +253,7 @@ export default function AppShell({ children }: AppShellProps) {
       )}
 
       {/* ── Main content area ── */}
-      <div className="app-content flex-1 flex flex-col min-w-0 overflow-hidden relative z-10">
+      <div className="app-content flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden relative z-10">
         {children}
       </div>
 

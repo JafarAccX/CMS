@@ -25,9 +25,9 @@ import { figmaGradient } from "../components/FigmaShared";
 
 const inputStyle = {
   height: 44,
-  borderRadius: 7,
-  background: "rgba(255,255,255,0.025)",
-  border: "1px solid rgba(148,163,184,0.45)",
+  borderRadius: 8,
+  background: "rgba(29,32,34,0.5)",
+  border: "1px solid rgba(66,71,84,0.5)",
   color: "#94a3b8",
   padding: "0 14px",
   fontSize: 13,
@@ -65,10 +65,8 @@ function Toggle({ checked, onClick }: { checked: boolean; onClick: () => void })
 function Panel({ title, icon, children, style }: { title: string; icon: ReactNode; children: ReactNode; style?: CSSProperties }) {
   return (
     <section
+      className="figma-panel"
       style={{
-        borderRadius: 9,
-        background: "linear-gradient(135deg,rgba(0,219,232,0.035),rgba(255,255,255,0.035))",
-        border: "1px solid rgba(59,130,255,0.16)",
         padding: 24,
         ...style,
       }}
@@ -123,7 +121,7 @@ export default function ProfilePage() {
   });
 
   return (
-    <div style={{ minHeight: "100%", background: "radial-gradient(900px 500px at 100% 15%, rgba(0,111,180,0.24), transparent 55%), #05070a", color: "#e0e3e6", overflowY: "auto" }}>
+    <div className="figma-page">
       <header className="app-topbar" style={{ height: 64, borderBottom: "1px solid rgba(255,255,255,0.08)", background: "rgba(5,7,10,0.82)", display: "flex", alignItems: "center", gap: 16, padding: "0 28px" }}>
         <button type="button" onClick={() => window.history.back()} style={{ display: "flex", background: "none", border: "none", color: "#94a3b8", cursor: "pointer" }}>
           <ArrowLeft size={22} />
@@ -149,7 +147,7 @@ export default function ProfilePage() {
         <Link to="/profile" aria-label="Open profile" style={{ width: 32, height: 32, borderRadius: "50%", background: "rgb(45,103,107)", border: "1px solid rgba(255,255,255,0.1)", display: "block" }} />
       </header>
 
-      <main className="profile-content page-scroll-content" style={{ maxWidth: 1240, margin: "0 auto", padding: "50px 28px 70px" }}>
+      <main className="profile-content page-scroll-content figma-scroll" style={{ width: "100%", maxWidth: 1240, margin: "0 auto", padding: "50px 28px 70px" }}>
         {message && <div style={{ marginBottom: 16, color: "rgb(53,221,61)", fontSize: 13 }}>{message}</div>}
 
         <section
@@ -157,7 +155,7 @@ export default function ProfilePage() {
           style={{
             minHeight: 154,
             borderRadius: 9,
-            border: "1px solid rgba(59,130,255,0.16)",
+            border: "1px solid var(--ax-border)",
             background: "linear-gradient(105deg,rgba(0,219,232,0.055),rgba(255,255,255,0.035),rgba(0,94,160,0.13))",
             display: "flex",
             alignItems: "center",

@@ -14,8 +14,8 @@ export type CreateBatchPayload = {
 const fieldStyle: CSSProperties = {
   width: "100%",
   borderRadius: 7,
-  background: "rgba(255,255,255,0.035)",
-  border: "1px solid rgba(148,163,184,0.46)",
+  background: "rgba(29,32,34,0.5)",
+  border: "1px solid rgba(66,71,84,0.5)",
   color: "#e0e3e6",
   fontFamily: "Poppins",
   fontSize: 14,
@@ -88,7 +88,7 @@ function AccessCard({
         minHeight: 64,
         borderRadius: 8,
         border: `1px solid ${active ? tone : "rgba(148,163,184,0.18)"}`,
-        background: active ? "linear-gradient(115deg,rgba(0,219,232,0.08),rgba(59,130,255,0.06))" : "rgba(255,255,255,0.025)",
+        background: active ? "linear-gradient(115deg,rgba(0,219,232,0.08),rgba(59,130,255,0.06))" : "rgba(16,21,29,0.45)",
         color: "#e0e3e6",
         cursor: "pointer",
         padding: "12px 12px",
@@ -142,31 +142,13 @@ export default function CreateBatchModal({
   };
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.68)",
-        backdropFilter: "blur(7px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 80,
-        padding: 24,
-      }}
-      onClick={onClose}
-    >
+    <div className="figma-modal-backdrop" style={{ zIndex: 80 }} onClick={onClose}>
       <div
-        className="create-batch-modal"
+        className="create-batch-modal figma-modal-shell"
         style={{
           width: 600,
           maxWidth: "calc(100vw - 48px)",
-          borderRadius: 10,
-          overflow: "hidden",
-          background: "linear-gradient(145deg,rgba(18,27,31,0.96),rgba(7,9,13,0.98))",
-          border: "1px solid rgba(59,130,255,0.22)",
           boxShadow: "0 24px 80px rgba(0,0,0,0.55), 0 0 60px rgba(0,219,232,0.05)",
-          color: "#e0e3e6",
         }}
         onClick={(event) => event.stopPropagation()}
       >
@@ -261,8 +243,8 @@ export default function CreateBatchModal({
               height: 34,
               borderRadius: 5,
               border: "none",
-              background: isValid ? "rgb(0,115,230)" : "rgba(59,130,255,0.35)",
-              color: "#fff",
+              background: isValid ? figmaGradient : "rgba(59,130,255,0.35)",
+              color: isValid ? "#05070a" : "#94a3b8",
               fontSize: 12,
               fontWeight: 800,
               fontFamily: "Poppins",

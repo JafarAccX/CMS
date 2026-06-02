@@ -388,7 +388,7 @@ export default function DashboardPage() {
   return (
     <>
       <FigmaTopBar title="Home" />
-      <div className="dashboard-layout page-scroll-content" style={{ flex: 1, overflowY: "auto", padding: "32px 32px 40px", display: "flex", gap: 32 }}>
+      <div className="dashboard-layout page-scroll-content figma-scroll" style={{ padding: "32px 32px 40px", display: "flex", gap: 32 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <FigmaOverline style={{ marginBottom: 16 }}>Admin Insights</FigmaOverline>
           <div className="responsive-stat-grid" style={{ display: "flex", gap: 16, marginBottom: 32 }}>

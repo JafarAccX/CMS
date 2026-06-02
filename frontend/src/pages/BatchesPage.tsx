@@ -551,18 +551,15 @@ export default function BatchesPage() {
   return (
     <>
       <FigmaTopBar title="Rooms" subtitle="Manage all learning batches" />
-      <div className="page-scroll-content" style={{ flex: 1, overflowY: "auto", padding: "32px 32px 40px" }}>
+      <div className="page-scroll-content figma-scroll" style={{ padding: "32px 32px 40px" }}>
         <FigmaOverline style={{ marginBottom: 16 }}>Overview</FigmaOverline>
         <div className="responsive-stat-grid" style={{ display: "flex", gap: 16, marginBottom: 32 }}>
           {stats.map((stat) => <FigmaStatCard key={stat.label} {...stat} />)}
         </div>
 
         <div
-          className="responsive-controls"
+          className="responsive-controls figma-panel"
           style={{
-            borderRadius: 12,
-            backgroundColor: "rgb(16,21,29)",
-            border: "1px solid rgb(30,41,59)",
             padding: 12,
             display: "flex",
             alignItems: "center",
@@ -674,7 +671,7 @@ export default function BatchesPage() {
         </div>
 
         {view === "grid" ? (
-          <div style={{ marginTop: 0, borderRadius: "0 0 12px 12px", background: "rgb(10,13,18)", border: "1px solid rgb(30,41,59)", borderTop: "none", padding: 20 }}>
+          <div className="figma-card" style={{ marginTop: 0, borderRadius: "0 0 12px 12px", borderTop: "none", padding: 20 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 16 }}>
               {filtered.map((batch, index) => (
                 <BatchCard key={batch.id} batch={batch} index={index} view="grid" canManage={canManage} onArchive={handleArchive} />
@@ -683,8 +680,8 @@ export default function BatchesPage() {
             {filtered.length === 0 && <p style={{ padding: "48px 0", textAlign: "center", fontSize: 14, color: "#6c7793" }}>No batches found.</p>}
           </div>
         ) : (
-          <div className="responsive-table-wrap" style={{ borderRadius: "0 0 12px 12px", background: "rgb(10,13,18)", border: "1px solid rgb(30,41,59)", borderTop: "none", overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <div className="responsive-table-wrap figma-card" style={{ borderRadius: "0 0 12px 12px", borderTop: "none" }}>
+            <table className="figma-table" style={{ tableLayout: "fixed" }}>
               <colgroup>
                 <col style={{ width: "32%" }} />
                 <col style={{ width: "16%" }} />
@@ -694,9 +691,9 @@ export default function BatchesPage() {
                 <col style={{ width: "10%" }} />
               </colgroup>
               <thead>
-                <tr style={{ borderBottom: "1px solid rgb(30,41,59)" }}>
+                <tr>
                   {["Batch Name", "Type", "Channels", "Members", "Status", "Actions"].map((heading) => (
-                    <th key={heading} style={{ padding: "13px 20px", textAlign: "left", fontSize: 11, fontWeight: 600, letterSpacing: "0.6px", color: "#6c7793", textTransform: "uppercase" }}>
+                    <th key={heading}>
                       {heading}
                     </th>
                   ))}

@@ -345,13 +345,13 @@ export default function ChannelChatPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 bg-surface text-primary relative overflow-hidden">
+    <div className="flex h-full min-h-0 bg-surface text-primary relative overflow-hidden" style={{ background: "var(--ax-bg)" }}>
       {isMobileSidebarOpen && (
         <div className="fixed inset-0 bg-surface/80 backdrop-blur-sm z-30 lg:hidden" onClick={() => setIsMobileSidebarOpen(false)} />
       )}
 
       {/* Channel sidebar (this batch's channels) */}
-      <aside className={`${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:relative inset-y-0 left-0 z-40 w-60 bg-surface-50 border-r border-hairline flex min-h-0 flex-col shrink-0 transition-transform duration-300 ease-in-out lg:flex lg:h-full`}>
+      <aside className={`${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:relative inset-y-0 left-0 z-40 w-60 figma-panel border-y-0 border-l-0 flex min-h-0 flex-col shrink-0 transition-transform duration-300 ease-in-out lg:flex lg:h-full`} style={{ borderRadius: 0 }}>
         <div className="p-3.5 border-b border-hairline space-y-2">
           <Link to={`/batch/${batchId}`} className="flex items-center gap-2 text-dim hover:text-primary text-sm transition-colors">
             <ArrowLeft className="w-4 h-4" />
@@ -402,7 +402,7 @@ export default function ChannelChatPage() {
           </div>
         </header>
 
-        <div ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto custom-scrollbar px-4 py-4 space-y-1">
+        <div ref={messagesScrollRef} className="figma-scroll custom-scrollbar px-4 py-4 space-y-1">
           {isGuest && (
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-[10px] p-3 mb-4 text-center">
               <p className="text-amber-300 text-sm">
@@ -530,7 +530,7 @@ export default function ChannelChatPage() {
         </div>
         <TypingIndicator users={currentTyping} />
         {canSend ? (
-          <div className="shrink-0 p-4 border-t border-hairline flex flex-col gap-2">
+          <div className="shrink-0 p-4 border-t border-hairline flex flex-col gap-2" style={{ background: "rgba(5,7,10,0.42)" }}>
             {replyingTo && (
               <div className="flex items-center gap-2 bg-accent-50 border border-accent-200 rounded-[10px] px-3 py-2">
                 <Reply className="w-4 h-4 text-accent-400 shrink-0" />
@@ -585,7 +585,7 @@ export default function ChannelChatPage() {
                 </div>
               )}
 
-              <div className="bg-surface-100 border border-hairline-strong rounded-xl shadow-inner-highlight overflow-hidden">
+              <div className="figma-panel rounded-xl shadow-inner-highlight overflow-hidden">
                 <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleFileSelect} accept="*/*" />
                 <div className="px-3.5 py-3">
                   <textarea ref={textareaRef} value={input} onChange={handleInputChange} onKeyDown={handleKeyDown} rows={1} placeholder={`Message #${channel?.name || "channel"}... (type @ to mention)`} className="w-full bg-transparent text-primary placeholder-faint resize-none focus:outline-none text-[13.5px] leading-relaxed" disabled={isUploading} />
@@ -624,7 +624,7 @@ export default function ChannelChatPage() {
       {rightPanelOpen && (
         <>
           <div className="fixed inset-0 bg-surface/60 z-30 lg:hidden" onClick={toggleRightPanel} />
-          <aside className="fixed lg:relative right-0 inset-y-0 z-40 w-[268px] bg-surface-50 border-l border-hairline flex min-h-0 flex-col shrink-0 transition-all lg:h-full">
+          <aside className="fixed lg:relative right-0 inset-y-0 z-40 w-[268px] figma-panel border-y-0 border-r-0 flex min-h-0 flex-col shrink-0 transition-all lg:h-full" style={{ borderRadius: 0 }}>
             <div className="px-4 py-3.5 border-b border-hairline">
               <div className="t-overline mb-1">This room</div>
               <div className="flex items-center gap-2">
@@ -734,11 +734,11 @@ function AddMemberModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-surface/80 backdrop-blur-sm flex items-center justify-center p-4"
+      className="figma-modal-backdrop"
       onClick={onClose}
     >
       <div
-        className="card max-w-md w-full max-h-[80vh] flex flex-col"
+        className="figma-modal-shell max-w-md w-full max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-4 border-b border-hairline flex items-center justify-between">
@@ -761,7 +761,7 @@ function AddMemberModal({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by username or email…"
-              className="w-full h-9 pl-9 pr-3 bg-surface-100 border border-hairline-strong rounded-lg text-[13px] text-primary placeholder-faint focus:outline-none focus:ring-2 focus:ring-accent-400/30"
+              className="figma-field h-9 pl-9 pr-3 text-[13px]"
             />
           </div>
           <div className="flex items-center gap-2 text-xs">

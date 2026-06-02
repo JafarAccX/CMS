@@ -135,7 +135,7 @@ export default function AdminPage() {
       </header>
 
       {/* ── Scrollable Content ── */}
-      <div className="page-scroll-content flex-1 overflow-y-auto custom-scrollbar px-8 py-8">
+      <div className="page-scroll-content figma-scroll custom-scrollbar px-8 py-8">
         {/* Admin Insights */}
         <p className="t-overline text-dim mb-4">ADMIN INSIGHTS</p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -151,8 +151,7 @@ export default function AdminPage() {
         </div>
 
         {/* Controls row */}
-        <div className="responsive-controls rounded-xl border border-[rgb(30,41,59)] p-3 flex items-center justify-between mb-0"
-          style={{ backgroundColor: "rgb(16,21,29)" }}>
+        <div className="responsive-controls figma-panel p-3 flex items-center justify-between mb-0">
           {/* Tabs */}
           <div className="flex items-center gap-1 p-1.5 rounded-lg border border-[rgb(30,41,59)]" style={{ backgroundColor: "rgb(5,7,10)" }}>
             {tabs.map(({ key, label, badge }) => (
@@ -199,19 +198,19 @@ export default function AdminPage() {
 
         {/* ── Users Tab ── */}
         {tab === "users" && (
-          <div className="responsive-table-wrap rounded-b-xl border border-[rgb(30,41,59)] border-t-0 overflow-hidden" style={{ backgroundColor: "rgb(10,13,18)" }}>
-            <table className="w-full border-collapse text-sm min-w-[760px]">
+          <div className="responsive-table-wrap figma-card rounded-b-xl border-t-0">
+            <table className="figma-table text-sm min-w-[760px]">
               <thead>
-                <tr className="border-b border-[rgb(30,41,59)]">
+                <tr>
                   {["User Profile", "Global Role", "Assigned Batches", "Account Status", "Actions"].map((h) => (
-                    <th key={h} className="px-5 py-3 text-left text-[11px] font-semibold tracking-widest text-dim uppercase">{h}</th>
+                    <th key={h}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filteredUsers?.map((u: any) => (
-                  <tr key={u.id} className="group border-t border-[rgb(22,30,42)] hover:bg-white/[0.025] transition-colors">
-                    <td className="px-5 py-4">
+                  <tr key={u.id} className="group transition-colors">
+                    <td>
                       <div className="flex items-center gap-3">
                         <div className="relative flex-shrink-0">
                           <span className={`avatar ${u.role === "admin" ? "avatar-coral" : u.role === "mentor" ? "avatar-cyan" : "avatar-indigo"} w-9 h-9 text-[13px]`}>
@@ -225,7 +224,7 @@ export default function AdminPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4">
+                    <td>
                       <div className="relative inline-flex items-center">
                         <select value={u.role} onChange={(e) => roleMutation.mutate({ id: u.id, role: e.target.value })}
                           className="appearance-none pr-6 pl-2.5 py-1.5 rounded-md text-xs text-primary focus:outline-none focus:ring-1 focus:ring-accent-400/30 border border-[rgb(30,41,59)] cursor-pointer"
@@ -237,7 +236,7 @@ export default function AdminPage() {
                         <span className="pointer-events-none absolute right-2 text-dim text-[10px]">▾</span>
                       </div>
                     </td>
-                    <td className="px-5 py-4 max-w-[220px]">
+                    <td className="max-w-[220px]">
                       <div className="flex flex-wrap gap-1">
                         {u.memberships?.length > 0
                           ? u.memberships.slice(0, 3).map((m: any, i: number) => (
@@ -249,7 +248,7 @@ export default function AdminPage() {
                           : <span className="text-xs text-faint italic">No batches</span>}
                       </div>
                     </td>
-                    <td className="px-5 py-4">
+                    <td>
                       <div className="flex items-start gap-1.5">
                         <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${u.is_banned ? "bg-red-500" : "bg-emerald-500"}`}
                           style={{ boxShadow: u.is_banned ? "0 0 6px rgba(239,68,68,0.5)" : "0 0 6px rgba(53,221,61,0.5)" }} />
@@ -259,7 +258,7 @@ export default function AdminPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4">
+                    <td>
                       <div className="flex items-center gap-3">
                         <button onClick={() => banMutation.mutate(u.id)} className="p-1.5 text-dim hover:text-red-400 transition-colors" aria-label={u.is_banned ? "Restore" : "Suspend"}>
                           <Trash2 className="w-3.5 h-3.5" />
@@ -289,7 +288,7 @@ export default function AdminPage() {
 
         {/* ── Batches Tab ── */}
         {tab === "batches" && (
-          <div className="rounded-b-xl border border-[rgb(30,41,59)] border-t-0 p-6" style={{ backgroundColor: "rgb(10,13,18)" }}>
+          <div className="figma-card rounded-b-xl border-t-0 p-6">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h2 className="text-lg font-bold text-primary flex items-center gap-2"><Pin className="w-5 h-5 text-accent-300" />Pinned Batches & Channels</h2>
@@ -349,7 +348,7 @@ export default function AdminPage() {
 
         {/* ── Logs Tab ── */}
         {tab === "logs" && (
-          <div className="responsive-table-wrap rounded-b-xl border border-[rgb(30,41,59)] border-t-0 overflow-hidden" style={{ backgroundColor: "rgb(10,13,18)" }}>
+          <div className="responsive-table-wrap figma-card rounded-b-xl border-t-0">
             <div className="px-6 py-4 border-b border-[rgb(30,41,59)]"><h3 className="t-overline text-dim">Administrative Audit Logs</h3></div>
             <table className="w-full text-sm min-w-[700px]">
               <thead><tr className="border-b border-[rgb(30,41,59)]">
@@ -371,7 +370,7 @@ export default function AdminPage() {
 
         {/* ── Mod Queue Tab ── */}
         {tab === "modqueue" && (
-          <div className="rounded-b-xl border border-[rgb(30,41,59)] border-t-0 p-6 space-y-4" style={{ backgroundColor: "rgb(10,13,18)" }}>
+          <div className="figma-card rounded-b-xl border-t-0 p-6 space-y-4">
             <div className="flex items-center gap-3 mb-2"><AlertTriangle className="w-5 h-5 text-amber-400" /><h2 className="text-lg font-bold text-primary">Moderation Queue</h2></div>
             {modData?.map((q: any) => (
               <div key={q.id} className="card card-hover p-6 flex items-start justify-between group">
