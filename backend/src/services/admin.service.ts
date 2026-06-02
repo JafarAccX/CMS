@@ -153,6 +153,20 @@ export async function listPinnedForAdmin() {
   };
 }
 
+export async function listBroadcastChannels() {
+  return prisma.channel.findMany({
+    where: { batch: { batch_settings: { is_archived: false } } },
+    orderBy: [{ batch: { name: "asc" } }, { created_at: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      batch_id: true,
+      batch: { select: { id: true, name: true } },
+      _count: { select: { messages: true } },
+    },
+  });
+}
+
 /**
  * Broadcast a system message to selected channels (or all channels in non-archived
  * batches when no channelIds are provided).

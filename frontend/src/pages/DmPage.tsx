@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -327,7 +327,7 @@ function WelcomeCanvas({
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          overflow: "hidden",
+          overflow: "visible",
         }}
       >
         <div
@@ -394,7 +394,7 @@ function WelcomeCanvas({
         </button>
 
         {suggested.length > 0 && (
-          <div style={{ width: "100%", maxWidth: 574, marginTop: 48, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ width: "100%", maxWidth: 574, minWidth: 0, marginTop: 48, display: "flex", flexDirection: "column", gap: 16 }}>
             <div
               style={{
                 fontSize: 11,
@@ -408,7 +408,7 @@ function WelcomeCanvas({
             >
               {suggestedLabel}
             </div>
-            <div className="dm-suggested-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div className="dm-suggested-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16, minWidth: 0, width: "100%" }}>
               {suggested.map((person, i) => (
                 <button
                   key={person.id}
@@ -422,6 +422,8 @@ function WelcomeCanvas({
                     display: "flex",
                     alignItems: "center",
                     gap: 16,
+                    minWidth: 0,
+                    width: "100%",
                     cursor: "pointer",
                     textAlign: "left",
                     transition: "border-color 0.15s, background 0.15s",
@@ -504,6 +506,7 @@ function PickerRow({ user, index, online, onStart }: { user: any; index: number;
 
 function StartConversationPanel({
   open,
+  mentorOnly,
   mentors,
   members,
   search,
@@ -513,6 +516,7 @@ function StartConversationPanel({
   onlineUsers,
 }: {
   open: boolean;
+  mentorOnly?: boolean;
   mentors: any[];
   members: any[];
   search: string;
@@ -522,6 +526,8 @@ function StartConversationPanel({
   onlineUsers: Set<string>;
 }) {
   const empty = mentors.length === 0 && members.length === 0;
+  const title = mentorOnly ? "Choose a mentor" : "Start your conversation with";
+  const emptyText = mentorOnly ? "No mentors found" : "No people found";
   return (
     <>
       <div
@@ -563,7 +569,7 @@ function StartConversationPanel({
       >
         <div style={{ padding: "24px 24px 16px", borderBottom: "1px solid rgba(66,71,84,0.1)", display: "flex", flexDirection: "column", gap: 16, flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-            <h2 style={{ fontSize: 24, fontWeight: 700, lineHeight: "28.8px", letterSpacing: "-0.48px", color: "#e0e3e6" }}>Start your conversation with</h2>
+            <h2 style={{ fontSize: 24, fontWeight: 700, lineHeight: "28.8px", letterSpacing: "-0.48px", color: "#e0e3e6" }}>{title}</h2>
             <button
               type="button"
               onClick={onClose}
@@ -599,14 +605,14 @@ function StartConversationPanel({
             <input
               value={search}
               onChange={(event) => onSearch(event.target.value)}
-              placeholder="Search people..."
+              placeholder={mentorOnly ? "Search mentors..." : "Search people..."}
               style={{ width: "100%", height: 42, borderRadius: 8, border: "1px solid rgb(30,41,59)", background: "rgb(7,9,13)", color: "#e0e3e6", fontFamily: "Poppins", fontSize: 14, padding: "0 16px 0 40px" }}
             />
           </div>
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px" }}>
-          {empty && <p style={{ color: "#424c64", fontSize: 13, textAlign: "center", paddingTop: 40 }}>No people found</p>}
+          {empty && <p style={{ color: "#424c64", fontSize: 13, textAlign: "center", paddingTop: 40 }}>{emptyText}</p>}
           {mentors.length > 0 && (
             <Section label="Mentors">
               {mentors.map((item, index) => (
@@ -766,6 +772,7 @@ function RightUtilityPanel({ activeConv, online }: { activeConv: any; online: bo
 export default function DmPage() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
   const conversations = useDmStore((state) => state.conversations);
   const setConversations = useDmStore((state) => state.setConversations);
@@ -780,12 +787,20 @@ export default function DmPage() {
   const [showDrawer, setShowDrawer] = useState(false);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMentorRequest = searchParams.get("askMentor") === "1";
 
   useEffect(() => {
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
   }, [conversationId, showDrawer]);
+
+  useEffect(() => {
+    if (isMentorRequest) {
+      setShowDrawer(true);
+      setUserSearch("");
+    }
+  }, [isMentorRequest]);
 
   useEffect(() => {
     if (!showDrawer) return;
@@ -843,8 +858,11 @@ export default function DmPage() {
     const query = userSearch.trim().toLowerCase();
     return !query || item.username?.toLowerCase().includes(query) || item.email?.toLowerCase().includes(query);
   });
-  const drawerMentors = drawerUsers.filter((item: any) => isPinnedRole(item.role));
-  const drawerMembers = drawerUsers.filter((item: any) => !isPinnedRole(item.role));
+  const drawerMentors = drawerUsers.filter((item: any) => {
+    const role = (item.role || "").toLowerCase();
+    return isMentorRequest ? role === "mentor" : isPinnedRole(role);
+  });
+  const drawerMembers = isMentorRequest ? [] : drawerUsers.filter((item: any) => !isPinnedRole(item.role));
 
   const allMentors = dmUsers.filter((item: any) => (item.role || "").toLowerCase() === "mentor");
   const suggested = (allMentors.length ? allMentors : dmUsers).slice(0, 4);
@@ -888,6 +906,15 @@ export default function DmPage() {
     setShowDrawer(false);
     refetchConvs();
     navigate(`/dm/${data.id}`);
+  };
+
+  const closeStartDrawer = () => {
+    setShowDrawer(false);
+    if (isMentorRequest) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("askMentor");
+      setSearchParams(next, { replace: true });
+    }
   };
 
   const activeOnline = activeConv ? onlineUsers.has(activeConv.otherUser.id) : false;
@@ -1064,11 +1091,12 @@ export default function DmPage() {
 
       <StartConversationPanel
         open={showDrawer}
+        mentorOnly={isMentorRequest}
         mentors={drawerMentors}
         members={drawerMembers}
         search={userSearch}
         onSearch={setUserSearch}
-        onClose={() => setShowDrawer(false)}
+        onClose={closeStartDrawer}
         onStart={startNewConversation}
         onlineUsers={onlineUsers}
       />

@@ -59,6 +59,8 @@ export default function BatchPage() {
         </div>
         <div className="app-topbar-actions flex items-center gap-2">
           <button className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-black"
+            type="button"
+            onClick={() => navigate("/dm?askMentor=1")}
             style={{ background: "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)", boxShadow: "0 0 10px rgba(59,130,255,0.3)" }}>
             <Sparkles className="w-3.5 h-3.5" /> Ask Mentor
           </button>

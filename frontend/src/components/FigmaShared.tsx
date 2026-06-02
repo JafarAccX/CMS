@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Bell, Search, Settings, Sparkles } from "lucide-react";
 
 export const figmaGradient = "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)";
@@ -63,6 +63,7 @@ export function FigmaTopBar({
   onPrimary?: () => void;
   bellSlot?: ReactNode;
 }) {
+  const navigate = useNavigate();
   const iconButton: CSSProperties = {
     width: 32,
     height: 32,
@@ -152,7 +153,7 @@ export function FigmaTopBar({
         <button
           className="figma-topbar-primary"
           type="button"
-          onClick={onPrimary}
+          onClick={onPrimary || (() => navigate("/dm?askMentor=1"))}
           style={{
             display: "flex",
             alignItems: "center",

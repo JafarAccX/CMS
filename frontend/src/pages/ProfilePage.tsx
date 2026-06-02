@@ -137,10 +137,10 @@ export default function ProfilePage() {
             <Sparkles size={13} color="rgb(0,219,232)" style={{ position: "absolute", right: 13, top: "50%", transform: "translateY(-50%)" }} />
           </div>
         </div>
-        <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 6, border: "none", background: figmaGradient, color: "#05070a", fontSize: 12, fontWeight: 600, fontFamily: "Poppins", cursor: "pointer" }}>
+        <Link to="/dm?askMentor=1" style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 6, border: "none", background: figmaGradient, color: "#05070a", fontSize: 12, fontWeight: 600, fontFamily: "Poppins", cursor: "pointer", textDecoration: "none" }}>
           <Sparkles size={13} />
           Ask Mentor
-        </button>
+        </Link>
         <Bell size={16} color="#94a3b8" />
         <Settings size={16} color="#94a3b8" />
         <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }} />

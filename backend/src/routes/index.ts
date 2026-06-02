@@ -27,6 +27,8 @@ router.use(rateLimiter);
 // ── Auth ──────────────────────────────────────────────────
 router.post("/auth/register", authCtrl.register);
 router.post("/auth/login", authCtrl.login);
+router.post("/auth/forgot-password", authCtrl.forgotPassword);
+router.post("/auth/reset-password", authCtrl.resetPassword);
 router.post("/auth/learner-login", authCtrl.learnerLogin);
 router.post("/auth/refresh", authCtrl.refresh);
 router.post("/auth/logout", authCtrl.logout);
@@ -101,6 +103,7 @@ router.patch("/admin/users/:id/ban", requireRole("admin"), adminCtrl.toggleBanUs
 router.patch("/admin/users/:id/role", requireRole("admin"), adminCtrl.updateUserRole);
 router.get("/admin/logs", requireRole("admin"), adminCtrl.listLogs);
 router.get("/admin/pinned", requireRole("admin"), adminCtrl.listPinned);
+router.get("/admin/broadcast-channels", requireRole("admin"), adminCtrl.listBroadcastChannels);
 router.post("/admin/sync-crm", requireRole("admin"), adminCtrl.syncCrm);
 
 router.delete("/admin/messages/:id", requireRole("admin"), adminCtrl.hardDeleteMessage);

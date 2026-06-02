@@ -78,3 +78,35 @@ export async function sendOtpEmail(toEmail: string, otp: string): Promise<void> 
     textContent: `Your AcceleratorX login OTP is: ${otp}\n\nThis code expires in 5 minutes. Do not share it with anyone.`,
   });
 }
+
+export async function sendPasswordResetEmail(toEmail: string, resetUrl: string, toName?: string): Promise<void> {
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #0d1017; color: #e2e8f0; border-radius: 12px;">
+      <div style="margin-bottom: 24px;">
+        <span style="font-size: 20px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">AcceleratorX</span>
+      </div>
+      <h1 style="font-size: 22px; font-weight: 600; color: #ffffff; margin: 0 0 8px;">Reset your password</h1>
+      <p style="color: #94a3b8; font-size: 14px; margin: 0 0 28px; line-height: 1.6;">
+        We received a request to reset your AcceleratorX password. Use the secure link below to set a new password. This link expires in 30 minutes.
+      </p>
+      <a href="${resetUrl}" style="display: inline-block; background: linear-gradient(90deg,#3b82ff,#00dbe8); color: #05070a; text-decoration: none; font-size: 14px; font-weight: 700; padding: 13px 22px; border-radius: 10px; margin-bottom: 28px;">
+        Reset password
+      </a>
+      <p style="color: #64748b; font-size: 12px; margin: 0 0 14px; line-height: 1.6;">
+        If the button does not work, paste this URL into your browser:
+      </p>
+      <p style="word-break: break-all; color: #94a3b8; font-size: 12px; line-height: 1.6; margin: 0 0 22px;">${resetUrl}</p>
+      <p style="color: #64748b; font-size: 12px; margin: 0; line-height: 1.6;">
+        If you did not request this, you can safely ignore this email.
+      </p>
+    </div>
+  `;
+
+  await emailService.sendEmail({
+    to: toEmail,
+    toName,
+    subject: "Reset your AcceleratorX password",
+    htmlContent: html,
+    textContent: `Reset your AcceleratorX password using this link:\n\n${resetUrl}\n\nThis link expires in 30 minutes. If you did not request this, ignore this email.`,
+  });
+}

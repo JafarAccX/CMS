@@ -137,6 +137,15 @@ export async function listPinned(_req: Request, res: Response, next: NextFunctio
   }
 }
 
+export async function listBroadcastChannels(_req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await adminService.listBroadcastChannels();
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function syncCrm(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await syncCrmBatchesAndPeople(req.user!.id);

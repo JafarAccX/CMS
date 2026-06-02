@@ -46,6 +46,35 @@ export async function login(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+const forgotPasswordSchema = z.object({
+  email: z.string().email("Enter a valid email address"),
+});
+
+export async function forgotPassword(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { email } = forgotPasswordSchema.parse(req.body);
+    const result = await authService.requestPasswordReset(email);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(20),
+  password: z.string().min(8).max(128),
+});
+
+export async function resetPassword(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { token, password } = resetPasswordSchema.parse(req.body);
+    const result = await authService.resetPassword(token, password);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 const learnerLoginSchema = z.object({
   phone: z.string().regex(/^\d{10}$/, "Phone must be 10 digits"),
   email: z.string().email("Enter a valid email address"),

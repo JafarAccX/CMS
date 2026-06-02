@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "../api/client";
@@ -20,6 +20,14 @@ type CrmSyncResult = {
   students: { created: number; updated: number; memberships: number };
   mentors: { created: number; updated: number; memberships: number };
   errors: string[];
+};
+
+type BroadcastChannel = {
+  id: string;
+  name: string;
+  batch_id: string;
+  batch?: { id: string; name: string };
+  _count?: { messages?: number };
 };
 
 type PageItem = number | "ellipsis";
@@ -148,6 +156,7 @@ export default function AdminPage() {
   const [broadcastContent, setBroadcastContent] = useState("");
   const [broadcastTargets, setBroadcastTargets] = useState<Set<string>>(new Set());
   const [broadcastAll, setBroadcastAll] = useState(true);
+  const [broadcastBatchId, setBroadcastBatchId] = useState<string | null>(null);
 
   const qc = useQueryClient();
   useEffect(() => {
@@ -168,6 +177,11 @@ export default function AdminPage() {
   const { data: pinnedData } = useQuery({ queryKey: ["admin-pinned"], queryFn: async () => (await api.get("/admin/pinned")).data });
   const { data: allBatchesData } = useQuery({ queryKey: ["batches"], queryFn: async () => (await api.get("/batches")).data });
   const { data: statsData } = useQuery({ queryKey: ["admin-stats"], queryFn: async () => (await api.get("/admin/stats")).data });
+  const { data: broadcastChannels = [] } = useQuery<BroadcastChannel[]>({
+    queryKey: ["admin-broadcast-channels"],
+    queryFn: async () => (await api.get("/admin/broadcast-channels")).data,
+    enabled: showBroadcast && !broadcastAll,
+  });
   const { data: logsData } = useQuery({
     queryKey: ["admin-logs", logsPage, logsLimit],
     queryFn: async () => (await api.get("/admin/logs", { params: { page: logsPage, limit: logsLimit } })).data,
@@ -240,6 +254,29 @@ export default function AdminPage() {
   const logsTotalPages = logsData?.totalPages ?? 1;
   const logsStart = logsTotal === 0 ? 0 : (logsCurrentPage - 1) * logsLimit + 1;
   const logsEnd = Math.min(logsCurrentPage * logsLimit, logsTotal);
+  const broadcastBatches = useMemo(() => {
+    const groups = new Map<string, { id: string; name: string; channels: BroadcastChannel[] }>();
+    for (const channel of broadcastChannels) {
+      const batchId = channel.batch?.id || channel.batch_id;
+      const batchName = channel.batch?.name || "Unknown batch";
+      if (!groups.has(batchId)) groups.set(batchId, { id: batchId, name: batchName, channels: [] });
+      groups.get(batchId)!.channels.push(channel);
+    }
+    return Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [broadcastChannels]);
+  const selectedBroadcastBatch = broadcastBatches.find((batch) => batch.id === broadcastBatchId) ?? null;
+  const canSendBroadcast = Boolean(
+    broadcastContent.trim() && (broadcastAll || broadcastTargets.size > 0)
+  );
+
+  const toggleBroadcastTarget = (channelId: string) => {
+    setBroadcastTargets((prev) => {
+      const next = new Set(prev);
+      if (next.has(channelId)) next.delete(channelId);
+      else next.add(channelId);
+      return next;
+    });
+  };
 
   return (
     <>
@@ -267,7 +304,7 @@ export default function AdminPage() {
           <button onClick={() => setShowBroadcast(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-black"
             style={{ background: "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)", boxShadow: "0 0 10px rgba(59,130,255,0.3)" }}>
-            <Megaphone className="w-3.5 h-3.5" /> Ask Mentor
+            <Megaphone className="w-3.5 h-3.5" /> Announcement
           </button>
           <button type="button" onClick={() => comingSoon("Settings panel")} className="w-8 h-8 flex items-center justify-center rounded-lg text-dim hover:text-primary transition-colors" aria-label="Settings" title="Settings panel coming soon"><Settings className="w-4 h-4" /></button>
           <div className="w-px h-5 bg-hairline mx-1" />
@@ -577,21 +614,135 @@ export default function AdminPage() {
             <p className="t-overline text-dim mb-2">Send to</p>
             <div className="flex gap-2 mb-3">
               {[{ k: true, l: "All channels" }, { k: false, l: "Specific channels" }].map(({ k, l }) => (
-                <button key={String(k)} onClick={() => { setBroadcastAll(k); if (k) setBroadcastTargets(new Set()); }}
+                <button key={String(k)} onClick={() => { setBroadcastAll(k); setBroadcastBatchId(null); if (k) setBroadcastTargets(new Set()); }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${broadcastAll === k ? "bg-accent-100 text-accent-300 border-accent-200" : "bg-surface-100 text-dim border-hairline hover:text-primary"}`}>{l}</button>
               ))}
             </div>
+            {!broadcastAll && (
+              <div className="mt-3 rounded-xl border border-hairline bg-surface-100/40">
+                <div className="flex items-center justify-between gap-3 border-b border-hairline px-3 py-2">
+                  <div className="min-w-0">
+                    {selectedBroadcastBatch ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setBroadcastBatchId(null)}
+                          className="mb-1 text-[11px] font-semibold text-accent-300 hover:text-primary transition-colors"
+                        >
+                          Back to batches
+                        </button>
+                        <p className="truncate text-xs font-semibold text-muted">
+                          {selectedBroadcastBatch.name} · {broadcastTargets.size} selected
+                        </p>
+                      </>
+                    ) : (
+                      <span className="text-xs font-semibold text-muted">
+                        Choose a batch · {broadcastTargets.size} selected
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {selectedBroadcastBatch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBroadcastTargets((prev) => {
+                            const next = new Set(prev);
+                            selectedBroadcastBatch.channels.forEach((channel) => next.add(channel.id));
+                            return next;
+                          });
+                        }}
+                        className="text-[11px] font-semibold text-accent-300 hover:text-primary transition-colors"
+                      >
+                        Select batch
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setBroadcastTargets(new Set())}
+                      className="text-[11px] font-semibold text-dim hover:text-primary transition-colors"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                <div className="custom-scrollbar max-h-56 overflow-y-auto p-2">
+                  {broadcastChannels.length === 0 ? (
+                    <p className="px-2 py-6 text-center text-sm text-dim">No batches available.</p>
+                  ) : selectedBroadcastBatch ? (
+                    <div className="space-y-1">
+                      {selectedBroadcastBatch.channels.map((channel) => {
+                        const checked = broadcastTargets.has(channel.id);
+                        return (
+                          <button
+                            key={channel.id}
+                            type="button"
+                            onClick={() => toggleBroadcastTarget(channel.id)}
+                            className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-all ${
+                              checked
+                                ? "border-accent-200 bg-accent-100/70"
+                                : "border-transparent hover:border-hairline hover:bg-surface-100"
+                            }`}
+                          >
+                            <span
+                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] font-black ${
+                                checked
+                                  ? "border-accent-300 bg-accent-300 text-surface"
+                                  : "border-hairline-strong text-transparent"
+                              }`}
+                            >
+                              ✓
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[13px] font-semibold text-primary">#{channel.name}</span>
+                              <span className="block truncate text-[11px] text-dim">{channel.batch?.name || "Unknown batch"}</span>
+                            </span>
+                            <span className="shrink-0 text-[11px] text-faint">{channel._count?.messages ?? 0} msgs</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {broadcastBatches.map((batch) => {
+                        const selectedInBatch = batch.channels.filter((channel) => broadcastTargets.has(channel.id)).length;
+                        return (
+                          <button
+                            key={batch.id}
+                            type="button"
+                            onClick={() => setBroadcastBatchId(batch.id)}
+                            className="flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-left transition-all hover:border-hairline hover:bg-surface-100"
+                          >
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-100 text-[13px] font-black text-accent-300">
+                              {batch.name[0]?.toUpperCase() || "B"}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[13px] font-semibold text-primary">{batch.name}</span>
+                              <span className="block text-[11px] text-dim">
+                                {batch.channels.length} channel{batch.channels.length === 1 ? "" : "s"}
+                                {selectedInBatch > 0 ? ` · ${selectedInBatch} selected` : ""}
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-[18px] leading-none text-dim">›</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </ModalBody>
         <ModalFooter className="justify-end">
           <button onClick={() => setShowBroadcast(false)} className="px-4 py-2 text-sm text-dim hover:text-primary transition-colors">Cancel</button>
-          <button disabled={!broadcastContent.trim()} onClick={async () => {
+          <button disabled={!canSendBroadcast} onClick={async () => {
             try {
               const body: any = { content: broadcastContent.trim() };
               if (!broadcastAll) body.channelIds = Array.from(broadcastTargets);
               const res = await api.post("/admin/broadcast", body);
               toast.success(`Broadcast sent to ${res.data.channelCount} channels!`);
-              setBroadcastContent(""); setShowBroadcast(false);
+              setBroadcastContent(""); setBroadcastTargets(new Set()); setBroadcastBatchId(null); setBroadcastAll(true); setShowBroadcast(false);
             } catch { toast.error("Failed to send broadcast"); }
           }} className="btn-primary px-4 py-2 text-sm font-medium rounded-lg disabled:opacity-50">Send broadcast</button>
         </ModalFooter>

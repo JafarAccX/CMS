@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import prisma from "../utils/prisma.js";
 import {
   generateAccessToken,
@@ -21,8 +22,11 @@ import {
   getLmsLearnerData,
   type LmsLearnerData,
 } from "./lms.client.js";
+import { sendPasswordResetEmail } from "./email.service.js";
 
 const BCRYPT_ROUNDS = 12;
+const PASSWORD_RESET_TOKEN_BYTES = 32;
+const PASSWORD_RESET_TTL_MINUTES = 30;
 
 export async function registerUser(data: RegisterInput) {
   const existing = await prisma.user.findFirst({
@@ -612,6 +616,84 @@ export async function learnerLogin(phone: string, email: string) {
   ]);
 
   return issueTokens(cmsUser, enriched ?? undefined);
+}
+
+function hashResetToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function getClientOrigin() {
+  const explicit = process.env.FRONTEND_URL || process.env.CLIENT_URL || process.env.CLIENT_ORIGIN;
+  return (explicit?.split(",")[0]?.trim() || "http://localhost:5173").replace(/\/$/, "");
+}
+
+export async function requestPasswordReset(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+  // Always return the same public outcome so this endpoint cannot reveal accounts.
+  if (!user || user.is_banned || normalizedEmail.endsWith("@crm.local")) {
+    return { message: "If that email exists, a password reset link has been sent." };
+  }
+
+  const token = crypto.randomBytes(PASSWORD_RESET_TOKEN_BYTES).toString("base64url");
+  const tokenHash = hashResetToken(token);
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MINUTES * 60 * 1000);
+
+  await prisma.$transaction([
+    prisma.passwordResetToken.updateMany({
+      where: { user_id: user.id, used_at: null },
+      data: { used_at: new Date() },
+    }),
+    prisma.passwordResetToken.deleteMany({
+      where: { expires_at: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+    }),
+    prisma.passwordResetToken.create({
+      data: {
+        user_id: user.id,
+        token_hash: tokenHash,
+        expires_at: expiresAt,
+      },
+    }),
+  ]);
+
+  const resetUrl = `${getClientOrigin()}/login?resetToken=${encodeURIComponent(token)}`;
+  await sendPasswordResetEmail(user.email, resetUrl, user.username);
+
+  return { message: "If that email exists, a password reset link has been sent." };
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  const tokenHash = hashResetToken(token.trim());
+  const resetToken = await prisma.passwordResetToken.findUnique({
+    where: { token_hash: tokenHash },
+    include: { user: true },
+  });
+
+  if (!resetToken || resetToken.used_at || resetToken.expires_at.getTime() < Date.now()) {
+    throw new UnauthorizedError("This reset link is invalid or has expired.");
+  }
+  if (resetToken.user.is_banned) {
+    throw new UnauthorizedError("Your account has been banned.");
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: resetToken.user_id },
+      data: { password_hash: passwordHash },
+    }),
+    prisma.passwordResetToken.update({
+      where: { id: resetToken.id },
+      data: { used_at: new Date() },
+    }),
+    prisma.passwordResetToken.updateMany({
+      where: { user_id: resetToken.user_id, used_at: null },
+      data: { used_at: new Date() },
+    }),
+  ]);
+
+  return { message: "Password reset successfully. You can now sign in." };
 }
 
 export async function refreshAccessToken(refreshTokenCookie: string) {

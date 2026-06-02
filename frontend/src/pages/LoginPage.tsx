@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
   CheckCircle2,
@@ -9,6 +9,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
+import api from "../api/client";
 
 type Kind = "email" | "phone" | "unknown";
 type Step = "input" | "verify";
@@ -28,16 +29,21 @@ function isValidEmail(value: string) {
 
 function UnifiedLoginForm() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const login = useAuthStore((s) => s.login);
   const sendOtp = useAuthStore((s) => s.sendOtp);
   const verifyOtp = useAuthStore((s) => s.verifyOtp);
+  const resetToken = searchParams.get("resetToken") || "";
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [requestId, setRequestId] = useState("");
   const [step, setStep] = useState<Step>("input");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(0);
 
@@ -71,6 +77,56 @@ function UnifiedLoginForm() {
       setLoading(false);
     }
   }, [identifier, login, navigate, password]);
+
+  const handleForgotPassword = useCallback(async () => {
+    setError("");
+    setNotice("");
+
+    if (!isValidEmail(identifier)) {
+      setError("Enter your email address first, then click Forgot.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data } = await api.post("/auth/forgot-password", { email: identifier.trim() });
+      setNotice(data?.message || "If that email exists, a password reset link has been sent.");
+    } catch (err: any) {
+      setError(err?.response?.data?.error || "Could not send reset email. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [identifier]);
+
+  const handleResetPassword = useCallback(async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data } = await api.post("/auth/reset-password", { token: resetToken, password: newPassword });
+      setNotice(data?.message || "Password reset successfully. You can now sign in.");
+      setNewPassword("");
+      setConfirmPassword("");
+      const next = new URLSearchParams(searchParams);
+      next.delete("resetToken");
+      setSearchParams(next, { replace: true });
+    } catch (err: any) {
+      setError(err?.response?.data?.error || "This reset link is invalid or has expired.");
+    } finally {
+      setLoading(false);
+    }
+  }, [confirmPassword, newPassword, resetToken, searchParams, setSearchParams]);
 
   const handleSendOtp = useCallback(async () => {
     setError("");
@@ -211,6 +267,77 @@ function UnifiedLoginForm() {
     );
   }
 
+  if (resetToken) {
+    return (
+      <form onSubmit={handleResetPassword} className="flex flex-col gap-5">
+        <div className="flex items-start gap-3 rounded-lg border border-[rgba(66,71,84,0.5)] bg-[rgba(29,32,34,0.5)] p-4 text-[13px] leading-5 text-[#C2C6D6]">
+          <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-[#AFC6FF]" />
+          <span>Enter a new password for your AcceleratorX account.</span>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label htmlFor="new-password" className="text-[12px] font-medium tracking-[0.52px] text-[#E0E3E6]">
+            New password
+          </label>
+          <input
+            id="new-password"
+            type="password"
+            value={newPassword}
+            onChange={(event) => {
+              setNewPassword(event.target.value);
+              setError("");
+            }}
+            autoComplete="new-password"
+            placeholder="At least 8 characters"
+            className="h-11 w-full rounded-lg border border-[rgba(66,71,84,0.5)] bg-[rgba(29,32,34,0.5)] px-4 text-base text-[#E0E3E6] shadow-[0_1px_2px_rgba(0,0,0,0.05)] placeholder:text-[rgba(194,198,214,0.5)] focus:border-[rgba(59,130,255,0.6)] focus:bg-[rgba(29,32,34,0.85)] focus:outline-none"
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label htmlFor="confirm-password" className="text-[12px] font-medium tracking-[0.52px] text-[#E0E3E6]">
+            Confirm password
+          </label>
+          <input
+            id="confirm-password"
+            type="password"
+            value={confirmPassword}
+            onChange={(event) => {
+              setConfirmPassword(event.target.value);
+              setError("");
+            }}
+            autoComplete="new-password"
+            placeholder="Repeat new password"
+            className="h-11 w-full rounded-lg border border-[rgba(66,71,84,0.5)] bg-[rgba(29,32,34,0.5)] px-4 text-base text-[#E0E3E6] shadow-[0_1px_2px_rgba(0,0,0,0.05)] placeholder:text-[rgba(194,198,214,0.5)] focus:border-[rgba(59,130,255,0.6)] focus:bg-[rgba(29,32,34,0.85)] focus:outline-none"
+          />
+        </div>
+
+        {error && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{error}</div>}
+        {notice && <div className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 p-3 text-sm text-cyan-100">{notice}</div>}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="flex w-full items-center justify-center gap-3 rounded-lg border-0 bg-[linear-gradient(82.76deg,#3B82FF_17.65%,#00DBE8_100.33%)] px-6 py-3 text-[13px] font-semibold tracking-[0.52px] text-white shadow-[0_0_18px_rgba(59,130,255,0.25)] transition disabled:cursor-wait disabled:opacity-70 hover:brightness-110"
+        >
+          {loading ? "Resetting..." : "Reset password"}
+          {!loading && <ArrowRight className="h-4 w-4" />}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            const next = new URLSearchParams(searchParams);
+            next.delete("resetToken");
+            setSearchParams(next, { replace: true });
+          }}
+          className="text-left text-[12px] font-medium text-[#94A3B8] transition hover:text-[#E0E3E6]"
+        >
+          Back to sign in
+        </button>
+      </form>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <div className="flex flex-col gap-2">
@@ -239,6 +366,7 @@ function UnifiedLoginForm() {
             onChange={(event) => {
               setIdentifier(event.target.value);
               setError("");
+              setNotice("");
             }}
             autoFocus
             autoComplete="username"
@@ -256,7 +384,7 @@ function UnifiedLoginForm() {
           <label htmlFor="login-password" className="text-[12px] font-medium tracking-[0.52px] text-[#E0E3E6]">
             Password
           </label>
-          <button type="button" className="text-[12px] font-medium tracking-[0.52px] text-[#E0E3E6] underline">
+          <button type="button" onClick={() => void handleForgotPassword()} disabled={loading} className="text-[12px] font-medium tracking-[0.52px] text-[#E0E3E6] underline disabled:cursor-wait disabled:opacity-60">
             Forgot?
           </button>
         </div>
@@ -280,6 +408,7 @@ function UnifiedLoginForm() {
       </div>
 
       {error && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{error}</div>}
+      {notice && <div className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 p-3 text-sm text-cyan-100">{notice}</div>}
 
       <button
         type="submit"

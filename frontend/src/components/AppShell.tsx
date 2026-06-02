@@ -4,7 +4,7 @@ import { useAuthStore } from "../store/authStore";
 import { useBatchStore } from "../store/batchStore";
 import api from "../api/client";
 import {
-  LayoutDashboard, Home, MessageCircle, Hash, Settings,
+  Home, MessageCircle, Hash, Settings,
   LogOut, ChevronDown, ChevronRight, Folder, BookOpen,
   Pin, Plus, UserPlus,
 } from "lucide-react";
@@ -125,6 +125,9 @@ export default function AppShell({ children }: AppShellProps) {
   const isDirect = pathname.startsWith("/dm");
   const isRooms = pathname === "/batches" || pathname.startsWith("/batch");
   const hideGlobalSidebar = pathname.startsWith("/profile");
+  const isAdmin = user?.role === "admin";
+  const isMentor = user?.role === "mentor";
+  const isLearner = user?.role === "learner";
 
   const pinnedChannels = pinnedData?.pinnedChannels || [];
   const activeBatches = batches.filter((b) => b.userMembership !== null || b.type === "general").slice(0, 5);
@@ -155,12 +158,15 @@ export default function AppShell({ children }: AppShellProps) {
 
         {/* Main nav */}
         <div className="px-4 pt-4 pb-2 flex flex-col gap-0.5">
-          <NavItem href="/admin" icon={<LayoutDashboard className="w-[15px] h-[15px]" />} label="Dashboard" active={isDashboard} />
           <NavItem href="/" icon={<Home className="w-[15px] h-[15px]" />} label="Home" active={isHome} />
           <NavItem href="/dm" icon={<MessageCircle className="w-[15px] h-[15px]" />} label="Direct" active={isDirect} />
           <NavItem href="/batches" icon={<Hash className="w-[15px] h-[15px]" />} label="Rooms" active={isRooms} badge={activeBatches.length || undefined} />
-          <NavItem href="/admin" icon={<UserPlus className="w-[15px] h-[15px]" />} label="New User" />
-          <NavItem href="/batches" icon={<Plus className="w-[15px] h-[15px]" />} label="Create Batch" />
+          {isAdmin && (
+            <>
+              <NavItem href="/admin" icon={<UserPlus className="w-[15px] h-[15px]" />} label="New User" active={isDashboard} />
+              <NavItem href="/batches" icon={<Plus className="w-[15px] h-[15px]" />} label="Create Batch" active={isRooms} />
+            </>
+          )}
         </div>
 
         <div className="h-px bg-hairline mx-6 my-2" />
@@ -212,17 +218,24 @@ export default function AppShell({ children }: AppShellProps) {
 
           <div className="h-px bg-hairline mx-2 my-3" />
 
-          {/* Mentorship link */}
-          <Link to="/mentor" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-white/[0.04] transition-colors">
-            <BookOpen className="w-[15px] h-[15px] text-muted" />
-            <span className="text-[14px] font-normal text-primary">Mentorship</span>
-          </Link>
+          {isMentor && (
+            <Link to="/mentor" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-white/[0.04] transition-colors">
+              <BookOpen className="w-[15px] h-[15px] text-muted" />
+              <span className="text-[14px] font-normal text-primary">Mentorship</span>
+            </Link>
+          )}
+          {isLearner && (
+            <Link to="/dm?askMentor=1" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-white/[0.04] transition-colors">
+              <BookOpen className="w-[15px] h-[15px] text-muted" />
+              <span className="text-[14px] font-normal text-primary">Ask Mentor</span>
+            </Link>
+          )}
         </div>
 
         {/* Footer */}
         <div className="px-4 mt-2">
           <div className="h-px bg-hairline mx-2 mb-2" />
-          {user?.role === "admin" && (
+          {isAdmin && (
             <Link to="/admin" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-white/[0.04] transition-colors mb-1">
               <Settings className="w-[15px] h-[15px] text-muted" />
               <span className="text-[14px] font-normal text-primary flex-1">Admin Console</span>
@@ -259,10 +272,11 @@ export default function AppShell({ children }: AppShellProps) {
 
       {!hideGlobalSidebar && (
         <nav className="mobile-nav">
-          <NavItem href="/admin" icon={<LayoutDashboard className="w-[15px] h-[15px]" />} label="Admin" active={isDashboard} />
           <NavItem href="/" icon={<Home className="w-[15px] h-[15px]" />} label="Home" active={isHome} />
           <NavItem href="/dm" icon={<MessageCircle className="w-[15px] h-[15px]" />} label="Direct" active={isDirect} />
           <NavItem href="/batches" icon={<Hash className="w-[15px] h-[15px]" />} label="Rooms" active={isRooms} />
+          {isLearner && <NavItem href="/dm?askMentor=1" icon={<BookOpen className="w-[15px] h-[15px]" />} label="Ask" active={false} />}
+          {isAdmin && <NavItem href="/admin" icon={<Settings className="w-[15px] h-[15px]" />} label="Admin" active={isDashboard} />}
         </nav>
       )}
     </div>
