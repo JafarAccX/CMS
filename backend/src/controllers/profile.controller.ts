@@ -3,6 +3,8 @@ import prisma from "../utils/prisma.js";
 import { updateProfileSchema, changePasswordSchema } from "../validators/index.js";
 import bcrypt from "bcrypt";
 import { UnauthorizedError } from "../utils/errors.js";
+import { revokeAllUserSessions, createRefreshSession } from "../services/session.service.js";
+import { setRefreshCookie } from "../utils/cookies.js";
 
 export async function getProfile(req: Request, res: Response, next: NextFunction) {
   try {
@@ -59,10 +61,13 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
     if (!isValid) throw new UnauthorizedError("Invalid current password");
 
     const password_hash = await bcrypt.hash(data.newPassword, 12);
-    await prisma.user.update({
-      where: { id: req.user!.id },
-      data: { password_hash },
-    });
+    await prisma.user.update({ where: { id: req.user!.id }, data: { password_hash } });
+
+    // Revoke every session (including potential attacker sessions), then issue a
+    // fresh one for this device so the user stays logged in on the current browser.
+    await revokeAllUserSessions(req.user!.id);
+    const newRefreshToken = await createRefreshSession(req.user!.id);
+    setRefreshCookie(res, newRefreshToken);
 
     res.status(200).json({ message: "Password updated successfully" });
   } catch (err) {

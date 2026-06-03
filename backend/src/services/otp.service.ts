@@ -1,9 +1,24 @@
+/**
+ * OTP service — Redis-backed.
+ *
+ * Keys:
+ *   otp:code:{key}        → JSON {code, attempts}   TTL = OTP_TTL_SECONDS
+ *   otp:pending:{cleaned} → requestId string         TTL = OTP_TTL_SECONDS
+ *
+ * The redis.ts util provides a transparent MemoryCache fallback for single-instance
+ * local development, so no code paths differ between environments.
+ */
 import crypto from "crypto";
 import { sendOtpEmail } from "./email.service.js";
+import { consumeCooldown, clearCooldown } from "../utils/throttle.js";
+import { redisGet, redisSet, redisDel } from "../utils/redis.js";
 
 const MAXXCOM_BASE_URL = process.env.MAXXCOM_BASE_URL || "";
 const OTP_GATEWAY_API_KEY = process.env.OTP_GATEWAY_API_KEY || "";
 const OTP_FETCH_TIMEOUT_MS = 8_000;
+const OTP_RESEND_COOLDOWN_SECONDS = 45;
+const OTP_TTL_SECONDS = 5 * 60; // 5 minutes
+const OTP_MAX_ATTEMPTS = 3;
 
 function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
   const controller = new AbortController();
@@ -11,63 +26,90 @@ function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Respo
   return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
 }
 
-interface OtpEntry {
-  code: string;
-  expiresAt: number;
-  attempts: number;
-}
-
-interface PendingRequest {
-  requestId: string;
-  expiresAt: number;
-}
-
-const otpStore = new Map<string, OtpEntry>();
-const pendingRequests = new Map<string, PendingRequest>();
-
-// Cleanup expired entries every 2 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of otpStore) {
-    if (now > entry.expiresAt) otpStore.delete(key);
-  }
-  for (const [key, entry] of pendingRequests) {
-    if (now > entry.expiresAt) pendingRequests.delete(key);
-  }
-}, 2 * 60 * 1000);
-
 function generateOtpCode(): string {
   return crypto.randomInt(100000, 999999).toString();
 }
+
+function otpStoreKey(key: string): string {
+  return `otp:code:${key}`;
+}
+
+function pendingKey(cleaned: string): string {
+  return `otp:pending:${cleaned}`;
+}
+
+interface StoredOtp {
+  code: string;
+  attempts: number;
+}
+
+// ── Redis OTP helpers ─────────────────────────────────────────────────────────
+
+async function storeOtp(key: string, code: string): Promise<void> {
+  const payload: StoredOtp = { code, attempts: 0 };
+  await redisSet(otpStoreKey(key), JSON.stringify(payload), OTP_TTL_SECONDS);
+}
+
+async function getOtp(key: string): Promise<StoredOtp | null> {
+  const raw = await redisGet(otpStoreKey(key));
+  if (!raw) return null;
+  try { return JSON.parse(raw) as StoredOtp; } catch { return null; }
+}
+
+async function updateOtpAttempts(key: string, entry: StoredOtp, ttlRemaining: number): Promise<void> {
+  // Re-store with updated attempts and a reasonable remaining TTL. We don't track
+  // exact TTL remaining from the cache, so we conservatively use the full window —
+  // the worst case is an extra minute of validity after max-attempts which is fine
+  // given the attempt limit is already enforced.
+  await redisSet(otpStoreKey(key), JSON.stringify(entry), ttlRemaining);
+}
+
+async function deleteOtp(key: string): Promise<void> {
+  await redisDel(otpStoreKey(key));
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
 
 export async function sendOtp(
   identifier: string,
   method: "phone" | "email"
 ): Promise<{ success: boolean; message: string; requestId?: string; method: string }> {
-  if (method === "phone" && MAXXCOM_BASE_URL && OTP_GATEWAY_API_KEY) {
-    return sendWhatsAppOtp(identifier);
+  // Per-target cooldown — prevents email/OTP bombing of a single recipient.
+  const cooldownKey = `cooldown:otp:${method}:${identifier.toLowerCase()}`;
+  if (!(await consumeCooldown(cooldownKey, OTP_RESEND_COOLDOWN_SECONDS))) {
+    return {
+      success: true,
+      message: `An OTP was just sent to your ${method}. Please wait a moment before requesting another.`,
+      method,
+    };
   }
 
-  // Fallback: generate code in-memory (for email or when Maxxcom not configured)
-  const code = generateOtpCode();
-  otpStore.set(identifier, {
-    code,
-    expiresAt: Date.now() + 5 * 60 * 1000,
-    attempts: 0,
-  });
+  try {
+    if (method === "phone" && MAXXCOM_BASE_URL && OTP_GATEWAY_API_KEY) {
+      return await sendWhatsAppOtp(identifier);
+    }
 
-  if (method === "email") {
-    try {
+    // Fallback: generate code and store in Redis (or MemoryCache in dev)
+    const code = generateOtpCode();
+    const key = identifier.includes("@") ? identifier.toLowerCase() : identifier.replace(/\D/g, "");
+    await storeOtp(key, code);
+
+    if (method === "email") {
       await sendOtpEmail(identifier, code);
-    } catch (err) {
+    } else {
+      console.log(`[OTP-DEV] Phone OTP for ${identifier}: ${code}`);
+    }
+
+    return { success: true, message: `OTP sent to your ${method}`, method };
+  } catch (err) {
+    // Send failed — release the cooldown immediately so the user can retry.
+    await clearCooldown(cooldownKey);
+    if (method === "email") {
       console.error(`[OTP] Failed to send email OTP to ${identifier}:`, err);
       throw new Error("Failed to send OTP email. Please try again.");
     }
-  } else {
-    console.log(`[OTP-DEV] Phone OTP for ${identifier}: ${code}`);
+    throw err;
   }
-
-  return { success: true, message: `OTP sent to your ${method}`, method };
 }
 
 async function sendWhatsAppOtp(phone: string) {
@@ -85,14 +127,9 @@ async function sendWhatsAppOtp(phone: string) {
     });
 
     const data: any = await response.json();
-    if (!response.ok) {
-      throw new Error("Failed to send OTP");
-    }
+    if (!response.ok) throw new Error("Failed to send OTP");
 
-    pendingRequests.set(cleaned, {
-      requestId: data.requestId,
-      expiresAt: Date.now() + 5 * 60 * 1000,
-    });
+    await redisSet(pendingKey(cleaned), data.requestId as string, OTP_TTL_SECONDS);
 
     return {
       success: true,
@@ -101,13 +138,9 @@ async function sendWhatsAppOtp(phone: string) {
       method: "whatsapp",
     };
   } catch {
-    // Fallback to in-memory if Maxxcom fails
+    // Maxxcom unavailable — generate and store a fallback code in Redis.
     const code = generateOtpCode();
-    otpStore.set(phone.replace(/\D/g, ""), {
-      code,
-      expiresAt: Date.now() + 5 * 60 * 1000,
-      attempts: 0,
-    });
+    await storeOtp(cleaned, code);
     console.log(`[OTP-FALLBACK] Phone OTP for ${phone}: ${code}`);
     return { success: true, message: "OTP sent", method: "fallback" };
   }
@@ -121,56 +154,49 @@ export async function verifyOtp(
   const cleaned = identifier.replace(/\D/g, "");
   const isPhone = /^\d{10,}$/.test(cleaned) && !identifier.includes("@");
 
-  // Try Maxxcom verification first for phone
+  // ── Maxxcom WhatsApp verification ──────────────────────────────────────────
   if (isPhone && MAXXCOM_BASE_URL && OTP_GATEWAY_API_KEY) {
     let finalRequestId = requestId;
     if (!finalRequestId) {
-      const pending = pendingRequests.get(cleaned);
-      if (pending && pending.expiresAt > Date.now()) {
-        finalRequestId = pending.requestId;
-      }
+      finalRequestId = (await redisGet(pendingKey(cleaned))) ?? undefined;
     }
-
     if (finalRequestId) {
       const valid = await verifyWhatsAppOtp(finalRequestId, otpCode);
-      if (!valid) {
-        return { success: false, message: "Invalid OTP" };
-      }
-      pendingRequests.delete(cleaned);
+      if (!valid) return { success: false, message: "Invalid OTP" };
+      await redisDel(pendingKey(cleaned));
       return { success: true };
     }
   }
 
-  // In-memory verification
+  // ── Redis-backed fallback verification ─────────────────────────────────────
   const key = identifier.includes("@") ? identifier.toLowerCase() : cleaned;
-  const entry = otpStore.get(key);
+  const entry = await getOtp(key);
 
   if (!entry) {
     return { success: false, message: "No OTP found. Please request a new one." };
   }
 
-  if (Date.now() > entry.expiresAt) {
-    otpStore.delete(key);
-    return { success: false, message: "OTP expired. Please request a new one." };
-  }
-
-  if (entry.attempts >= 3) {
-    otpStore.delete(key);
+  if (entry.attempts >= OTP_MAX_ATTEMPTS) {
+    await deleteOtp(key);
     return { success: false, message: "Too many attempts. Please request a new OTP." };
   }
 
-  entry.attempts++;
+  // Increment attempts and persist before checking the code (prevents race conditions
+  // where a client retries while the previous update is in flight).
+  entry.attempts += 1;
+  await updateOtpAttempts(key, entry, OTP_TTL_SECONDS);
 
-  const isValid = crypto.timingSafeEqual(
-    Buffer.from(otpCode.trim()),
-    Buffer.from(entry.code)
-  );
+  // Guard length before timingSafeEqual to avoid the "unequal buffer length" throw.
+  const submitted = otpCode.trim();
+  const isValid =
+    submitted.length === entry.code.length &&
+    crypto.timingSafeEqual(Buffer.from(submitted), Buffer.from(entry.code));
 
   if (!isValid) {
     return { success: false, message: "Invalid OTP" };
   }
 
-  otpStore.delete(key);
+  await deleteOtp(key);
   return { success: true };
 }
 

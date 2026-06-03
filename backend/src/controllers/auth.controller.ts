@@ -1,19 +1,16 @@
 import type { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import * as authService from "../services/auth.service.js";
-import { registerSchema, loginSchema } from "../validators/index.js";
+import { registerSchema, loginSchema, strongPassword } from "../validators/index.js";
+import { setRefreshCookie, clearRefreshCookie } from "../utils/cookies.js";
+import { revokeRefreshSession } from "../services/session.service.js";
 
 export async function register(req: Request, res: Response, next: NextFunction) {
   try {
     const data = registerSchema.parse(req.body);
     const result = await authService.registerUser(data);
 
-    res.cookie("refreshToken", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    setRefreshCookie(res, result.refreshToken);
 
     res.status(201).json({
       user: result.user,
@@ -29,12 +26,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     const data = loginSchema.parse(req.body);
     const result = await authService.loginUser(data);
 
-    res.cookie("refreshToken", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    setRefreshCookie(res, result.refreshToken);
 
     res.status(200).json({
       user: result.user,
@@ -62,7 +54,7 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
 
 const resetPasswordSchema = z.object({
   token: z.string().min(20),
-  password: z.string().min(8).max(128),
+  password: strongPassword,
 });
 
 export async function resetPassword(req: Request, res: Response, next: NextFunction) {
@@ -85,12 +77,7 @@ export async function learnerLogin(req: Request, res: Response, next: NextFuncti
     const { phone, email } = learnerLoginSchema.parse(req.body);
     const result = await authService.learnerLogin(phone, email);
 
-    res.cookie("refreshToken", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    setRefreshCookie(res, result.refreshToken);
 
     res.status(200).json({
       user: result.user,
@@ -105,7 +92,13 @@ export async function learnerLogin(req: Request, res: Response, next: NextFuncti
 export async function refresh(req: Request, res: Response, next: NextFunction) {
   try {
     const refreshTokenCookie = req.cookies?.refreshToken;
-    const result = await authService.refreshAccessToken(refreshTokenCookie);
+    const result = await authService.refreshAccessToken(refreshTokenCookie, {
+      userAgent: req.headers["user-agent"] ?? null,
+      ip: req.ip ?? null,
+    });
+
+    // Rotation issues a new refresh token — replace the cookie.
+    setRefreshCookie(res, result.refreshToken);
 
     res.status(200).json({
       accessToken: result.accessToken,
@@ -115,9 +108,10 @@ export async function refresh(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-export async function logout(_req: Request, res: Response, next: NextFunction) {
+export async function logout(req: Request, res: Response, next: NextFunction) {
   try {
-    res.clearCookie("refreshToken");
+    await revokeRefreshSession(req.cookies?.refreshToken);
+    clearRefreshCookie(res);
     res.status(200).json({ message: "Logged out successfully" });
   } catch (err) {
     next(err);

@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useAuthStore } from "../store/authStore";
+import { isEmbed, requestParentReauth } from "../embed/bridge";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
 
@@ -17,6 +18,29 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Single-flight refresh: when many requests 401 at once (e.g. on page load), they
+// must share ONE /auth/refresh call instead of each firing their own. This also
+// matters once refresh-token rotation lands — parallel refreshes would otherwise
+// invalidate each other.
+let refreshPromise: Promise<string> | null = null;
+
+function refreshAccessToken(): Promise<string> {
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post(`${API_URL}/auth/refresh`, {}, { withCredentials: true })
+      .then((res) => {
+        const token: string = res.data.accessToken;
+        localStorage.setItem("accessToken", token);
+        useAuthStore.getState().setToken(token);
+        return token;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
 
 // Response interceptor — auto-refresh on 401, otherwise pass through
 api.interceptors.response.use(
@@ -40,15 +64,9 @@ api.interceptors.response.use(
 
     original._retry = true;
     try {
-      const { data } = await axios.post(
-        `${API_URL}/auth/refresh`,
-        {},
-        { withCredentials: true }
-      );
-      localStorage.setItem("accessToken", data.accessToken);
-      useAuthStore.getState().setToken(data.accessToken);
+      const token = await refreshAccessToken();
       original.headers = original.headers || {};
-      original.headers.Authorization = `Bearer ${data.accessToken}`;
+      original.headers.Authorization = `Bearer ${token}`;
       return api(original);
     } catch (refreshErr) {
       // Refresh failed → session is truly dead. Clear state and bounce to login,
@@ -58,7 +76,12 @@ api.interceptors.response.use(
       try {
         useAuthStore.getState().logout();
       } catch {}
-      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      // Embedded in the LMS: there's no /login page to send the user to — ask
+      // the parent to re-supply credentials so we can re-establish the session.
+      // The App-level embed gate shows a "Connecting…" screen meanwhile.
+      if (isEmbed()) {
+        requestParentReauth();
+      } else if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
         window.location.href = "/login";
       }
       return Promise.reject(error);

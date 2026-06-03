@@ -8,6 +8,7 @@ import { useDmStore } from "../store/dmStore";
 import { useSocketStore } from "../store/socketStore";
 import { toast } from "react-hot-toast";
 import api from "../api/client";
+import { isEmbed, requestParentReauth } from "../embed/bridge";
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:4000";
 
@@ -39,6 +40,11 @@ export function useSocketInit() {
 
     const cleanToken = accessToken.startsWith("Bearer ") ? accessToken.slice(7) : accessToken;
 
+    // Throttle the token-refresh attempt triggered by socket auth failures.
+    // Without this, an unrefreshable token + infinite reconnection fires an
+    // /auth/me request on every single connect_error (a request storm).
+    let lastRefreshAttempt = 0;
+
     const newSocket = io(SOCKET_URL, {
       auth: { token: cleanToken },
       transports: ["websocket", "polling"],
@@ -62,6 +68,19 @@ export function useSocketInit() {
       setIsConnected(false);
 
       if (err.message.includes("Invalid token") || err.message.includes("No token provided")) {
+        // Embedded in the LMS: ask the parent to re-supply credentials instead
+        // of relying on the refresh cookie (blocked third-party in the iframe).
+        // requestParentReauth is itself throttled, so this is safe to call here.
+        if (isEmbed()) {
+          requestParentReauth();
+          return;
+        }
+        // At most one refresh attempt per 30s. A successful refresh updates the
+        // store token, which recreates the socket with a fresh token; a failed
+        // one bounces to login via the axios interceptor.
+        const now = Date.now();
+        if (now - lastRefreshAttempt < 30_000) return;
+        lastRefreshAttempt = now;
         try {
           await api.get("/auth/me");
         } catch (refreshErr) {

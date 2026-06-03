@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authenticate, requireRole } from "../middlewares/auth.js";
 import { rateLimiter } from "../middlewares/rateLimiter.js";
+import { authRateLimiter, byEmail, byLoginIdentifier } from "../middlewares/authRateLimiter.js";
 import { upload } from "../middlewares/upload.js";
 
 import * as authCtrl from "../controllers/auth.controller.js";
@@ -24,16 +25,23 @@ const router = Router();
 // Apply rate limiting globally to all API routes
 router.use(rateLimiter);
 
+// Stricter, dedicated limiters for sensitive auth endpoints (per IP + per target).
+const loginLimiter = authRateLimiter({ prefix: "login", windowSeconds: 60, max: 12, identifier: byLoginIdentifier });
+const otpSendLimiter = authRateLimiter({ prefix: "otp-send", windowSeconds: 60, max: 6, identifier: byLoginIdentifier });
+const otpVerifyLimiter = authRateLimiter({ prefix: "otp-verify", windowSeconds: 60, max: 12, identifier: byLoginIdentifier });
+const forgotLimiter = authRateLimiter({ prefix: "forgot", windowSeconds: 60, max: 6, identifier: byEmail });
+const resetLimiter = authRateLimiter({ prefix: "reset", windowSeconds: 60, max: 10 });
+
 // ── Auth ──────────────────────────────────────────────────
 router.post("/auth/register", authCtrl.register);
-router.post("/auth/login", authCtrl.login);
-router.post("/auth/forgot-password", authCtrl.forgotPassword);
-router.post("/auth/reset-password", authCtrl.resetPassword);
-router.post("/auth/learner-login", authCtrl.learnerLogin);
+router.post("/auth/login", loginLimiter, authCtrl.login);
+router.post("/auth/forgot-password", forgotLimiter, authCtrl.forgotPassword);
+router.post("/auth/reset-password", resetLimiter, authCtrl.resetPassword);
+router.post("/auth/learner-login", loginLimiter, authCtrl.learnerLogin);
 router.post("/auth/refresh", authCtrl.refresh);
 router.post("/auth/logout", authCtrl.logout);
-router.post("/auth/send-otp", otpAuthCtrl.handleSendOtp);
-router.post("/auth/verify-otp", otpAuthCtrl.handleVerifyOtp);
+router.post("/auth/send-otp", otpSendLimiter, otpAuthCtrl.handleSendOtp);
+router.post("/auth/verify-otp", otpVerifyLimiter, otpAuthCtrl.handleVerifyOtp);
 
 // Protect all routes below
 router.use(authenticate);

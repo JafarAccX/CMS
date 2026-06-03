@@ -1,11 +1,25 @@
 import { z } from "zod";
 
+// ─── Shared helpers ────────────────────────────────────────
+
+/**
+ * Strong password: min 8 chars, at least one letter, at least one digit.
+ * Applied consistently across register / reset / change-password so the
+ * policy can be updated in one place.
+ */
+export const strongPassword = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .max(128, "Password must be at most 128 characters")
+  .refine((v) => /[a-zA-Z]/.test(v), "Password must contain at least one letter")
+  .refine((v) => /\d/.test(v), "Password must contain at least one number");
+
 // ─── Auth ──────────────────────────────────────────────────
 export const registerSchema = z.object({
   username: z.string().min(2).max(50),
   email: z.string().email(),
   phone: z.string().min(10).max(20),
-  password: z.string().min(8).max(128),
+  password: strongPassword,
   role: z.enum(["admin", "mentor", "batch_moderator", "learner", "guest"]).optional(),
   provider: z.enum(["crm", "website"]),
 });
@@ -91,7 +105,7 @@ export const updateProfileSchema = z.object({
 
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1),
-  newPassword: z.string().min(8).max(128),
+  newPassword: strongPassword,
 });
 
 // ─── Broadcast ─────────────────────────────────────────────

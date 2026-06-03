@@ -1,32 +1,46 @@
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import prisma from "../utils/prisma.js";
-import {
-  generateAccessToken,
-  generateRefreshToken,
-  verifyRefreshToken,
-} from "../utils/jwt.js";
+import { generateAccessToken } from "../utils/jwt.js";
 import { UnauthorizedError, ConflictError, ForbiddenError } from "../utils/errors.js";
+import {
+  createRefreshSession,
+  rotateRefreshSession,
+  revokeAllUserSessions,
+  type SessionMeta,
+} from "./session.service.js";
 import type { RegisterInput, LoginInput } from "../validators/index.js";
 import {
   loginCrmStaff,
   findCrmCustomerByContact,
   findCrmCustomerByCustId,
   getCustomerEnrollments,
-  getBatchStudents,
   type CrmCustomer,
   type CrmEnrollmentWithBatch,
-  type CrmBatchStudent,
 } from "./crm.client.js";
 import {
   getLmsLearnerData,
   type LmsLearnerData,
 } from "./lms.client.js";
 import { sendPasswordResetEmail } from "./email.service.js";
+import { consumeCooldown } from "../utils/throttle.js";
+import {
+  ensureUniqueUsername,
+  findOrCreateLearner,
+  syncBatchMemberships,
+} from "./learner.provisioning.service.js";
 
 const BCRYPT_ROUNDS = 12;
 const PASSWORD_RESET_TOKEN_BYTES = 32;
 const PASSWORD_RESET_TTL_MINUTES = 30;
+const PASSWORD_RESET_COOLDOWN_SECONDS = 60;
+
+/**
+ * A pre-computed bcrypt hash compared against on the "no such user" login paths.
+ * Running a real compare for non-existent accounts keeps response timing similar
+ * to the valid-account path, mitigating user-enumeration via timing analysis.
+ */
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync("timing-equalizer-not-a-real-password", BCRYPT_ROUNDS);
 
 export async function registerUser(data: RegisterInput) {
   const existing = await prisma.user.findFirst({
@@ -72,7 +86,7 @@ export async function registerUser(data: RegisterInput) {
 
   const fullUser = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
   const accessToken = generateAccessToken(fullUser);
-  const refreshToken = generateRefreshToken(fullUser);
+  const refreshToken = await createRefreshSession(fullUser.id);
 
   return { user, accessToken, refreshToken };
 }
@@ -145,28 +159,26 @@ export async function loginUser(data: LoginInput) {
 
     // Fetch enriched CRM/LMS data even for existing local users
     const customer = await findCrmCustomer(identifier, idType).catch(() => null);
+    const enriched = await fetchEnrichedData(customer ?? null).catch(() => null);
 
-    const [enriched] = await Promise.all([
-      fetchEnrichedData(customer ?? null).catch(() => null),
-      customer
-        ? getCustomerEnrollments(customer.CustId)
-            .then((enrollments) => syncLearnerBatches(localUser.id, enrollments))
-            .catch((err) => console.error("Batch sync failed (continuing login):", err))
-        : Promise.resolve(),
-    ]);
-
-    // Sync phone and avatar from CRM into local record if missing
-    let syncedUser = localUser;
+    // Sync batches and profile fields asynchronously — do NOT block token issuance.
     if (customer) {
       const updates: Record<string, unknown> = {};
       if (!localUser.phone && customer.Mobile) updates.phone = String(customer.Mobile);
       if (!localUser.avatar_url && customer.ProfilePicture) updates.avatar_url = customer.ProfilePicture;
-      if (Object.keys(updates).length > 0) {
-        syncedUser = await prisma.user.update({ where: { id: localUser.id }, data: updates });
-      }
+      setImmediate(() => {
+        const syncUser = Object.keys(updates).length > 0
+          ? prisma.user.update({ where: { id: localUser.id }, data: updates }).catch(() => {})
+          : Promise.resolve();
+        syncUser.then(() =>
+          getCustomerEnrollments(customer.CustId)
+            .then((enrollments) => syncBatchMemberships(localUser.id, enrollments))
+            .catch((err) => console.error("[bg] Batch sync failed:", err))
+        );
+      });
     }
 
-    return issueTokens(syncedUser, enriched ?? undefined);
+    return issueTokens(localUser, enriched ?? undefined);
   }
 
   // Not in local DB — try CRM customer lookup (cross-system)
@@ -174,17 +186,21 @@ export async function loginUser(data: LoginInput) {
   if (customer) {
     if (!customer.Active) throw new UnauthorizedError("Your CRM account is inactive");
     const cmsUser = await findOrCreateLearnerUser(customer, data.password);
+    const enriched = await fetchEnrichedData(customer).catch(() => null);
 
-    const [enriched] = await Promise.all([
-      fetchEnrichedData(customer),
+    // Fire batch sync in background — tokens are issued immediately.
+    setImmediate(() => {
       getCustomerEnrollments(customer.CustId)
-        .then((enrollments) => syncLearnerBatches(cmsUser.id, enrollments))
-        .catch((err) => console.error("CRM batch sync failed (continuing login):", err)),
-    ]);
+        .then((enrollments) => syncBatchMemberships(cmsUser.id, enrollments))
+        .catch((err) => console.error("[bg] CRM batch sync failed:", err));
+    });
 
     return issueTokens(cmsUser, enriched);
   }
 
+  // No local user and no CRM match. Run a dummy compare so response timing
+  // matches the valid-account path, then return a generic error (no enumeration).
+  await bcrypt.compare(data.password, DUMMY_PASSWORD_HASH);
   throw new UnauthorizedError("Invalid credentials");
 }
 
@@ -233,14 +249,13 @@ async function loginViaCrm(identifier: string, idType: IdentifierType, password:
     }
 
     const cmsUser = await findOrCreateLearnerUser(customer, password);
+    const enriched = await fetchEnrichedData(customer).catch(() => null);
 
-    // Fetch enriched data from CRM + LMS, and sync batches — all in parallel
-    const [enriched] = await Promise.all([
-      fetchEnrichedData(customer),
+    setImmediate(() => {
       getCustomerEnrollments(customer.CustId)
-        .then((enrollments) => syncLearnerBatches(cmsUser.id, enrollments))
-        .catch((err) => console.error("CRM batch sync failed (continuing login):", err)),
-    ]);
+        .then((enrollments) => syncBatchMemberships(cmsUser.id, enrollments))
+        .catch((err) => console.error("[bg] CRM batch sync failed:", err));
+    });
 
     return issueTokens(cmsUser, enriched);
   }
@@ -248,7 +263,9 @@ async function loginViaCrm(identifier: string, idType: IdentifierType, password:
   // 2. Not a customer. Staff login is already handled by loginUser() before
   //    this function is called for emails, so getting here means: not a
   //    customer, and (if email) staff login also failed → no account.
-  throw new UnauthorizedError("No account found with that identifier");
+  //    Use a generic error + dummy compare so we don't reveal account existence.
+  await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
+  throw new UnauthorizedError("Invalid credentials");
 }
 
 async function upsertAndIssueAdmin(staff: { user: { id: string; email: string; full_name?: string | null; mobile_number?: string | null } }) {
@@ -286,194 +303,33 @@ async function findOrCreateLearnerUser(
   customer: NonNullable<Awaited<ReturnType<typeof findCrmCustomerByContact>>>,
   passwordPlain: string
 ) {
-  // Try to find existing user by email first, then by phone.
-  let user = customer.Email
-    ? await prisma.user.findUnique({ where: { email: customer.Email } })
-    : null;
+  // Try to find an existing user first (by email then phone).
+  const email = customer.Email?.toLowerCase() ?? null;
+  const phone = String(customer.Mobile);
 
-  if (!user) {
-    const phone = String(customer.Mobile);
-    user = await prisma.user.findFirst({ where: { phone } });
-  }
+  let user = email ? await prisma.user.findUnique({ where: { email } }) : null;
+  if (!user) user = await prisma.user.findFirst({ where: { phone } });
 
   if (user) {
     if (user.is_banned) throw new UnauthorizedError("Your account has been banned");
-    // Existing user: verify password if it's a real one. CRM_MANAGED placeholder
-    // means this is the user's first password — set it now.
-    if (user.password_hash === "CRM_MANAGED") {
+    // CRM_MANAGED means first login — set a real password now.
+    if (user.password_hash === "CRM_MANAGED" || user.password_hash === "OTP_MANAGED") {
       const newHash = await bcrypt.hash(passwordPlain, BCRYPT_ROUNDS);
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: { password_hash: newHash },
-      });
+      user = await prisma.user.update({ where: { id: user.id }, data: { password_hash: newHash } });
     } else {
       const ok = await bcrypt.compare(passwordPlain, user.password_hash);
-      if (!ok) throw new UnauthorizedError("Invalid password");
+      if (!ok) throw new UnauthorizedError("Invalid credentials");
     }
     return user;
   }
 
-  // Auto-provision new learner. The password they typed becomes their CMS password.
-  const fullName =
-    [customer.FirstName, customer.LastName].filter(Boolean).join(" ").trim() ||
-    customer.Email?.split("@")[0] ||
-    `learner-${customer.CustId}`;
-
+  // No existing record — provision via shared service, using a real hashed password.
   const password_hash = await bcrypt.hash(passwordPlain, BCRYPT_ROUNDS);
-
-  // Ensure email uniqueness — fabricate one from CustId if CRM has no email.
-  const email = customer.Email ?? `cust-${customer.CustId}@crm.local`;
-
-  const created = await prisma.user.create({
-    data: {
-      email,
-      username: await ensureUniqueUsername(fullName),
-      phone: String(customer.Mobile),
-      password_hash,
-      role: "learner",
-      provider: "crm",
-    },
-  });
-  await prisma.subscription.create({
-    data: {
-      user_id: created.id,
-      plan: "free",
-      status: "active",
-      started_at: new Date(),
-    },
-  });
-  return created;
+  return findOrCreateLearner(customer, password_hash);
 }
 
-async function ensureUniqueUsername(base: string): Promise<string> {
-  const sanitized = base.replace(/\s+/g, " ").trim().slice(0, 45) || "user";
-  let candidate = sanitized;
-  let suffix = 1;
-  // Loop until we find an unused username.
-  // In practice this resolves on the first or second try.
-  while (await prisma.user.findUnique({ where: { username: candidate } })) {
-    suffix += 1;
-    candidate = `${sanitized.slice(0, 40)} ${suffix}`;
-  }
-  return candidate;
-}
-
-async function syncLearnerBatches(
-  userId: string,
-  enrollments: CrmEnrollmentWithBatch[]
-) {
-  if (!enrollments.length) return;
-
-  // Pick a default org + admin to satisfy required Batch foreign keys.
-  const defaultOrg = await prisma.organization.findFirst();
-  const defaultAdmin = await prisma.user.findFirst({ where: { role: "admin" } });
-  if (!defaultOrg || !defaultAdmin) {
-    console.warn("Cannot sync batches: missing default org or admin in CMS DB");
-    return;
-  }
-
-  for (const enr of enrollments) {
-    const crmBatchName = enr.Batch?.Batch;
-    if (!crmBatchName) continue;
-
-    // Match by name (case-insensitive). Auto-create if missing.
-    let batch = await prisma.batch.findFirst({
-      where: { name: { equals: crmBatchName, mode: "insensitive" } },
-    });
-    if (!batch) {
-      batch = await prisma.batch.create({
-        data: {
-          name: crmBatchName,
-          type: "private",
-          org_id: defaultOrg.id,
-          created_by: defaultAdmin.id,
-          description: `Auto-synced from CRM (Course: ${enr.Batch.Course ?? "—"})`,
-        },
-      });
-      // Auto-create default channel1 for the new batch
-      await prisma.channel.create({
-        data: { batch_id: batch.id, name: "channel1", created_by: defaultAdmin.id },
-      });
-    }
-
-    // Add the current user to the batch
-    await prisma.membership.upsert({
-      where: { user_id_batch_id: { user_id: userId, batch_id: batch.id } },
-      update: {},
-      create: {
-        user_id: userId,
-        batch_id: batch.id,
-        role_in_batch: "member",
-      },
-    });
-
-    // Sync all other students in this batch from CRM (best-effort)
-    try {
-      const students = await getBatchStudents(enr.BatchId);
-      await syncBatchStudents(batch.id, students);
-    } catch (err) {
-      console.error(`Failed to sync students for batch ${crmBatchName}:`, err);
-    }
-  }
-}
-
-/**
- * Provision CMS users for all CRM students in a batch and add them as members.
- */
-async function syncBatchStudents(cmsBatchId: string, students: CrmBatchStudent[]) {
-  for (const student of students) {
-    try {
-      const email = student.Email ?? `cust-${student.CustId}@crm.local`;
-      const phone = student.Mobile ? String(student.Mobile) : null;
-
-      // Find existing user by email or phone
-      let user = await prisma.user.findUnique({ where: { email } });
-      if (!user && phone) {
-        user = await prisma.user.findFirst({ where: { phone } });
-      }
-
-      if (!user) {
-        // Auto-provision the student
-        const fullName =
-          [student.FirstName, student.LastName].filter(Boolean).join(" ").trim() ||
-          email.split("@")[0];
-
-        user = await prisma.user.create({
-          data: {
-            email,
-            username: await ensureUniqueUsername(fullName),
-            phone,
-            password_hash: "CRM_MANAGED",
-            role: "learner",
-            provider: "crm",
-          },
-        });
-        await prisma.subscription.create({
-          data: {
-            user_id: user.id,
-            plan: "free",
-            status: "active",
-            started_at: new Date(),
-          },
-        });
-      }
-
-      // Add to batch
-      await prisma.membership.upsert({
-        where: { user_id_batch_id: { user_id: user.id, batch_id: cmsBatchId } },
-        update: {},
-        create: {
-          user_id: user.id,
-          batch_id: cmsBatchId,
-          role_in_batch: "member",
-        },
-      });
-    } catch (err) {
-      // Skip individual student failures — don't block the rest
-      console.error(`Failed to sync student ${student.CustId}:`, err);
-    }
-  }
-}
+// ensureUniqueUsername, syncBatchMemberships, and findOrCreateLearner are now
+// provided by learner.provisioning.service.ts (imported at the top of this file).
 
 // ─── Enriched data fetching ──────────────────────────────────────────────
 
@@ -523,13 +379,13 @@ export async function fetchEnrichedData(customer: CrmCustomer | null) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
-function issueTokens(
+async function issueTokens(
   user: { id: string; email: string; role: string; password_hash: string; is_banned: boolean },
   enriched?: { crm: any; lms: any; crmEnrollments: any } | null
 ) {
   if (user.is_banned) throw new UnauthorizedError("Your account has been banned");
   const accessToken = generateAccessToken(user as any);
-  const refreshToken = generateRefreshToken(user as any);
+  const refreshToken = await createRefreshSession(user.id);
   const { password_hash: _ph, ...userWithoutPassword } = user as any;
   return {
     user: userWithoutPassword,
@@ -607,13 +463,14 @@ export async function learnerLogin(phone: string, email: string) {
     cmsUser = await prisma.user.update({ where: { id: cmsUser.id }, data: profileUpdates });
   }
 
-  // 5. Fetch enriched data + sync CRM batch memberships in parallel
-  const [enriched] = await Promise.all([
-    fetchEnrichedData(customer).catch(() => null),
-    getCustomerEnrollments(customer.CustId)
-      .then((enrollments) => syncLearnerBatches(cmsUser!.id, enrollments))
-      .catch((err) => console.error("Learner batch sync failed (continuing login):", err)),
-  ]);
+  // 5. Fetch enriched data — sync CRM batch memberships fires asynchronously.
+  const enriched = await fetchEnrichedData(customer).catch(() => null);
+
+  setImmediate(() => {
+    getCustomerEnrollments(customer!.CustId)
+      .then((enrollments) => syncBatchMemberships(cmsUser!.id, enrollments))
+      .catch((err) => console.error("[bg] Learner batch sync failed:", err));
+  });
 
   return issueTokens(cmsUser, enriched ?? undefined);
 }
@@ -633,6 +490,12 @@ export async function requestPasswordReset(email: string) {
 
   // Always return the same public outcome so this endpoint cannot reveal accounts.
   if (!user || user.is_banned || normalizedEmail.endsWith("@crm.local")) {
+    return { message: "If that email exists, a password reset link has been sent." };
+  }
+
+  // Throttle reset emails per target to prevent inbox bombing. Same neutral
+  // response so the cooldown doesn't reveal that the account exists.
+  if (!(await consumeCooldown(`cooldown:pwreset:${normalizedEmail}`, PASSWORD_RESET_COOLDOWN_SECONDS))) {
     return { message: "If that email exists, a password reset link has been sent." };
   }
 
@@ -658,7 +521,16 @@ export async function requestPasswordReset(email: string) {
   ]);
 
   const resetUrl = `${getClientOrigin()}/login?resetToken=${encodeURIComponent(token)}`;
-  await sendPasswordResetEmail(user.email, resetUrl, user.username);
+  try {
+    await sendPasswordResetEmail(user.email, resetUrl, user.username);
+  } catch (err: any) {
+    // Never surface mail-provider/transport failures to the client. Doing so would
+    // (1) crash the flow on any provider hiccup, and (2) break the account-enumeration
+    // guarantee — a 500 would only ever happen for real accounts, revealing which
+    // emails exist. The reset token is already persisted; log loudly to diagnose.
+    const detail = err?.response?.body ?? err?.response?.data ?? err?.message ?? err;
+    console.error(`[AUTH] Failed to send password reset email to ${user.email}:`, detail);
+  }
 
   return { message: "If that email exists, a password reset link has been sent." };
 }
@@ -691,27 +563,32 @@ export async function resetPassword(token: string, newPassword: string) {
       where: { user_id: resetToken.user_id, used_at: null },
       data: { used_at: new Date() },
     }),
+    // Invalidate every existing session so a reset truly locks out any attacker
+    // who already had access.
+    prisma.refreshToken.updateMany({
+      where: { user_id: resetToken.user_id, revoked_at: null },
+      data: { revoked_at: new Date() },
+    }),
   ]);
 
   return { message: "Password reset successfully. You can now sign in." };
 }
 
-export async function refreshAccessToken(refreshTokenCookie: string) {
+export async function refreshAccessToken(refreshTokenCookie: string, meta: SessionMeta = {}) {
   if (!refreshTokenCookie) {
     throw new UnauthorizedError("No refresh token provided");
   }
 
-  let payload;
-  try {
-    payload = verifyRefreshToken(refreshTokenCookie);
-  } catch {
-    throw new UnauthorizedError("Invalid refresh token");
+  // Rotate the session: the presented token is revoked and a new one issued.
+  const { userId, refreshToken } = await rotateRefreshSession(refreshTokenCookie, meta);
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new UnauthorizedError("User not found");
+  if (user.is_banned) {
+    await revokeAllUserSessions(user.id);
+    throw new UnauthorizedError("Your account has been banned");
   }
 
-  const user = await prisma.user.findUnique({ where: { id: payload.userId } });
-  if (!user) throw new UnauthorizedError("User not found");
-  if (user.is_banned) throw new UnauthorizedError("Your account has been banned");
-
   const accessToken = generateAccessToken(user);
-  return { accessToken };
+  return { accessToken, refreshToken };
 }

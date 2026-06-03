@@ -114,6 +114,7 @@ model User {
   direct_messages     DirectMessage[]    @relation("DMSender")
   message_reactions   MessageReaction[]
   password_reset_tokens PasswordResetToken[]
+  refresh_tokens        RefreshToken[]
 
   @@map("users")
 }
@@ -131,6 +132,24 @@ model PasswordResetToken {
   @@index([user_id])
   @@index([expires_at])
   @@map("password_reset_tokens")
+}
+
+model RefreshToken {
+  id          String    @id @default(uuid()) @db.Uuid
+  user_id     String    @db.Uuid
+  token_hash  String    @unique
+  expires_at  DateTime
+  revoked_at  DateTime?
+  replaced_by String?   @db.Uuid
+  user_agent  String?
+  ip          String?
+  created_at  DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("refresh_tokens")
 }
 
 model Organization {

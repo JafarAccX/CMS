@@ -1,6 +1,7 @@
 import prisma from "../utils/prisma.js";
 import bcrypt from "bcrypt";
 import type { Prisma, UserRole } from "@prisma/client";
+import { revokeAllUserSessions } from "./session.service.js";
 
 const USER_ROLES: UserRole[] = ["admin", "mentor", "batch_moderator", "learner", "guest"];
 
@@ -70,8 +71,15 @@ export async function createUser(data: { username: string; email: string; phone:
 
 export async function toggleBanUser(userId: string, actorId: string) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-  const updated = await prisma.user.update({ where: { id: userId }, data: { is_banned: !user.is_banned } });
-  await logAdminAction(actorId, userId, user.is_banned ? "unban_user" : "ban_user", { username: user.username });
+  const banning = !user.is_banned;
+  const updated = await prisma.user.update({ where: { id: userId }, data: { is_banned: banning } });
+
+  // Immediately invalidate all active sessions when an account is banned.
+  if (banning) {
+    await revokeAllUserSessions(userId);
+  }
+
+  await logAdminAction(actorId, userId, banning ? "ban_user" : "unban_user", { username: user.username });
   return { id: updated.id, is_banned: updated.is_banned, username: updated.username };
 }
 
