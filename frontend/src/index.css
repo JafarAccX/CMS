@@ -17,7 +17,16 @@
 @tailwind utilities;
 
 @layer base {
+  /* ─────────────────────────────────────────────────────────────────
+     THEME TOKENS — :root is the DARK theme (default).
+     A [data-theme="light"] override block below flips every neutral.
+     Brand colors (blue #3b82ff, cyan #00dbe8, orb indigo, status hues)
+     are theme-independent and live outside the flip.
+     Surface scale is stored as "R G B" channel triplets so Tailwind
+     opacity modifiers (e.g. bg-surface-50/80) keep working.
+     ───────────────────────────────────────────────────────────────── */
   :root {
+    /* Panels & text (used by var(--ax-*) in CSS + inline styles) */
     --ax-bg: #05070a;
     --ax-panel: #0a0d12;
     --ax-panel-2: #10151d;
@@ -28,14 +37,180 @@
     --ax-muted: #94a3b8;
     --ax-dim: #6c7793;
     --ax-faint: #424c64;
+
+    /* Brand (theme-independent) */
     --ax-blue: #3b82ff;
     --ax-cyan: #00dbe8;
     --ax-gradient: linear-gradient(180deg, rgb(59, 130, 255) 17%, rgb(0, 219, 232) 100%);
     --ax-orb-gradient: linear-gradient(180deg, rgb(62, 56, 224) 0%, rgb(0, 219, 232) 100%);
+    --ax-primary-action-bg: var(--ax-gradient);
+    --ax-primary-action-text: #05070a;
+    --ax-primary-action-shadow: 0 0 14px rgba(59,130,255,0.35), 0 1px 0 rgba(255,255,255,0.18) inset;
+
+    /* Layout */
     --ax-topbar-h: 64px;
     --ax-sidebar-w: 256px;
     --ax-radius: 8px;
     --ax-shadow-card: 0 1px 0 rgba(255,255,255,0.05) inset, 0 12px 32px -12px rgba(0,0,0,0.6);
+
+    /* Tailwind token channels (R G B) — surface scale */
+    --surface: 5 7 10;
+    --surface-50: 10 13 18;
+    --surface-100: 16 21 29;
+    --surface-200: 22 30 46;
+    --surface-300: 30 41 59;
+    --surface-400: 44 52 77;
+    --surface-500: 58 69 99;
+
+    /* Tailwind token colors — text / hairline / accent / shadow */
+    --text-primary: #e0e3e6;
+    --text-muted: #94a3b8;
+    --text-dim: #6c7793;
+    --text-faint: #424c64;
+    --hairline: rgba(255, 255, 255, 0.08);
+    --hairline-strong: rgba(255, 255, 255, 0.14);
+    --accent-300: #afc6ff;
+    --shadow-card: 0 1px 0 rgba(255,255,255,0.05) inset, 0 12px 32px -12px rgba(0,0,0,0.6);
+
+    /* Helper neutrals (referenced by component rules + the inline-style sweep) */
+    --ax-hover: rgba(255, 255, 255, 0.04);
+    --ax-hover-strong: rgba(255, 255, 255, 0.06);
+    --ax-grid-dot: rgba(255, 255, 255, 0.04);
+    --ax-glass: rgba(10, 12, 17, 0.6);
+    --ax-field-bg: rgba(29, 32, 34, 0.5);
+    --ax-field-bg-focus: rgba(29, 32, 34, 0.85);
+    --ax-field-border: rgba(66, 71, 84, 0.5);
+    --ax-input-bg: #07090d;
+    --ax-input-border: #1e293b;
+    --ax-topbar-bg: rgba(10, 12, 17, 0.6);
+    --ax-sidebar-bg: rgba(10, 13, 18, 0.82);
+    --ax-card-bg: #0a0d12;
+    --ax-card-hover-bg: #0d1118;
+    --ax-tile-bg: #05070a;
+    --ax-pill-bg: #05070a;
+    --ax-page-radial: radial-gradient(760px 420px at 100% 10%, rgba(0, 111, 180, 0.22), transparent 58%);
+    --ax-mobile-nav-shadow: 0 16px 40px rgba(0,0,0,0.45);
+    --ax-row-border: rgba(255, 255, 255, 0.06);
+    --ax-row-hover: rgba(255, 255, 255, 0.025);
+    --ax-placeholder: rgba(194, 198, 214, 0.5);
+    --ax-table-head: rgba(16, 21, 29, 0.65);
+    --ax-active-bg: rgba(59, 130, 255, 0.14);
+    --ax-active-border: rgba(59, 130, 255, 0.18);
+    --ax-active-text: #afc6ff;
+    --ax-active-shadow: none;
+    --ax-sidebar-title: var(--ax-text);
+    --ax-sidebar-link: var(--ax-text);
+    --ax-sidebar-muted: var(--ax-muted);
+    --ax-sidebar-section: var(--ax-muted);
+    --ax-sidebar-badge-bg: rgba(59, 130, 255, 0.14);
+    --ax-sidebar-badge-text: var(--accent-300);
+    --ax-control-bg: var(--ax-bg);
+    --ax-segment-active-bg: #ffffff;
+    --ax-segment-active-text: #05070a;
+    --ax-modal-header-bg: rgba(16, 20, 22, 0.5);
+    --ax-modal-footer-bg: rgba(16, 20, 22, 0.4);
+    --ax-modal-accent-panel: #07090d;
+    --ax-option-bg: rgb(var(--surface-100) / 0.45);
+    --ax-option-active-bg: linear-gradient(115deg,rgba(0,219,232,0.08),rgba(59,130,255,0.06));
+    --ax-disabled-bg: rgb(30, 41, 59);
+    --ax-disabled-text: var(--ax-faint);
+    --ax-profile-avatar-bg: linear-gradient(145deg, rgba(45,103,107,0.95), rgba(0,219,232,0.28));
+    --ax-profile-avatar-icon: #e0e3e6;
+    --ax-profile-avatar-shadow: 0 6px 18px -10px rgba(15,23,42,0.5), 0 0 0 3px rgba(0,219,232,0.08);
+    --ax-dm-avatar-mentor-bg: rgba(82, 141, 255, 0.2);
+    --ax-dm-avatar-mentor-border: rgba(175, 198, 255, 0.3);
+    --ax-dm-avatar-mentor-text: rgb(175, 198, 255);
+    --ax-dm-avatar-admin-bg: rgba(124, 92, 255, 0.2);
+    --ax-dm-avatar-admin-border: rgba(183, 139, 255, 0.3);
+    --ax-dm-avatar-admin-text: rgb(183, 139, 255);
+  }
+
+  /* ── LIGHT THEME ──────────────────────────────────────────────────
+     Crisp arctic palette; brand blue→cyan accent preserved so the
+     identity holds across both modes. */
+  :root[data-theme="light"] {
+    --ax-bg: #f4f6fa;
+    --ax-panel: #ffffff;
+    --ax-panel-2: #f8fafc;
+    --ax-panel-3: #d7dee9;
+    --ax-border: rgba(15, 23, 42, 0.13);
+    --ax-border-strong: rgba(15, 23, 42, 0.24);
+    --ax-text: #0b1220;
+    --ax-muted: #42506a;
+    --ax-dim: #647089;
+    --ax-faint: #68758c;
+    --ax-shadow-card: 0 1px 1px rgba(255,255,255,0.95) inset, 0 16px 34px -26px rgba(15, 23, 42, 0.28), 0 5px 14px -12px rgba(15, 23, 42, 0.20);
+
+    --surface: 244 246 250;
+    --surface-50: 255 255 255;
+    --surface-100: 248 250 252;
+    --surface-200: 226 232 240;
+    --surface-300: 203 213 225;
+    --surface-400: 148 163 184;
+    --surface-500: 104 122 151;
+
+    --text-primary: #0b1220;
+    --text-muted: #42506a;
+    --text-dim: #647089;
+    --text-faint: #68758c;
+    --hairline: rgba(15, 23, 42, 0.13);
+    --hairline-strong: rgba(15, 23, 42, 0.24);
+    --accent-300: #1d4ed8;
+    --shadow-card: 0 1px 1px rgba(255,255,255,0.95) inset, 0 16px 34px -26px rgba(15, 23, 42, 0.28), 0 5px 14px -12px rgba(15, 23, 42, 0.20);
+    --ax-primary-action-bg: #2563eb;
+    --ax-primary-action-text: #ffffff;
+    --ax-primary-action-shadow: 0 12px 24px -16px rgba(37, 99, 235, 0.65), 0 1px 0 rgba(255,255,255,0.18) inset;
+
+    --ax-hover: rgba(15, 23, 42, 0.05);
+    --ax-hover-strong: rgba(15, 23, 42, 0.08);
+    --ax-grid-dot: rgba(15, 23, 42, 0.035);
+    --ax-glass: rgba(255, 255, 255, 0.9);
+    --ax-field-bg: rgba(255, 255, 255, 0.94);
+    --ax-field-bg-focus: rgba(255, 255, 255, 0.96);
+    --ax-field-border: rgba(30, 41, 59, 0.14);
+    --ax-input-bg: #ffffff;
+    --ax-input-border: #d4dfec;
+    --ax-topbar-bg: rgba(255, 255, 255, 0.96);
+    --ax-sidebar-bg: #ffffff;
+    --ax-card-bg: #ffffff;
+    --ax-card-hover-bg: #f8fafc;
+    --ax-tile-bg: #f1f5f9;
+    --ax-pill-bg: #eef2f7;
+    --ax-page-radial: linear-gradient(180deg, #f5f7fb 0%, #eef2f7 100%);
+    --ax-mobile-nav-shadow: 0 18px 48px -22px rgba(15, 23, 42, 0.28), 0 8px 20px -14px rgba(15, 23, 42, 0.18);
+    --ax-row-border: rgba(30, 41, 59, 0.07);
+    --ax-row-hover: rgba(15, 23, 42, 0.035);
+    --ax-placeholder: rgba(82, 96, 120, 0.55);
+    --ax-table-head: rgba(246, 249, 253, 0.92);
+    --ax-active-bg: #e8f0ff;
+    --ax-active-border: rgba(37, 99, 235, 0.42);
+    --ax-active-text: #1d4ed8;
+    --ax-active-shadow: inset 3px 0 0 #2563eb, 0 10px 22px -18px rgba(37, 99, 235, 0.45);
+    --ax-sidebar-title: #020617;
+    --ax-sidebar-link: #0f172a;
+    --ax-sidebar-muted: #334155;
+    --ax-sidebar-section: #475569;
+    --ax-sidebar-badge-bg: #dbeafe;
+    --ax-sidebar-badge-text: #1e40af;
+    --ax-control-bg: #eef2f7;
+    --ax-segment-active-bg: #ffffff;
+    --ax-segment-active-text: #0b1220;
+    --ax-modal-header-bg: #f8fafc;
+    --ax-modal-footer-bg: #f8fafc;
+    --ax-modal-accent-panel: #ffffff;
+    --ax-option-bg: rgba(255,255,255,0.86);
+    --ax-option-active-bg: #f8fafc;
+    --ax-disabled-bg: #d8e4f4;
+    --ax-disabled-text: #718099;
+    --ax-profile-avatar-bg: #476b72;
+    --ax-profile-avatar-icon: #ffffff;
+    --ax-profile-avatar-shadow: 0 6px 18px -12px rgba(15,23,42,0.28);
+    --ax-dm-avatar-mentor-bg: #dbeafe;
+    --ax-dm-avatar-mentor-border: #93c5fd;
+    --ax-dm-avatar-mentor-text: #1e3a8a;
+    --ax-dm-avatar-admin-bg: #ede9fe;
+    --ax-dm-avatar-admin-border: #c4b5fd;
+    --ax-dm-avatar-admin-text: #5b21b6;
   }
 
   html,
@@ -68,6 +243,54 @@
   select {
     font: inherit;
   }
+
+  :root[data-theme="light"] .app-sidebar {
+    border-right-color: rgba(15, 23, 42, 0.12);
+    box-shadow: 1px 0 0 rgba(255,255,255,0.9) inset, 12px 0 34px -30px rgba(30,64,175,0.5);
+  }
+
+  :root[data-theme="light"] .dashboard-layout {
+    background: var(--ax-page-radial);
+  }
+
+  :root[data-theme="light"] .figma-topbar {
+    box-shadow: 0 1px 0 rgba(255,255,255,0.85) inset, 0 10px 30px -28px rgba(15,23,42,0.45);
+  }
+
+  :root[data-theme="light"] .text-primary {
+    color: var(--text-primary) !important;
+  }
+
+  :root[data-theme="light"] .text-muted {
+    color: var(--text-muted) !important;
+  }
+
+  :root[data-theme="light"] .text-dim {
+    color: var(--text-dim) !important;
+  }
+
+  :root[data-theme="light"] .text-faint {
+    color: var(--text-faint) !important;
+  }
+
+  :root[data-theme="light"] .theme-orb {
+    display: none;
+  }
+
+  :root[data-theme="light"] .bg-glow {
+    background: transparent;
+  }
+
+  :root[data-theme="light"] .orb-top-right,
+  :root[data-theme="light"] .orb-bottom-right,
+  :root[data-theme="light"] .orb-card {
+    display: none;
+  }
+
+  :root[data-theme="light"] .card,
+  :root[data-theme="light"] .btn-surface {
+    background: var(--ax-card-bg);
+  }
 }
 
 @layer components {
@@ -90,15 +313,15 @@
 
   /* Primary — blue → cyan gradient (exact Figma match) */
   .btn-primary {
-    background: var(--ax-gradient);
-    box-shadow: 0 0 14px rgba(59, 130, 255, 0.35), 0 1px 0 rgba(255, 255, 255, 0.18) inset;
-    color: #05070a;
+    background: var(--ax-primary-action-bg);
+    box-shadow: var(--ax-primary-action-shadow);
+    color: var(--ax-primary-action-text);
     @apply font-semibold border-transparent;
     transition: filter 0.15s ease;
   }
   .btn-primary:hover {
     filter: brightness(1.07);
-    box-shadow: 0 0 20px rgba(59, 130, 255, 0.5), 0 0 10px rgba(0, 219, 232, 0.2), 0 1px 0 rgba(255, 255, 255, 0.18) inset;
+    box-shadow: var(--ax-primary-action-shadow);
   }
   .btn-primary:active {
     filter: brightness(0.96);
@@ -157,7 +380,7 @@
   /* ── Status dots ──────────────────────────────────────────────── */
   .status-dot {
     @apply w-[9px] h-[9px] rounded-full inline-block;
-    border: 2px solid var(--tw-border-opacity, #0a0d12);
+    border: 2px solid var(--ax-panel);
   }
   .status-online { background: rgb(53, 221, 61);  box-shadow: 0 0 6px rgba(53,221,61,0.5); }
   .status-idle   { background: oklch(0.78 0.13 80); }
@@ -173,13 +396,13 @@
     width: 3px;
     height: 24px;
     border-radius: 0 4px 4px 0;
-    background: linear-gradient(rgb(59,130,255) 17%, rgb(0,219,232) 100%);
-    box-shadow: 0 0 8px rgba(59,130,255,0.5);
+    background: var(--ax-primary-action-bg);
+    box-shadow: 0 0 8px rgba(37,99,235,0.35);
   }
 
   /* ── Background textures ──────────────────────────────────────── */
   .bg-grid {
-    background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-image: radial-gradient(var(--ax-grid-dot) 1px, transparent 1px);
     background-size: 28px 28px;
   }
 
@@ -238,37 +461,37 @@
   /* ── Glassmorphic header ──────────────────────────────────────── */
   /* Apply to <header> elements for the frosted-glass topbar */
   .header-glass {
-    background-color: rgba(10, 12, 17, 0.6);
+    background-color: var(--ax-glass);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid var(--ax-border);
   }
 
   /* ── Search bar ───────────────────────────────────────────────── */
   .search-bar {
-    background-color: rgb(10, 13, 18);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: var(--ax-panel);
+    border: 1px solid var(--ax-border);
     border-radius: 6px;
     height: 42px;
   }
   .search-bar::placeholder {
-    color: rgba(148, 163, 184, 0.45);
+    color: var(--ax-placeholder);
   }
 
   .form-input {
     width: 100%;
     height: 44px;
     border-radius: 8px;
-    background-color: rgb(7, 9, 13);
-    border: 1px solid rgb(30, 41, 59);
+    background-color: var(--ax-input-bg);
+    border: 1px solid var(--ax-input-border);
     padding: 0 14px;
     font-size: 14px;
-    color: #e0e3e6;
+    color: var(--ax-text);
     font-family: Poppins, Inter, ui-sans-serif, system-ui, sans-serif;
     transition: border-color 0.15s ease;
   }
   .form-input::placeholder {
-    color: rgba(66, 71, 84, 0.9);
+    color: var(--ax-placeholder);
   }
   .form-input:focus {
     outline: none;
@@ -283,7 +506,7 @@
     flex-direction: column;
     overflow: hidden;
     background:
-      radial-gradient(760px 420px at 100% 10%, rgba(0, 111, 180, 0.22), transparent 58%),
+      var(--ax-page-radial),
       var(--ax-bg);
     color: var(--ax-text);
   }
@@ -305,7 +528,7 @@
 
   .figma-panel {
     border-radius: var(--ax-radius);
-    background: rgba(10, 13, 18, 0.74);
+    background: rgb(var(--surface-50) / 0.74);
     border: 1px solid var(--ax-border);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
@@ -316,8 +539,8 @@
   .figma-textarea {
     width: 100%;
     border-radius: 8px;
-    background: rgba(29, 32, 34, 0.5);
-    border: 1px solid rgba(66, 71, 84, 0.5);
+    background: var(--ax-field-bg);
+    border: 1px solid var(--ax-field-border);
     color: var(--ax-text);
     font-family: Poppins, Inter, ui-sans-serif, system-ui, sans-serif;
     transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
@@ -340,14 +563,14 @@
 
   .figma-field::placeholder,
   .figma-textarea::placeholder {
-    color: rgba(194, 198, 214, 0.5);
+    color: var(--ax-placeholder);
   }
 
   .figma-field:focus,
   .figma-select:focus,
   .figma-textarea:focus {
     outline: none;
-    background: rgba(29, 32, 34, 0.85);
+    background: var(--ax-field-bg-focus);
     border-color: rgba(59, 130, 255, 0.6);
     box-shadow: 0 0 0 3px rgba(59, 130, 255, 0.12);
   }
@@ -374,18 +597,18 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--ax-muted);
-    background: rgba(16, 21, 29, 0.65);
+    background: var(--ax-table-head);
     border-bottom: 1px solid var(--ax-border);
   }
 
   .figma-table td {
     padding: 14px 16px;
     color: var(--ax-text);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid var(--ax-row-border);
   }
 
   .figma-table tr:hover td {
-    background: rgba(255,255,255,0.025);
+    background: var(--ax-row-hover);
   }
 
   .figma-modal-backdrop {
@@ -396,7 +619,7 @@
     align-items: center;
     justify-content: center;
     padding: 24px;
-    background: rgba(5, 7, 10, 0.78);
+    background: rgb(var(--surface) / 0.78);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
@@ -408,9 +631,71 @@
     flex-direction: column;
     overflow: hidden;
     border-radius: 14px;
-    background: rgba(10, 13, 18, 0.94);
-    border: 1px solid rgba(30, 41, 59, 0.92);
-    box-shadow: 0 0 50px -12px rgba(224, 227, 230, 0.24);
+    background: rgb(var(--surface-50) / 0.97);
+    border: 1px solid var(--ax-border-strong);
+    box-shadow: var(--ax-shadow-card);
+  }
+
+  :root[data-theme="light"] .figma-topbar,
+  :root[data-theme="light"] .app-topbar {
+    box-shadow: 0 1px 0 rgba(255,255,255,0.78) inset, 0 10px 28px -22px rgba(15, 23, 42, 0.45);
+  }
+
+  :root[data-theme="light"] .figma-panel,
+  :root[data-theme="light"] .figma-card,
+  :root[data-theme="light"] .card {
+    background: var(--ax-card-bg);
+    box-shadow: var(--ax-shadow-card);
+  }
+
+  :root[data-theme="light"] .figma-table th {
+    color: #53617a;
+  }
+
+  :root[data-theme="light"] .figma-table td {
+    color: #1d293d;
+  }
+
+  :root[data-theme="light"] .figma-table tbody tr {
+    background: rgba(255,255,255,0.56);
+  }
+
+  :root[data-theme="light"] .figma-table tbody tr:hover td {
+    background: rgba(237, 246, 255, 0.92);
+  }
+
+  :root[data-theme="light"] .figma-modal-backdrop {
+    background: rgba(196, 211, 229, 0.58);
+  }
+
+  :root[data-theme="light"] .figma-modal-shell {
+    background: linear-gradient(145deg, #ffffff 0%, #f8fbff 100%);
+    box-shadow: 0 30px 80px -34px rgba(15,23,42,0.5), 0 18px 42px -30px rgba(37,99,235,0.35);
+  }
+
+  :root[data-theme="light"] .figma-field,
+  :root[data-theme="light"] .figma-textarea,
+  :root[data-theme="light"] .figma-select {
+    background: rgba(255,255,255,0.94);
+    border-color: #c9d6e8;
+    color: #0b1220;
+  }
+
+  :root[data-theme="light"] .figma-field::placeholder,
+  :root[data-theme="light"] .figma-textarea::placeholder,
+  :root[data-theme="light"] .figma-select::placeholder {
+    color: #8b98ad;
+  }
+
+  :root[data-theme="light"] .new-user-modal-header,
+  :root[data-theme="light"] .new-user-modal-footer {
+    color: #0b1220;
+  }
+
+  :root[data-theme="light"] .new-user-preview,
+  :root[data-theme="light"] .new-user-welcome {
+    color: #0b1220;
+    box-shadow: 0 14px 28px -24px rgba(15,23,42,0.38);
   }
 }
 
@@ -474,11 +759,11 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px;
     padding: 8px;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid var(--ax-border);
     border-radius: 14px;
-    background: rgba(10,13,18,0.92);
+    background: rgb(var(--surface-50) / 0.92);
     backdrop-filter: blur(18px);
-    box-shadow: 0 16px 40px rgba(0,0,0,0.45);
+    box-shadow: var(--ax-mobile-nav-shadow);
   }
 
   .mobile-nav .block > div {

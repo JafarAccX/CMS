@@ -39,23 +39,26 @@ function RoomRow({ batch, index }: { batch: any; index: number }) {
       <div
         style={{
           borderRadius: 12,
-          backgroundColor: "rgb(10,12,17)",
-          border: "1px solid rgba(255,255,255,0.08)",
+          background: "var(--ax-card-bg)",
+          border: "1px solid var(--ax-border)",
+          boxShadow: "var(--ax-shadow-card)",
           padding: "16px 20px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          transition: "background 0.14s, border-color 0.14s",
+          transition: "background 0.14s, border-color 0.14s, transform 0.14s",
           cursor: "pointer",
           marginBottom: 8,
         }}
         onMouseEnter={(event) => {
-          event.currentTarget.style.background = "rgb(13,17,24)";
-          event.currentTarget.style.borderColor = "rgba(255,255,255,0.14)";
+          event.currentTarget.style.background = "var(--ax-card-hover-bg)";
+          event.currentTarget.style.borderColor = "var(--ax-border-strong)";
+          event.currentTarget.style.transform = "translateY(-1px)";
         }}
         onMouseLeave={(event) => {
-          event.currentTarget.style.background = "rgb(10,12,17)";
-          event.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+          event.currentTarget.style.background = "var(--ax-card-bg)";
+          event.currentTarget.style.borderColor = "var(--ax-border)";
+          event.currentTarget.style.transform = "translateY(0)";
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1, minWidth: 0 }}>
@@ -64,25 +67,25 @@ function RoomRow({ batch, index }: { batch: any; index: number }) {
               width: 40,
               height: 40,
               borderRadius: 8,
-              backgroundColor: "rgb(5,7,10)",
-              border: "1px solid rgba(255,255,255,0.1)",
+              background: "var(--ax-tile-bg)",
+              border: "1px solid var(--ax-border)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0,
             }}
           >
-            <span style={{ fontSize: 16, color: "#94a3b8", fontWeight: 500 }}>#</span>
+            <span style={{ fontSize: 16, color: "var(--accent-300)", fontWeight: 700 }}>#</span>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-              <span style={{ fontSize: 14, fontWeight: 500, color: "#e0e3e6" }}>{batch.name}</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ax-text)" }}>{batch.name}</span>
               <span
                 style={{
                   fontSize: 10,
-                  color: "#94a3b8",
-                  background: "rgb(5,7,10)",
-                  border: "1px solid rgba(255,255,255,0.1)",
+                  color: "var(--ax-muted)",
+                  background: "var(--ax-pill-bg)",
+                  border: "1px solid var(--ax-border)",
                   borderRadius: 4,
                   padding: "1px 6px",
                   textTransform: "capitalize",
@@ -94,7 +97,7 @@ function RoomRow({ batch, index }: { batch: any; index: number }) {
             <div
               style={{
                 fontSize: 13,
-                color: "#94a3b8",
+                color: "var(--ax-muted)",
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -104,7 +107,7 @@ function RoomRow({ batch, index }: { batch: any; index: number }) {
               {batch.description || "Welcome to this learning room."}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-              <span style={{ fontSize: 12, color: "#6c7793", fontWeight: 500 }}>
+              <span style={{ fontSize: 12, color: "var(--ax-dim)", fontWeight: 500 }}>
                 {channels || members || 0} messages
               </span>
               {(batch.hasAccess || isOpen) && (
@@ -128,9 +131,9 @@ function RoomRow({ batch, index }: { batch: any; index: number }) {
             style={{
               padding: "6px 14px",
               borderRadius: 6,
-              border: "1px solid rgb(30,41,59)",
+              border: "1px solid var(--ax-panel-3)",
               background: "transparent",
-              color: "#94a3b8",
+              color: "var(--ax-muted)",
               fontSize: 12,
               fontFamily: "Poppins",
               cursor: "pointer",
@@ -139,13 +142,13 @@ function RoomRow({ batch, index }: { batch: any; index: number }) {
             }}
             onMouseEnter={(event) => {
               event.currentTarget.style.background = "rgba(59,130,255,0.1)";
-              event.currentTarget.style.color = "#afc6ff";
+              event.currentTarget.style.color = "var(--accent-300)";
               event.currentTarget.style.borderColor = "rgba(59,130,255,0.3)";
             }}
             onMouseLeave={(event) => {
               event.currentTarget.style.background = "transparent";
-              event.currentTarget.style.color = "#94a3b8";
-              event.currentTarget.style.borderColor = "rgb(30,41,59)";
+              event.currentTarget.style.color = "var(--ax-muted)";
+              event.currentTarget.style.borderColor = "var(--ax-border)";
             }}
           >
             {isOpen ? "Join" : "Open"} -&gt;
@@ -161,8 +164,9 @@ function MentorshipCard() {
     <div
       style={{
         borderRadius: 12,
-        backgroundColor: "rgb(10,13,18)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        background: "var(--ax-card-bg)",
+        border: "1px solid var(--ax-border)",
+        boxShadow: "var(--ax-shadow-card)",
         padding: 20,
         overflow: "hidden",
         position: "relative",
@@ -197,11 +201,11 @@ function MentorshipCard() {
         >
           <Video size={15} />
         </div>
-        <span style={{ fontSize: 10, color: "#94a3b8" }}>Starts 2:00 PM</span>
+        <span style={{ fontSize: 10, color: "var(--ax-muted)" }}>Starts 2:00 PM</span>
       </div>
       <div style={{ marginBottom: 4 }}>
-        <div style={{ fontSize: 18, color: "#fff", fontWeight: 600, lineHeight: "27px" }}>Live Session</div>
-        <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: "19.5px", marginTop: 4 }}>
+        <div style={{ fontSize: 18, color: "var(--ax-text)", fontWeight: 600, lineHeight: "27px" }}>Live Session</div>
+        <div style={{ fontSize: 13, color: "var(--ax-muted)", lineHeight: "19.5px", marginTop: 4 }}>
           Advanced Hooks Deep Dive.
         </div>
       </div>
@@ -222,7 +226,7 @@ function MentorshipCard() {
         >
           M
         </div>
-        <span style={{ fontSize: 12, color: "#94a3b8" }}>with mentor</span>
+        <span style={{ fontSize: 12, color: "var(--ax-muted)" }}>with mentor</span>
         <div style={{ flex: 1 }} />
         <button
           type="button"
@@ -231,7 +235,7 @@ function MentorshipCard() {
             borderRadius: 6,
             border: "none",
             background: figmaGradient,
-            color: "#05070a",
+            color: "var(--ax-primary-action-text)",
             fontSize: 11,
             fontWeight: 600,
             fontFamily: "Poppins",
@@ -254,8 +258,9 @@ function UpcomingCard({ title, time, type, color }: { title: string; time: strin
         gap: 12,
         padding: "12px 16px",
         borderRadius: 10,
-        backgroundColor: "rgb(10,13,18)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        background: "var(--ax-card-bg)",
+        border: "1px solid var(--ax-border)",
+        boxShadow: "var(--ax-shadow-card)",
         marginBottom: 8,
       }}
     >
@@ -280,7 +285,7 @@ function UpcomingCard({ title, time, type, color }: { title: string; time: strin
           style={{
             fontSize: 13,
             fontWeight: 500,
-            color: "#e0e3e6",
+            color: "var(--ax-text)",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -288,7 +293,7 @@ function UpcomingCard({ title, time, type, color }: { title: string; time: strin
         >
           {title}
         </div>
-        <div style={{ fontSize: 11, color: "#6c7793", marginTop: 2 }}>{time}</div>
+        <div style={{ fontSize: 11, color: "var(--ax-dim)", marginTop: 2 }}>{time}</div>
       </div>
       <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: `${color}22`, color, border: `1px solid ${color}33` }}>
         {type}
@@ -309,10 +314,10 @@ function QuickLink({ href, icon, label }: { href: string; icon: ReactNode; label
         borderRadius: 8,
         marginBottom: 4,
         transition: "background 0.14s",
-        color: "#94a3b8",
+        color: "var(--ax-muted)",
         textDecoration: "none",
       }}
-      onMouseEnter={(event) => { event.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+      onMouseEnter={(event) => { event.currentTarget.style.background = "var(--ax-hover)"; }}
       onMouseLeave={(event) => { event.currentTarget.style.background = "transparent"; }}
     >
       <div
@@ -329,7 +334,7 @@ function QuickLink({ href, icon, label }: { href: string; icon: ReactNode; label
       >
         {icon}
       </div>
-      <span style={{ fontSize: 13, color: "#e0e3e6", flex: 1 }}>{label}</span>
+      <span style={{ fontSize: 13, color: "var(--ax-text)", flex: 1 }}>{label}</span>
       <ArrowRight size={12} />
     </Link>
   );
@@ -409,11 +414,11 @@ export default function DashboardPage() {
               <div
                 style={{
                   borderRadius: 12,
-                  backgroundColor: "rgb(10,12,17)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  backgroundColor: "var(--ax-panel)",
+                  border: "1px solid var(--ax-border)",
                   padding: 32,
                   textAlign: "center",
-                  color: "#6c7793",
+                  color: "var(--ax-dim)",
                   fontSize: 14,
                 }}
               >

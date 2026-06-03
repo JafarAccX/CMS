@@ -43,7 +43,7 @@ function typeTone(type: string) {
   if (type === "general") {
     return {
       background: "rgba(148,163,184,0.12)",
-      color: "#94a3b8",
+      color: "var(--ax-muted)",
       border: "1px solid rgba(148,163,184,0.15)",
     };
   }
@@ -106,15 +106,15 @@ function IconAction({
       onClick={onClick}
       aria-label={label}
       style={{
-        color: "#6c7793",
+        color: "var(--ax-dim)",
         background: "none",
         border: "none",
         display: "flex",
         cursor: "pointer",
         padding: 0,
       }}
-      onMouseEnter={(event) => { event.currentTarget.style.color = "#e0e3e6"; }}
-      onMouseLeave={(event) => { event.currentTarget.style.color = "#6c7793"; }}
+      onMouseEnter={(event) => { event.currentTarget.style.color = "var(--ax-text)"; }}
+      onMouseLeave={(event) => { event.currentTarget.style.color = "var(--ax-dim)"; }}
     >
       {children}
     </button>
@@ -141,7 +141,7 @@ function BatchCard({
 
   if (view === "list") {
     return (
-      <tr style={{ cursor: "default" }} onMouseEnter={(event) => { event.currentTarget.style.background = "rgba(255,255,255,0.025)"; }} onMouseLeave={(event) => { event.currentTarget.style.background = "transparent"; }}>
+      <tr style={{ cursor: "default" }} onMouseEnter={(event) => { event.currentTarget.style.background = "var(--ax-row-hover)"; }} onMouseLeave={(event) => { event.currentTarget.style.background = "transparent"; }}>
         <td style={{ padding: "14px 20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div
@@ -161,13 +161,13 @@ function BatchCard({
               <Shield size={16} />
             </div>
             <div>
-              <Link to={`/batch/${batch.id}`} style={{ fontSize: 14, fontWeight: 500, color: "#e0e3e6", textDecoration: "none" }}>
+              <Link to={`/batch/${batch.id}`} style={{ fontSize: 14, fontWeight: 500, color: "var(--ax-text)", textDecoration: "none" }}>
                 {batch.name}
               </Link>
               <div
                 style={{
                   fontSize: 12,
-                  color: "#6c7793",
+                  color: "var(--ax-dim)",
                   marginTop: 1,
                   maxWidth: 280,
                   overflow: "hidden",
@@ -187,13 +187,13 @@ function BatchCard({
           </div>
         </td>
         <td style={{ padding: "14px 20px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#94a3b8" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ax-muted)" }}>
             <Hash size={14} />
             <span style={{ fontSize: 13 }}>{channels} channels</span>
           </div>
         </td>
         <td style={{ padding: "14px 20px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#94a3b8" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ax-muted)" }}>
             <Users size={14} />
             <span style={{ fontSize: 13 }}>{members} members</span>
           </div>
@@ -206,7 +206,7 @@ function BatchCard({
         </td>
         <td style={{ padding: "14px 20px", textAlign: "right" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 }}>
-            <Link to={`/batch/${batch.id}`} style={{ color: "#6c7793", display: "flex" }} aria-label={`Open ${batch.name}`}>
+            <Link to={`/batch/${batch.id}`} style={{ color: "var(--ax-dim)", display: "flex" }} aria-label={`Open ${batch.name}`}>
               <Eye size={14} />
             </Link>
             {canManage && (
@@ -229,8 +229,8 @@ function BatchCard({
     <div
       style={{
         borderRadius: 12,
-        backgroundColor: "rgb(10,13,18)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        background: "var(--ax-card-bg)",
+        border: "1px solid var(--ax-border)",
         padding: 20,
         transition: "all 0.14s",
         cursor: "pointer",
@@ -239,12 +239,12 @@ function BatchCard({
         gap: 12,
       }}
       onMouseEnter={(event) => {
-        event.currentTarget.style.borderColor = "rgba(255,255,255,0.15)";
-        event.currentTarget.style.background = "rgb(13,17,24)";
+        event.currentTarget.style.borderColor = "var(--ax-border-strong)";
+        event.currentTarget.style.background = "var(--ax-card-hover-bg)";
       }}
       onMouseLeave={(event) => {
-        event.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
-        event.currentTarget.style.background = "rgb(10,13,18)";
+        event.currentTarget.style.borderColor = "var(--ax-border)";
+        event.currentTarget.style.background = "var(--ax-card-bg)";
       }}
     >
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
@@ -270,21 +270,21 @@ function BatchCard({
         </div>
       </div>
       <div>
-        <Link to={`/batch/${batch.id}`} style={{ fontSize: 15, fontWeight: 600, color: "#e0e3e6", marginBottom: 4, display: "block", textDecoration: "none" }}>
+        <Link to={`/batch/${batch.id}`} style={{ fontSize: 15, fontWeight: 600, color: "var(--ax-text)", marginBottom: 4, display: "block", textDecoration: "none" }}>
           {batch.name}
         </Link>
-        <div style={{ fontSize: 12, color: "#6c7793", lineHeight: "18px", minHeight: 36 }}>
+        <div style={{ fontSize: 12, color: "var(--ax-dim)", lineHeight: "18px", minHeight: 36 }}>
           {batchDescription(batch)}
         </div>
       </div>
-      <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
+      <div style={{ height: 1, background: "var(--ax-border)" }} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", gap: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#6c7793" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--ax-dim)" }}>
             <Hash size={14} />
             {channels}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#6c7793" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--ax-dim)" }}>
             <Users size={14} />
             {members}
           </div>
@@ -331,8 +331,8 @@ function CreateBatchModal({
     >
       <div
         style={{
-          background: "rgb(16,21,29)",
-          border: "1px solid rgb(30,41,59)",
+          background: "var(--ax-panel-2)",
+          border: "1px solid var(--ax-panel-3)",
           borderRadius: 16,
           padding: 28,
           width: 440,
@@ -341,15 +341,15 @@ function CreateBatchModal({
         onClick={(event) => event.stopPropagation()}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-          <span style={{ fontSize: 18, fontWeight: 700, color: "#e0e3e6" }}>Create New Batch</span>
-          <button type="button" onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#6c7793", display: "flex", padding: 4 }}>
+          <span style={{ fontSize: 18, fontWeight: 700, color: "var(--ax-text)" }}>Create New Batch</span>
+          <button type="button" onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ax-dim)", display: "flex", padding: 4 }}>
             <X size={16} />
           </button>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 500, color: "#94a3b8", marginBottom: 6, letterSpacing: "0.02em" }}>
+            <div style={{ fontSize: 12, fontWeight: 500, color: "var(--ax-muted)", marginBottom: 6, letterSpacing: "0.02em" }}>
               Batch Name
             </div>
             <input
@@ -358,19 +358,19 @@ function CreateBatchModal({
               placeholder="e.g. React Deep Dive 2024"
               style={{
                 width: "100%",
-                background: "rgb(10,13,18)",
-                border: "1px solid rgb(30,41,59)",
+                background: "var(--ax-panel)",
+                border: "1px solid var(--ax-panel-3)",
                 borderRadius: 8,
                 padding: "10px 14px",
                 fontSize: 13,
                 fontFamily: "Poppins",
-                color: "#e0e3e6",
+                color: "var(--ax-text)",
               }}
               autoFocus
             />
           </div>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 500, color: "#94a3b8", marginBottom: 6, letterSpacing: "0.02em" }}>
+            <div style={{ fontSize: 12, fontWeight: 500, color: "var(--ax-muted)", marginBottom: 6, letterSpacing: "0.02em" }}>
               Description
             </div>
             <input
@@ -379,31 +379,31 @@ function CreateBatchModal({
               placeholder="Briefly describe the batch..."
               style={{
                 width: "100%",
-                background: "rgb(10,13,18)",
-                border: "1px solid rgb(30,41,59)",
+                background: "var(--ax-panel)",
+                border: "1px solid var(--ax-panel-3)",
                 borderRadius: 8,
                 padding: "10px 14px",
                 fontSize: 13,
                 fontFamily: "Poppins",
-                color: "#e0e3e6",
+                color: "var(--ax-text)",
               }}
             />
           </div>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 500, color: "#94a3b8", marginBottom: 6 }}>Visibility</div>
+            <div style={{ fontSize: 12, fontWeight: 500, color: "var(--ax-muted)", marginBottom: 6 }}>Visibility</div>
             <div style={{ position: "relative" }}>
               <select
                 value={newBatch.type}
                 onChange={(event) => setNewBatch((prev) => ({ ...prev, type: event.target.value }))}
                 style={{
                   width: "100%",
-                  background: "rgb(10,13,18)",
-                  border: "1px solid rgb(30,41,59)",
+                  background: "var(--ax-panel)",
+                  border: "1px solid var(--ax-panel-3)",
                   borderRadius: 8,
                   padding: "10px 14px",
                   fontSize: 13,
                   fontFamily: "Poppins",
-                  color: "#e0e3e6",
+                  color: "var(--ax-text)",
                   appearance: "none",
                 }}
               >
@@ -411,7 +411,7 @@ function CreateBatchModal({
                 <option value="private">Private</option>
                 <option value="general">General</option>
               </select>
-              <span style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none", fontSize: 10 }}>
+              <span style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", color: "var(--ax-muted)", pointerEvents: "none", fontSize: 10 }}>
                 v
               </span>
             </div>
@@ -425,7 +425,7 @@ function CreateBatchModal({
                 width: 18,
                 height: 18,
                 borderRadius: 4,
-                border: `1px solid ${newBatch.is_paid ? "transparent" : "rgb(30,41,59)"}`,
+                border: `1px solid ${newBatch.is_paid ? "transparent" : "var(--ax-panel-3)"}`,
                 background: newBatch.is_paid ? figmaGradient : "transparent",
                 display: "flex",
                 alignItems: "center",
@@ -433,9 +433,9 @@ function CreateBatchModal({
                 transition: "all 0.15s",
               }}
             >
-              {newBatch.is_paid && <span style={{ color: "#05070a", fontSize: 11, fontWeight: 900 }}>✓</span>}
+              {newBatch.is_paid && <span style={{ color: "var(--ax-bg)", fontSize: 11, fontWeight: 900 }}>✓</span>}
             </div>
-            <span style={{ fontSize: 13, color: "#94a3b8" }}>Paid Access</span>
+            <span style={{ fontSize: 13, color: "var(--ax-muted)" }}>Paid Access</span>
           </div>
         </div>
 
@@ -447,9 +447,9 @@ function CreateBatchModal({
               flex: 1,
               padding: 11,
               borderRadius: 10,
-              border: "1px solid rgb(30,41,59)",
+              border: "1px solid var(--ax-panel-3)",
               background: "transparent",
-              color: "#6c7793",
+              color: "var(--ax-dim)",
               fontSize: 13,
               fontFamily: "Poppins",
               cursor: "pointer",
@@ -467,7 +467,7 @@ function CreateBatchModal({
               borderRadius: 10,
               border: "none",
               background: figmaGradient,
-              color: "#05070a",
+              color: "var(--ax-primary-action-text)",
               fontSize: 13,
               fontFamily: "Poppins",
               fontWeight: 700,
@@ -567,7 +567,7 @@ export default function BatchesPage() {
             marginBottom: 0,
           }}
         >
-          <div className="responsive-tab-strip" style={{ display: "flex", alignItems: "center", background: "rgb(5,7,10)", border: "1px solid rgb(30,41,59)", borderRadius: 8, padding: 6, gap: 2 }}>
+          <div className="responsive-tab-strip" style={{ display: "flex", alignItems: "center", background: "var(--ax-control-bg)", border: "1px solid var(--ax-border)", borderRadius: 8, padding: 6, gap: 2 }}>
             {[
               { key: "all", label: "All Batches" },
               { key: "private", label: "Private" },
@@ -586,8 +586,9 @@ export default function BatchesPage() {
                   fontFamily: "Poppins",
                   fontSize: 12,
                   fontWeight: 700,
-                  background: filter === item.key ? "rgb(255,255,255)" : "transparent",
-                  color: filter === item.key ? "rgb(5,7,10)" : "rgb(194,198,214)",
+                  background: filter === item.key ? "var(--ax-segment-active-bg)" : "transparent",
+                  color: filter === item.key ? "var(--ax-segment-active-text)" : "var(--ax-muted)",
+                  boxShadow: filter === item.key ? "0 8px 18px -14px rgba(15,23,42,0.35)" : "none",
                   transition: "all 0.15s",
                 }}
               >
@@ -597,7 +598,7 @@ export default function BatchesPage() {
           </div>
 
           <div className="responsive-control-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ display: "flex", background: "rgb(5,7,10)", border: "1px solid rgb(30,41,59)", borderRadius: 6, overflow: "hidden" }}>
+            <div style={{ display: "flex", background: "var(--ax-control-bg)", border: "1px solid var(--ax-border)", borderRadius: 6, overflow: "hidden" }}>
               {[
                 { key: "grid", icon: <LayoutGrid size={15} /> },
                 { key: "list", icon: <ListIcon size={15} /> },
@@ -614,8 +615,8 @@ export default function BatchesPage() {
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    background: view === item.key ? "rgba(59,130,255,0.15)" : "transparent",
-                    color: view === item.key ? "#afc6ff" : "#6c7793",
+                    background: view === item.key ? "var(--ax-active-bg)" : "transparent",
+                    color: view === item.key ? "var(--ax-active-text)" : "var(--ax-dim)",
                     transition: "all 0.15s",
                   }}
                 >
@@ -629,17 +630,17 @@ export default function BatchesPage() {
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search batches..."
                 style={{
-                  background: "rgb(10,13,18)",
-                  border: "1px solid rgb(30,41,59)",
+                  background: "var(--ax-panel)",
+                  border: "1px solid var(--ax-border)",
                   borderRadius: 6,
                   padding: "6px 12px 6px 32px",
                   fontSize: 12,
                   fontFamily: "Poppins",
-                  color: "#e0e3e6",
+                  color: "var(--ax-text)",
                   width: 200,
                 }}
               />
-              <span style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", display: "flex", pointerEvents: "none" }}>
+              <span style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "var(--ax-muted)", display: "flex", pointerEvents: "none" }}>
                 <Search size={14} />
               </span>
             </div>
@@ -658,7 +659,7 @@ export default function BatchesPage() {
                   fontFamily: "Poppins",
                   background: figmaGradient,
                   boxShadow: "0 0 10px rgba(59,130,255,0.3)",
-                  color: "#05070a",
+                  color: "var(--ax-primary-action-text)",
                   fontSize: 13,
                   fontWeight: 600,
                 }}
@@ -677,7 +678,7 @@ export default function BatchesPage() {
                 <BatchCard key={batch.id} batch={batch} index={index} view="grid" canManage={canManage} onArchive={handleArchive} />
               ))}
             </div>
-            {filtered.length === 0 && <p style={{ padding: "48px 0", textAlign: "center", fontSize: 14, color: "#6c7793" }}>No batches found.</p>}
+            {filtered.length === 0 && <p style={{ padding: "48px 0", textAlign: "center", fontSize: 14, color: "var(--ax-dim)" }}>No batches found.</p>}
           </div>
         ) : (
           <div className="responsive-table-wrap figma-card" style={{ borderRadius: "0 0 12px 12px", borderTop: "none" }}>
@@ -705,7 +706,7 @@ export default function BatchesPage() {
                     {index > 0 && (
                       <tr>
                         <td colSpan={6}>
-                          <div style={{ height: 1, background: "rgb(22,30,42)" }} />
+                          <div style={{ height: 1, background: "var(--ax-row-border)" }} />
                         </td>
                       </tr>
                     )}
@@ -714,9 +715,9 @@ export default function BatchesPage() {
                 ))}
               </tbody>
             </table>
-            {filtered.length === 0 && <p style={{ padding: "48px 0", textAlign: "center", fontSize: 14, color: "#6c7793" }}>No batches found.</p>}
-            <div style={{ padding: "14px 20px", borderTop: "1px solid rgb(30,41,59)" }}>
-              <span style={{ fontSize: 12, color: "#94a3b8" }}>Showing {filtered.length} of {batches.length} batches</span>
+            {filtered.length === 0 && <p style={{ padding: "48px 0", textAlign: "center", fontSize: 14, color: "var(--ax-dim)" }}>No batches found.</p>}
+            <div style={{ padding: "14px 20px", borderTop: "1px solid var(--ax-border)" }}>
+              <span style={{ fontSize: 12, color: "var(--ax-muted)" }}>Showing {filtered.length} of {batches.length} batches</span>
             </div>
           </div>
         )}

@@ -18,17 +18,19 @@ import {
   Share2,
   ShieldAlert,
   Sparkles,
+  User,
 } from "lucide-react";
 import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { figmaGradient } from "../components/FigmaShared";
+import ThemeToggle from "../components/ThemeToggle";
 
 const inputStyle = {
   height: 44,
   borderRadius: 8,
-  background: "rgba(29,32,34,0.5)",
-  border: "1px solid rgba(66,71,84,0.5)",
-  color: "#94a3b8",
+  background: "var(--ax-field-bg)",
+  border: "1px solid var(--ax-field-border)",
+  color: "var(--ax-muted)",
   padding: "0 14px",
   fontSize: 13,
   fontFamily: "Poppins",
@@ -36,7 +38,7 @@ const inputStyle = {
 } as const;
 
 function FieldLabel({ children }: { children: string }) {
-  return <div style={{ color: "#b6bdca", fontSize: 12, letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 8 }}>{children}</div>;
+  return <div style={{ color: "var(--ax-muted)", fontSize: 12, letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 8 }}>{children}</div>;
 }
 
 function Toggle({ checked, onClick }: { checked: boolean; onClick: () => void }) {
@@ -49,7 +51,7 @@ function Toggle({ checked, onClick }: { checked: boolean; onClick: () => void })
         height: 18,
         borderRadius: 20,
         border: "none",
-        background: checked ? "linear-gradient(90deg,#2e6cff,#00dbe8)" : "rgba(255,255,255,0.14)",
+        background: checked ? "linear-gradient(90deg,#2e6cff,#00dbe8)" : "var(--ax-border-strong)",
         padding: 2,
         cursor: "pointer",
         display: "flex",
@@ -57,7 +59,7 @@ function Toggle({ checked, onClick }: { checked: boolean; onClick: () => void })
         alignItems: "center",
       }}
     >
-      <span style={{ width: 14, height: 14, borderRadius: "50%", background: "#e0e3e6", display: "block" }} />
+      <span style={{ width: 14, height: 14, borderRadius: "50%", background: "var(--ax-text)", display: "block" }} />
     </button>
   );
 }
@@ -71,11 +73,11 @@ function Panel({ title, icon, children, style }: { title: string; icon: ReactNod
         ...style,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#d7dce3", fontSize: 16, marginBottom: 18 }}>
-        <span style={{ color: "#b8c0cc", display: "flex" }}>{icon}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--ax-text)", fontSize: 16, marginBottom: 18 }}>
+        <span style={{ color: "var(--ax-muted)", display: "flex" }}>{icon}</span>
         <span>{title}</span>
       </div>
-      <div style={{ height: 1, background: "rgba(255,255,255,0.06)", marginBottom: 18 }} />
+      <div style={{ height: 1, background: "var(--ax-border)", marginBottom: 18 }} />
       {children}
     </section>
   );
@@ -122,29 +124,47 @@ export default function ProfilePage() {
 
   return (
     <div className="figma-page">
-      <header className="app-topbar" style={{ height: 64, borderBottom: "1px solid rgba(255,255,255,0.08)", background: "rgba(5,7,10,0.82)", display: "flex", alignItems: "center", gap: 16, padding: "0 28px" }}>
-        <button type="button" onClick={() => window.history.back()} style={{ display: "flex", background: "none", border: "none", color: "#94a3b8", cursor: "pointer" }}>
+      <header className="app-topbar" style={{ height: 64, borderBottom: "1px solid var(--ax-border)", background: "var(--ax-glass)", display: "flex", alignItems: "center", gap: 16, padding: "0 28px" }}>
+        <button type="button" onClick={() => window.history.back()} style={{ display: "flex", background: "none", border: "none", color: "var(--ax-muted)", cursor: "pointer" }}>
           <ArrowLeft size={22} />
         </button>
-        <h1 style={{ fontSize: 18, color: "#e0e3e6", fontWeight: 700 }}>Profile Settings</h1>
+        <h1 style={{ fontSize: 18, color: "var(--ax-text)", fontWeight: 700 }}>Profile Settings</h1>
         <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
           <div className="app-topbar-search" style={{ position: "relative", width: 460 }}>
             <Search size={15} color="#6c7793" style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)" }} />
             <input
               placeholder="Ask AI or search workspace... (Cmd+K)"
-              style={{ width: "100%", height: 38, borderRadius: 6, background: "rgb(7,9,13)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", padding: "0 42px", fontFamily: "Poppins", fontSize: 13 }}
+              style={{ width: "100%", height: 38, borderRadius: 6, background: "var(--ax-input-bg)", border: "1px solid var(--ax-border)", color: "var(--ax-muted)", padding: "0 42px", fontFamily: "Poppins", fontSize: 13 }}
             />
             <Sparkles size={13} color="rgb(0,219,232)" style={{ position: "absolute", right: 13, top: "50%", transform: "translateY(-50%)" }} />
           </div>
         </div>
-        <Link to="/dm?askMentor=1" style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 6, border: "none", background: figmaGradient, color: "#05070a", fontSize: 12, fontWeight: 600, fontFamily: "Poppins", cursor: "pointer", textDecoration: "none" }}>
+        <Link to="/dm?askMentor=1" style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 6, border: "none", background: figmaGradient, color: "var(--ax-primary-action-text)", fontSize: 12, fontWeight: 600, fontFamily: "Poppins", cursor: "pointer", textDecoration: "none" }}>
           <Sparkles size={13} />
           Ask Mentor
         </Link>
+        <ThemeToggle />
         <Bell size={16} color="#94a3b8" />
         <Settings size={16} color="#94a3b8" />
-        <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }} />
-        <Link to="/profile" aria-label="Open profile" style={{ width: 32, height: 32, borderRadius: "50%", background: "rgb(45,103,107)", border: "1px solid rgba(255,255,255,0.1)", display: "block" }} />
+        <div style={{ width: 1, height: 20, background: "var(--ax-border)" }} />
+        <Link
+          to="/profile"
+          aria-label="Open profile"
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: "50%",
+            background: "var(--ax-profile-avatar-bg)",
+            border: "1px solid var(--ax-border)",
+            boxShadow: "var(--ax-profile-avatar-shadow)",
+            color: "var(--ax-profile-avatar-icon)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <User size={16} strokeWidth={2.2} />
+        </Link>
       </header>
 
       <main className="profile-content page-scroll-content figma-scroll" style={{ width: "100%", maxWidth: 1240, margin: "0 auto", padding: "50px 28px 70px" }}>
@@ -173,25 +193,25 @@ export default function ProfilePage() {
                   {displayName[0]?.toUpperCase()}
                 </div>
               )}
-              <button style={{ position: "absolute", right: -2, bottom: 8, width: 28, height: 28, borderRadius: "50%", border: "1px solid rgba(148,163,184,0.4)", background: "rgb(16,21,29)", color: "#94a3b8", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <button style={{ position: "absolute", right: -2, bottom: 8, width: 28, height: 28, borderRadius: "50%", border: "1px solid rgba(148,163,184,0.4)", background: "var(--ax-panel-2)", color: "var(--ax-muted)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Settings size={13} />
               </button>
             </div>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                 <h2 style={{ fontSize: 24, fontWeight: 700 }}>{displayName}</h2>
-                <span style={{ borderRadius: 4, border: "1px solid rgba(175,198,255,0.22)", background: "rgba(79,124,255,0.15)", color: "#afc6ff", fontSize: 9, fontWeight: 700, letterSpacing: "0.09em", padding: "5px 8px" }}>
+                <span style={{ borderRadius: 4, border: "1px solid rgba(175,198,255,0.22)", background: "rgba(79,124,255,0.15)", color: "var(--accent-300)", fontSize: 9, fontWeight: 700, letterSpacing: "0.09em", padding: "5px 8px" }}>
                   SYSTEM ADMINISTRATOR
                 </span>
               </div>
-              <div style={{ color: "#94a3b8", fontSize: 14, marginBottom: 10 }}>@admin_master</div>
+              <div style={{ color: "var(--ax-muted)", fontSize: 14, marginBottom: 10 }}>@admin_master</div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, color: "rgb(0,219,232)", fontSize: 11, fontWeight: 700 }}>
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: "rgb(0,219,232)", boxShadow: "0 0 6px rgba(0,219,232,0.7)" }} />
                 Online - Last active just now
               </div>
             </div>
           </div>
-          <button style={{ display: "flex", alignItems: "center", gap: 10, height: 38, padding: "0 17px", borderRadius: 7, border: "1px solid rgba(148,163,184,0.28)", background: "rgba(255,255,255,0.03)", color: "#d7dce3", fontFamily: "Poppins", fontSize: 14 }}>
+          <button style={{ display: "flex", alignItems: "center", gap: 10, height: 38, padding: "0 17px", borderRadius: 7, border: "1px solid rgba(148,163,184,0.28)", background: "rgba(255,255,255,0.03)", color: "var(--ax-text)", fontFamily: "Poppins", fontSize: 14 }}>
             <Share2 size={15} />
             Share Profile
           </button>
@@ -222,7 +242,7 @@ export default function ProfilePage() {
                 <button
                   onClick={() => profileMut.mutate({ username, bio })}
                   disabled={profileMut.isPending}
-                  style={{ display: "flex", alignItems: "center", gap: 8, height: 40, border: "none", borderRadius: 7, background: figmaGradient, color: "#fff", padding: "0 22px", fontFamily: "Poppins", fontSize: 14, cursor: "pointer" }}
+                  style={{ display: "flex", alignItems: "center", gap: 8, height: 40, border: "none", borderRadius: 7, background: figmaGradient, color: "var(--ax-primary-action-text)", padding: "0 22px", fontFamily: "Poppins", fontSize: 14, cursor: "pointer" }}
                 >
                   <Save size={14} />
                   Save Changes
@@ -230,28 +250,28 @@ export default function ProfilePage() {
               </div>
             </Panel>
 
-            <section style={{ borderRadius: 9, padding: 22, background: "linear-gradient(120deg,#006df5,#00dbe8)", color: "#e0e3e6" }}>
+            <section style={{ borderRadius: 9, padding: 22, background: "linear-gradient(120deg,#006df5,#00dbe8)", color: "var(--ax-text)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 17 }}>
                   <BriefcaseBusiness size={17} />
                   API & Integrations
                 </div>
-                <span style={{ borderRadius: 4, background: "rgba(5,7,10,0.25)", color: "#9cf9ff", fontSize: 9, fontWeight: 700, padding: "4px 8px" }}>PRO</span>
+                <span style={{ borderRadius: 4, background: "rgb(var(--surface) / 0.25)", color: "#9cf9ff", fontSize: 9, fontWeight: 700, padding: "4px 8px" }}>PRO</span>
               </div>
-              <div style={{ height: 1, background: "rgba(5,7,10,0.18)", marginBottom: 20 }} />
+              <div style={{ height: 1, background: "rgb(var(--surface) / 0.18)", marginBottom: 20 }} />
               {[
                 { icon: <Github size={18} />, title: "GitHub Workspace", sub: "Connected to acme-corp repo", action: "Manage", dark: true },
                 { icon: <Bot size={18} />, title: "OpenAI API Key", sub: "sk-...8f92 (Active)", action: "Revoke", dark: false },
               ].map((item) => (
-                <div key={item.title} style={{ display: "flex", alignItems: "center", gap: 18, borderRadius: 7, border: "1px solid rgba(5,7,10,0.22)", padding: "13px 12px", marginBottom: 12 }}>
+                <div key={item.title} style={{ display: "flex", alignItems: "center", gap: 18, borderRadius: 7, border: "1px solid rgb(var(--surface) / 0.22)", padding: "13px 12px", marginBottom: 12 }}>
                   <div style={{ width: 36, height: 36, borderRadius: 4, background: item.dark ? "#05070a" : "rgba(255,255,255,0.28)", display: "flex", alignItems: "center", justifyContent: "center", color: item.dark ? "#fff" : "#003b91" }}>
                     {item.icon}
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14 }}>{item.title}</div>
-                    <div style={{ color: "rgba(255,255,255,0.72)", fontSize: 14, marginTop: 4 }}>{item.sub}</div>
+                    <div style={{ color: "var(--ax-muted)", fontSize: 14, marginTop: 4 }}>{item.sub}</div>
                   </div>
-                  <button style={{ borderRadius: 4, border: "1px solid rgba(5,7,10,0.2)", background: "rgba(5,7,10,0.18)", color: "#e0e3e6", fontSize: 11, padding: "7px 12px" }}>{item.action}</button>
+                  <button style={{ borderRadius: 4, border: "1px solid rgb(var(--surface) / 0.2)", background: "rgb(var(--surface) / 0.18)", color: "var(--ax-text)", fontSize: 11, padding: "7px 12px" }}>{item.action}</button>
                 </div>
               ))}
             </section>
@@ -267,13 +287,13 @@ export default function ProfilePage() {
                 <FieldLabel>New Password</FieldLabel>
                 <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" placeholder="Enter new password" style={inputStyle} />
               </label>
-              <button onClick={() => passwordMut.mutate({ currentPassword, newPassword })} style={{ width: "100%", height: 40, borderRadius: 7, border: "1px solid rgba(59,130,255,0.22)", background: "transparent", color: "#e0e3e6", fontFamily: "Poppins", fontSize: 13 }}>
+              <button onClick={() => passwordMut.mutate({ currentPassword, newPassword })} style={{ width: "100%", height: 40, borderRadius: 7, border: "1px solid rgba(59,130,255,0.22)", background: "transparent", color: "var(--ax-text)", fontFamily: "Poppins", fontSize: 13 }}>
                 Update Password
               </button>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 32 }}>
                 <div>
-                  <div style={{ fontSize: 14, color: "#e0e3e6" }}>Two-Factor Auth</div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>Recommended for admins</div>
+                  <div style={{ fontSize: 14, color: "var(--ax-text)" }}>Two-Factor Auth</div>
+                  <div style={{ fontSize: 11, color: "var(--ax-muted)", marginTop: 4 }}>Recommended for admins</div>
                 </div>
                 <Toggle checked={twoFactor} onClick={() => setTwoFactor((value) => !value)} />
               </div>
@@ -300,7 +320,7 @@ export default function ProfilePage() {
                 <ShieldAlert size={18} color="rgb(255,99,93)" />
                 <div>
                   <div style={{ color: "rgb(255,99,93)", fontSize: 14 }}>Danger Zone</div>
-                  <div style={{ color: "#94a3b8", fontSize: 11, marginTop: 5 }}>Permanently delete account</div>
+                  <div style={{ color: "var(--ax-muted)", fontSize: 11, marginTop: 5 }}>Permanently delete account</div>
                 </div>
               </div>
               <button style={{ borderRadius: 7, border: "1px solid rgb(255,99,93)", background: "transparent", color: "rgb(255,99,93)", fontWeight: 700, fontSize: 11, padding: "7px 13px" }}>Delete</button>

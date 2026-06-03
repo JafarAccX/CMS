@@ -25,7 +25,7 @@ export default {
           50:  'rgba(59, 130, 255, 0.06)',
           100: 'rgba(59, 130, 255, 0.14)',
           200: 'rgba(59, 130, 255, 0.24)',
-          300: '#afc6ff',   // badge text, active link tint
+          300: 'var(--accent-300)',   // badge text, active link tint (themed)
           400: '#3b82ff',   // primary blue (gradient start)
           500: '#2563eb',
           600: '#1d4ed8',
@@ -42,13 +42,15 @@ export default {
          * DEFAULT (#05070a) is the root background.
          */
         surface: {
-          DEFAULT: '#05070a',
-          50:  '#0a0d12',   // card backgrounds   (rgb 10,13,18)
-          100: '#10151d',   // panel backgrounds  (rgb 16,21,29)
-          200: '#161e2e',   // elevated panels
-          300: '#1e293b',   // strong borders, input bg (rgb 30,41,59)
-          400: '#2c344d',
-          500: '#3a4563',
+          // Channel triplets defined in index.css (:root + [data-theme=light]) so
+          // /alpha modifiers (e.g. bg-surface-50/80) keep working in both themes.
+          DEFAULT: 'rgb(var(--surface) / <alpha-value>)',
+          50:  'rgb(var(--surface-50) / <alpha-value>)',
+          100: 'rgb(var(--surface-100) / <alpha-value>)',
+          200: 'rgb(var(--surface-200) / <alpha-value>)',
+          300: 'rgb(var(--surface-300) / <alpha-value>)',
+          400: 'rgb(var(--surface-400) / <alpha-value>)',
+          500: 'rgb(var(--surface-500) / <alpha-value>)',
         },
 
         /**
@@ -56,8 +58,8 @@ export default {
          * Matches rgba(255,255,255,0.08) used throughout the designs.
          */
         hairline: {
-          DEFAULT: 'rgba(255, 255, 255, 0.08)',
-          strong:  'rgba(255, 255, 255, 0.14)',
+          DEFAULT: 'var(--hairline)',
+          strong:  'var(--hairline-strong)',
         },
 
         /**
@@ -79,10 +81,10 @@ export default {
        *   faint    #424c64  — disabled, placeholder-level
        */
       textColor: {
-        primary: '#e0e3e6',
-        muted:   '#94a3b8',
-        dim:     '#6c7793',
-        faint:   '#424c64',
+        primary: 'var(--text-primary)',
+        muted:   'var(--text-muted)',
+        dim:     'var(--text-dim)',
+        faint:   'var(--text-faint)',
       },
 
       borderRadius: {
@@ -96,7 +98,7 @@ export default {
        * Shadow tokens — updated to match design glow system.
        */
       boxShadow: {
-        'card':             '0 1px 0 rgba(255,255,255,0.05) inset, 0 12px 32px -12px rgba(0,0,0,0.6)',
+        'card':             'var(--shadow-card)',
         'glow':             '0 0 0 1px rgba(59,130,255,0.32), 0 14px 40px -10px rgba(59,130,255,0.45)',
         'btn':              '0 0 14px rgba(59,130,255,0.35), 0 1px 0 rgba(255,255,255,0.18) inset',
         'btn-cyan':         '0 0 14px rgba(0,219,232,0.25), 0 0 28px rgba(59,130,255,0.2)',

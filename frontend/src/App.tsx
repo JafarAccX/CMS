@@ -46,7 +46,7 @@ function EmbedScreen({ error }: { error: string | null }) {
   return (
     <div
       className="fixed inset-0 flex flex-col items-center justify-center gap-4 text-center px-6"
-      style={{ background: "#0a0d12", color: "#e2e8f0", fontFamily: "Poppins, Inter, sans-serif" }}
+      style={{ background: "var(--ax-panel)", color: "#e2e8f0", fontFamily: "Poppins, Inter, sans-serif" }}
     >
       {error ? (
         <>

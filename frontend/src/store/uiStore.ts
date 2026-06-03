@@ -1,6 +1,21 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
+
+export type Theme = "light" | "dark";
+
+/** Reflect the active theme onto <html data-theme> so the CSS variables flip. */
+function applyThemeToDom(theme: Theme) {
+  if (typeof document !== "undefined") {
+    document.documentElement.setAttribute("data-theme", theme);
+  }
+}
 
 interface UiState {
+  // Theme (persisted)
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
+
   rightPanelOpen: boolean;
   toggleRightPanel: () => void;
   setRightPanel: (open: boolean) => void;
@@ -23,7 +38,19 @@ interface UiState {
   setOnlineUsers: (userIds: string[]) => void;
 }
 
-export const useUiStore = create<UiState>()((set, get) => ({
+export const useUiStore = create<UiState>()(
+  persist(
+    (set, get) => ({
+  // Theme
+  theme: "dark" as Theme,
+  setTheme: (theme) => {
+    applyThemeToDom(theme);
+    set({ theme });
+  },
+  toggleTheme: () => {
+    get().setTheme(get().theme === "dark" ? "light" : "dark");
+  },
+
   rightPanelOpen: true,
   toggleRightPanel: () => set((s) => ({ rightPanelOpen: !s.rightPanelOpen })),
   setRightPanel: (open) => set({ rightPanelOpen: open }),
@@ -76,4 +103,14 @@ export const useUiStore = create<UiState>()((set, get) => ({
     }),
   isUserOnline: (userId) => get().onlineUsers.has(userId),
   setOnlineUsers: (userIds) => set({ onlineUsers: new Set(userIds) }),
-}));
+    }),
+    {
+      name: "cms-ui",
+      // Only the theme is persisted; transient socket/typing state is not.
+      partialize: (s) => ({ theme: s.theme }),
+      onRehydrateStorage: () => (state) => {
+        if (state) applyThemeToDom(state.theme);
+      },
+    }
+  )
+);

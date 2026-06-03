@@ -1,20 +1,24 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bell, Search, Settings, Sparkles } from "lucide-react";
+import { Bell, Search, Settings, Sparkles, User } from "lucide-react";
+import ThemeToggle from "./ThemeToggle";
 
-export const figmaGradient = "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)";
+export const figmaGradient = "var(--ax-primary-action-bg)";
+export const figmaActionText = "var(--ax-primary-action-text)";
 export const figmaOrbGradient = "linear-gradient(rgb(62,56,224) 0%,rgb(0,219,232) 100%)";
-export const figmaSurface = "rgb(10,13,18)";
-export const figmaSurfaceElevated = "rgb(16,21,29)";
-export const figmaBorder = "rgba(255,255,255,0.08)";
-export const figmaText = "#e0e3e6";
-export const figmaMuted = "#94a3b8";
-export const figmaDim = "#6c7793";
+// Theme-aware tokens — these flip with [data-theme] (see index.css).
+export const figmaSurface = "var(--ax-panel)";
+export const figmaSurfaceElevated = "var(--ax-panel-2)";
+export const figmaBorder = "var(--ax-border)";
+export const figmaText = "var(--ax-text)";
+export const figmaMuted = "var(--ax-muted)";
+export const figmaDim = "var(--ax-dim)";
 
 export function FigmaOrbs() {
   return (
     <>
       <div
+        className="theme-orb"
         style={{
           position: "absolute",
           right: -80,
@@ -30,6 +34,7 @@ export function FigmaOrbs() {
         }}
       />
       <div
+        className="theme-orb"
         style={{
           position: "absolute",
           right: -80,
@@ -74,7 +79,7 @@ export function FigmaTopBar({
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    color: "#94a3b8",
+    color: "var(--ax-muted)",
   };
 
   return (
@@ -83,7 +88,7 @@ export function FigmaTopBar({
       style={{
         height: 64,
         flexShrink: 0,
-        backgroundColor: "rgba(10,12,17,0.6)",
+        background: "var(--ax-topbar-bg)",
         borderBottom: `1px solid ${figmaBorder}`,
         backdropFilter: "blur(24px)",
         WebkitBackdropFilter: "blur(24px)",
@@ -96,7 +101,7 @@ export function FigmaTopBar({
       }}
     >
       <div className="figma-topbar-title">
-        <span style={{ fontWeight: 700, fontSize: 20, color: "#e0e3e6", letterSpacing: "-0.01em" }}>
+        <span style={{ fontWeight: 700, fontSize: 20, color: "var(--ax-text)", letterSpacing: "-0.01em" }}>
           {title}
         </span>
         {subtitle && <span style={{ fontSize: 12, color: figmaDim, marginLeft: 10 }}>{subtitle}</span>}
@@ -109,14 +114,15 @@ export function FigmaTopBar({
               position: "absolute",
               inset: 0,
               borderRadius: 6,
-              backgroundColor: figmaSurface,
-              border: "1px solid rgba(255,255,255,0.1)",
+              background: "var(--ax-field-bg)",
+              border: "1px solid var(--ax-border)",
+              boxShadow: "0 1px 0 rgba(255,255,255,0.55) inset",
               display: "flex",
               alignItems: "center",
               padding: "0 40px",
             }}
           >
-            <span style={{ fontSize: 14, color: "rgba(148,163,184,0.5)", userSelect: "none" }}>
+            <span style={{ fontSize: 14, color: "var(--ax-placeholder)", userSelect: "none" }}>
               Ask AI or search workspace... (Cmd+K)
             </span>
           </div>
@@ -126,7 +132,7 @@ export function FigmaTopBar({
               left: 12,
               top: "50%",
               transform: "translateY(-50%)",
-              color: "rgba(148,163,184,0.5)",
+              color: "var(--ax-placeholder)",
               display: "flex",
               pointerEvents: "none",
             }}
@@ -139,7 +145,7 @@ export function FigmaTopBar({
               right: 12,
               top: "50%",
               transform: "translateY(-50%)",
-              color: "rgb(0,219,232)",
+              color: "var(--ax-primary-action-bg)",
               display: "flex",
               pointerEvents: "none",
             }}
@@ -165,7 +171,7 @@ export function FigmaTopBar({
             fontFamily: "Poppins",
             background: figmaGradient,
             boxShadow: "0 0 10px rgba(59,130,255,0.3)",
-            color: "#05070a",
+            color: figmaActionText,
             fontSize: 13,
             fontWeight: 500,
           }}
@@ -173,6 +179,7 @@ export function FigmaTopBar({
           {primaryIcon || <Sparkles size={13} />}
           {primaryLabel}
         </button>
+        <ThemeToggle />
         {bellSlot || (
           <button type="button" style={iconButton} aria-label="Notifications">
             <Bell size={14} />
@@ -181,7 +188,7 @@ export function FigmaTopBar({
         <button type="button" style={iconButton} aria-label="Settings">
           <Settings size={16} />
         </button>
-        <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)", margin: "0 4px" }} />
+        <div style={{ width: 1, height: 20, background: "var(--ax-border)", margin: "0 4px" }} />
         <Link
           to="/profile"
           aria-label="Open profile"
@@ -189,12 +196,18 @@ export function FigmaTopBar({
             width: 32,
             height: 32,
             borderRadius: "50%",
-            backgroundColor: "rgb(45,103,107)",
-            border: "1px solid rgba(255,255,255,0.1)",
+            background: "var(--ax-profile-avatar-bg, linear-gradient(145deg, rgba(45,103,107,0.95), rgba(0,219,232,0.28)))",
+            border: "1px solid var(--ax-border)",
+            boxShadow: "var(--ax-profile-avatar-shadow)",
             cursor: "pointer",
-            display: "block",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--ax-profile-avatar-icon)",
           }}
-        />
+        >
+          <User size={16} strokeWidth={2.2} />
+        </Link>
       </div>
     </header>
   );
@@ -221,13 +234,14 @@ export function FigmaStatCard({
         borderRadius: 8,
         overflow: "hidden",
         position: "relative",
-        backgroundColor: figmaSurface,
+        background: "var(--ax-card-bg)",
         border: `1px solid ${figmaBorder}`,
         padding: "17px 20px",
-        boxShadow: "0 1px 0 rgba(255,255,255,0.05) inset, 0 12px 32px -12px rgba(0,0,0,0.6)",
+        boxShadow: "var(--ax-shadow-card)",
       }}
     >
       <div
+        className="theme-orb"
         style={{
           position: "absolute",
           right: -18,
@@ -254,18 +268,16 @@ export function FigmaStatCard({
             justifyContent: "center",
           }}
         >
-          <span
-            style={{
-              background: figmaGradient,
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              display: "flex",
-            }}
-          >
+        <span
+          style={{
+            color: "var(--accent-300)",
+            display: "flex",
+          }}
+        >
             {icon}
           </span>
         </div>
-        <span style={{ fontWeight: 700, fontSize: 24, color: "#fff", lineHeight: 1 }}>{value ?? "--"}</span>
+        <span style={{ fontWeight: 700, fontSize: 24, color: "var(--ax-text)", lineHeight: 1 }}>{value ?? "--"}</span>
       </div>
       <div
         style={{
@@ -317,7 +329,7 @@ export function FigmaAvatarStack({ colors }: { colors: string[] }) {
             height: 24,
             borderRadius: "50%",
             background: color,
-            border: "2px solid #05070a",
+            border: "2px solid var(--ax-bg)",
             marginLeft: index > 0 ? -8 : 0,
             zIndex: colors.length - index,
             display: "flex",

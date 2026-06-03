@@ -3,10 +3,11 @@ import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "../api/client";
 import {
-  Users, Shield, FileText, AlertTriangle, Check, Plus, UserPlus,
+  Users, User, Shield, FileText, AlertTriangle, Check, Plus, UserPlus,
   Trash2, Megaphone, Pin, PinOff, Hash, Search,
   Settings, Sparkles, RefreshCw,
 } from "lucide-react";
+import ThemeToggle from "../components/ThemeToggle";
 import { toast } from "react-hot-toast";
 import { Modal, ModalHeader, ModalBody, ModalFooter } from "../components/Modal";
 import { FormTextarea } from "../components/FormField";
@@ -68,7 +69,7 @@ function PaginationControls({
         disabled={safePage <= 1}
         onClick={() => onPageChange(safePage - 1)}
         className={buttonBase}
-        style={{ border: "1px solid rgb(30,41,59)", background: "rgb(10,13,18)", color: "#94a3b8" }}
+        style={{ border: "1px solid var(--ax-border)", background: "var(--ax-field-bg)", color: "var(--ax-muted)" }}
         aria-label="Previous page"
       >
         &lt;
@@ -85,9 +86,9 @@ function PaginationControls({
             onClick={() => onPageChange(item)}
             className={buttonBase}
             style={{
-              border: "1px solid rgb(30,41,59)",
-              background: item === safePage ? "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)" : "rgb(10,13,18)",
-              color: item === safePage ? "#fff" : "#94a3b8",
+              border: "1px solid var(--ax-border)",
+              background: item === safePage ? "var(--ax-primary-action-bg)" : "var(--ax-panel)",
+              color: item === safePage ? "var(--ax-primary-action-text)" : "var(--ax-muted)",
             }}
             aria-label={`Page ${item}`}
             aria-current={item === safePage ? "page" : undefined}
@@ -101,7 +102,7 @@ function PaginationControls({
         disabled={safePage >= safeTotal}
         onClick={() => onPageChange(safePage + 1)}
         className={buttonBase}
-        style={{ border: "1px solid rgb(30,41,59)", background: "rgb(10,13,18)", color: "#94a3b8" }}
+        style={{ border: "1px solid var(--ax-border)", background: "var(--ax-field-bg)", color: "var(--ax-muted)" }}
         aria-label="Next page"
       >
         &gt;
@@ -121,18 +122,18 @@ function StatCard({
     <div
       onClick={onClick}
       className="relative overflow-hidden rounded-xl border border-hairline p-5 cursor-pointer transition-all hover:-translate-y-px"
-      style={{ backgroundColor: "rgb(10,13,18)" }}
+      style={{ background: "var(--ax-card-bg)", boxShadow: "var(--ax-shadow-card)" }}
     >
       {/* decorative orb */}
-      <div className="pointer-events-none absolute -right-4 -top-10 w-24 h-24 rounded-full opacity-20 blur-2xl"
+      <div className="theme-orb pointer-events-none absolute -right-4 -top-10 w-24 h-24 rounded-full opacity-20 blur-2xl"
         style={{ background: "linear-gradient(rgb(62,56,224),rgb(0,219,232))" }} />
       <div className="flex items-center gap-4 mb-4 relative">
         <div className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0" style={{ backgroundColor: iconBg }}>
-          <span style={{ background: "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", display: "flex" }}>
+          <span style={{ color: "var(--accent-300)", display: "flex" }}>
             {icon}
           </span>
         </div>
-        <span className="text-2xl font-bold text-white leading-none">{value ?? "—"}</span>
+        <span className="text-2xl font-bold leading-none" style={{ color: "var(--ax-text)" }}>{value ?? "--"}</span>
       </div>
       <p className="text-[11px] font-semibold tracking-widest text-muted uppercase relative">{label}</p>
       {delta && <p className="text-[11px] text-dim mt-1 relative">{delta}</p>}
@@ -282,7 +283,7 @@ export default function AdminPage() {
     <>
       {/* ── Glassmorphic Header ── */}
       <header className="app-topbar h-16 flex-shrink-0 border-b border-hairline flex items-center px-8 gap-4 sticky top-0 z-20"
-        style={{ backgroundColor: "rgba(10,12,17,0.6)", backdropFilter: "blur(24px)" }}>
+        style={{ background: "var(--ax-topbar-bg)", backdropFilter: "blur(24px)" }}>
         <h1 className="text-xl font-bold text-primary tracking-tight">Dashboard</h1>
         <div className="flex-1 flex justify-center">
           <div className="app-topbar-search relative w-[480px]">
@@ -290,7 +291,7 @@ export default function AdminPage() {
               type="button"
               onClick={() => comingSoon("Workspace search")}
               className="w-full h-10 rounded-md flex items-center px-10 border border-hairline text-left"
-              style={{ backgroundColor: "rgb(10,13,18)" }}
+              style={{ background: "var(--ax-field-bg)" }}
               aria-label="Workspace search"
               title="Workspace search coming soon"
             >
@@ -302,13 +303,25 @@ export default function AdminPage() {
         </div>
         <div className="app-topbar-actions flex items-center gap-2">
           <button onClick={() => setShowBroadcast(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-black"
-            style={{ background: "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)", boxShadow: "0 0 10px rgba(59,130,255,0.3)" }}>
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold"
+            style={{ background: "var(--ax-primary-action-bg)", color: "var(--ax-primary-action-text)", boxShadow: "var(--ax-primary-action-shadow)" }}>
             <Megaphone className="w-3.5 h-3.5" /> Announcement
           </button>
+          <ThemeToggle />
           <button type="button" onClick={() => comingSoon("Settings panel")} className="w-8 h-8 flex items-center justify-center rounded-lg text-dim hover:text-primary transition-colors" aria-label="Settings" title="Settings panel coming soon"><Settings className="w-4 h-4" /></button>
           <div className="w-px h-5 bg-hairline mx-1" />
-          <Link to="/profile" aria-label="Open profile" className="w-8 h-8 rounded-full bg-[rgb(45,103,107)] border border-hairline cursor-pointer" />
+          <Link
+            to="/profile"
+            aria-label="Open profile"
+            className="w-8 h-8 rounded-full border border-hairline cursor-pointer flex items-center justify-center"
+            style={{
+              background: "var(--ax-profile-avatar-bg)",
+              color: "var(--ax-profile-avatar-icon)",
+              boxShadow: "var(--ax-profile-avatar-shadow)",
+            }}
+          >
+            <User className="w-4 h-4" />
+          </Link>
         </div>
       </header>
 
@@ -331,17 +344,18 @@ export default function AdminPage() {
         {/* Controls row */}
         <div className="responsive-controls figma-panel p-3 flex items-center justify-between mb-0">
           {/* Tabs */}
-          <div className="flex items-center gap-1 p-1.5 rounded-lg border border-[rgb(30,41,59)]" style={{ backgroundColor: "rgb(5,7,10)" }}>
+          <div className="flex items-center gap-1 p-1.5 rounded-lg border" style={{ background: "var(--ax-control-bg)", borderColor: "var(--ax-border)" }}>
             {tabs.map(({ key, label, badge }) => (
               <button key={key} onClick={() => setTab(key)}
                 className="flex items-center gap-1.5 px-4 py-1.5 rounded-md text-[13px] font-bold transition-all"
                 style={{
-                  background: tab === key ? "rgb(255,255,255)" : "transparent",
-                  color: tab === key ? "rgb(5,7,10)" : "rgb(194,198,214)",
+                  background: tab === key ? "var(--ax-segment-active-bg)" : "transparent",
+                  color: tab === key ? "var(--ax-segment-active-text)" : "var(--ax-muted)",
+                  boxShadow: tab === key ? "0 8px 18px -14px rgba(15,23,42,0.35)" : "none",
                 }}>
                 {label}
                 {badge != null && badge > 0 && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: tab === key ? "rgba(0,0,0,0.12)" : "rgba(175,198,255,0.2)", color: tab === key ? "rgb(5,7,10)" : "rgb(175,198,255)" }}>{badge}</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: tab === key ? "rgba(37,99,235,0.12)" : "rgba(59,130,255,0.14)", color: tab === key ? "var(--ax-active-text)" : "var(--accent-300)" }}>{badge}</span>
                 )}
               </button>
             ))}
@@ -352,31 +366,31 @@ export default function AdminPage() {
             <button
               onClick={() => syncCrmMutation.mutate()}
               disabled={syncCrmMutation.isPending}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[13px] font-bold text-primary border border-[rgb(30,41,59)] disabled:opacity-60 disabled:cursor-not-allowed hover:border-accent-300/40 transition-all"
-              style={{ backgroundColor: "rgb(10,13,18)" }}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[13px] font-bold text-primary border disabled:opacity-60 disabled:cursor-not-allowed hover:border-accent-300/40 transition-all"
+              style={{ background: "var(--ax-field-bg)", borderColor: "var(--ax-border)" }}
             >
               <RefreshCw className={`w-4 h-4 text-accent-300 ${syncCrmMutation.isPending ? "animate-spin" : ""}`} />
               {syncCrmMutation.isPending ? "Syncing" : "Sync CRM"}
             </button>
-            <div className="flex items-center gap-1 p-0.5 rounded-md border border-[rgb(30,41,59)]" style={{ backgroundColor: "rgb(5,7,10)" }}>
+            <div className="flex items-center gap-1 p-0.5 rounded-md border" style={{ background: "var(--ax-control-bg)", borderColor: "var(--ax-border)" }}>
               {["all", "admin", "mentor", "learner"].map((f) => (
                 <button key={f} onClick={() => setUserFilter(f)}
                   className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
-                  style={{ background: userFilter === f ? "rgba(59,130,255,0.15)" : "transparent", color: userFilter === f ? "#afc6ff" : "rgb(194,198,214)" }}>
+                  style={{ background: userFilter === f ? "var(--ax-active-bg)" : "transparent", color: userFilter === f ? "var(--ax-active-text)" : "var(--ax-muted)" }}>
                   {f}
                 </button>
               ))}
             </div>
             <div className="relative">
               <input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Search users, emails…"
-                className="h-8 pl-8 pr-3 rounded-md text-[12px] text-primary placeholder-faint focus:outline-none focus:ring-1 focus:ring-accent-400/30 w-44 border border-[rgb(30,41,59)]"
-                style={{ backgroundColor: "rgb(10,13,18)" }} />
+                className="h-8 pl-8 pr-3 rounded-md text-[12px] text-primary placeholder-faint focus:outline-none focus:ring-1 focus:ring-accent-400/30 w-44 border"
+                style={{ background: "var(--ax-field-bg)", borderColor: "var(--ax-border)" }} />
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-faint pointer-events-none" />
             </div>
             {tab === "users" && (
               <button onClick={() => setShowCreateUser(true)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[13px] font-bold text-black border-none"
-                style={{ background: "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)", boxShadow: "0 0 10px rgba(59,130,255,0.3)" }}>
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[13px] font-bold border-none"
+                style={{ background: "var(--ax-primary-action-bg)", color: "var(--ax-primary-action-text)", boxShadow: "var(--ax-primary-action-shadow)" }}>
                 <UserPlus className="w-4 h-4" /> New User
               </button>
             )}
@@ -403,7 +417,7 @@ export default function AdminPage() {
                           <span className={`avatar ${u.role === "admin" ? "avatar-coral" : u.role === "mentor" ? "avatar-cyan" : "avatar-indigo"} w-9 h-9 text-[13px]`}>
                             {u.username[0].toUpperCase()}
                           </span>
-                          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[rgb(10,13,18)]" />
+                          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2" style={{ borderColor: "var(--ax-panel)" }} />
                         </div>
                         <div>
                           <p className="font-semibold text-primary text-[14px]">{u.username}</p>
@@ -414,8 +428,8 @@ export default function AdminPage() {
                     <td>
                       <div className="relative inline-flex items-center">
                         <select value={u.role} onChange={(e) => roleMutation.mutate({ id: u.id, role: e.target.value })}
-                          className="appearance-none pr-6 pl-2.5 py-1.5 rounded-md text-xs text-primary focus:outline-none focus:ring-1 focus:ring-accent-400/30 border border-[rgb(30,41,59)] cursor-pointer"
-                          style={{ backgroundColor: "rgb(13,17,24)" }}>
+                          className="appearance-none pr-6 pl-2.5 py-1.5 rounded-md text-xs text-primary focus:outline-none focus:ring-1 focus:ring-accent-400/30 border cursor-pointer"
+                          style={{ background: "var(--ax-field-bg)", borderColor: "var(--ax-border)" }}>
                           <option value="learner">Learner</option>
                           <option value="mentor">Mentor</option>
                           <option value="admin">Admin</option>
@@ -428,7 +442,7 @@ export default function AdminPage() {
                         {u.memberships?.length > 0
                           ? u.memberships.slice(0, 3).map((m: any, i: number) => (
                             <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border"
-                              style={{ background: "rgba(59,130,255,0.14)", color: "#94b4ff", borderColor: "rgba(59,130,255,0.18)" }}>
+                              style={{ background: "rgba(59,130,255,0.14)", color: "var(--ax-active-text)", borderColor: "rgba(59,130,255,0.22)" }}>
                               {m.batch.name}
                             </span>
                           ))
@@ -459,7 +473,7 @@ export default function AdminPage() {
               </tbody>
             </table>
 
-            <div className="px-5 py-3.5 border-t border-[rgb(30,41,59)] flex items-center justify-between">
+            <div className="px-5 py-3.5 border-t flex items-center justify-between" style={{ borderColor: "var(--ax-border)" }}>
               <span className="text-xs text-dim">Showing {usersStart}-{usersEnd} of {usersTotal} users</span>
               <PaginationControls page={usersCurrentPage} totalPages={usersTotalPages} onPageChange={setUsersPage} />
             </div>
@@ -529,14 +543,14 @@ export default function AdminPage() {
         {/* ── Logs Tab ── */}
         {tab === "logs" && (
           <div className="responsive-table-wrap figma-card rounded-b-xl border-t-0">
-            <div className="px-6 py-4 border-b border-[rgb(30,41,59)]"><h3 className="t-overline text-dim">Administrative Audit Logs</h3></div>
+            <div className="px-6 py-4 border-b" style={{ borderColor: "var(--ax-border)" }}><h3 className="t-overline text-dim">Administrative Audit Logs</h3></div>
             <table className="w-full text-sm min-w-[700px]">
-              <thead><tr className="border-b border-[rgb(30,41,59)]">
+              <thead><tr className="border-b" style={{ borderColor: "var(--ax-border)" }}>
                 {["Administrator", "Action", "Target", "Timestamp"].map(h => <th key={h} className="px-6 py-3 text-left text-[11px] font-semibold tracking-widest text-dim uppercase">{h}</th>)}
               </tr></thead>
-              <tbody className="divide-y divide-[rgb(22,30,42)]">
+              <tbody className="divide-y" style={{ borderColor: "var(--ax-row-border)" }}>
                 {logs.map((l: any) => (
-                  <tr key={l.id} className="hover:bg-white/[0.02] transition-colors">
+                  <tr key={l.id} className="hover:bg-[var(--ax-hover)] transition-colors">
                     <td className="px-6 py-4 flex items-center gap-2"><span className="avatar avatar-muted w-6 h-6 text-[10px]">{l.actor?.username[0]}</span><span className="text-primary font-medium">{l.actor?.username}</span></td>
                     <td className="px-6 py-4"><span className="chip chip-accent text-[10px]">{l.action_type.replace(/_/g, " ")}</span></td>
                     <td className="px-6 py-4"><span className="text-muted text-xs font-mono bg-surface-100 px-2 py-0.5 rounded border border-hairline">{l.target_id || "System"}</span></td>
@@ -545,7 +559,7 @@ export default function AdminPage() {
                 ))}
               </tbody>
             </table>
-            <div className="px-5 py-3.5 border-t border-[rgb(30,41,59)] flex items-center justify-between">
+            <div className="px-5 py-3.5 border-t flex items-center justify-between" style={{ borderColor: "var(--ax-border)" }}>
               <span className="text-xs text-dim">Showing {logsStart}-{logsEnd} of {logsTotal} logs</span>
               <PaginationControls page={logsCurrentPage} totalPages={logsTotalPages} onPageChange={setLogsPage} />
             </div>

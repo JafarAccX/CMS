@@ -1,4 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import type { CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../store/authStore";
 import { useBatchStore } from "../store/batchStore";
@@ -20,28 +21,42 @@ function NavItem({
   href: string; icon: React.ReactNode; label: string;
   active?: boolean; badge?: number;
 }) {
+  const activeStyle: CSSProperties | undefined = active
+    ? {
+        background: "var(--ax-active-bg)",
+        border: "1px solid var(--ax-active-border)",
+        boxShadow: "var(--ax-active-shadow)",
+      }
+    : { border: "1px solid transparent" };
+
   return (
     <Link to={href} className="block">
       <div
-        className={`relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
-          active ? "bg-accent-100" : "hover:bg-white/[0.04]"
-        }`}
+        className="relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-colors hover:bg-[var(--ax-hover)]"
+        style={activeStyle}
       >
         {active && (
           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full"
-            style={{ background: "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)", boxShadow: "0 0 8px rgba(59,130,255,0.5)" }} />
+            style={{ background: "var(--ax-primary-action-bg)", boxShadow: "0 0 8px rgba(37,99,235,0.35)" }} />
         )}
         <span
-          className={active ? "text-transparent bg-clip-text" : "text-muted"}
-          style={active ? { backgroundImage: "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)" } : undefined}
+          style={{ color: active ? "var(--ax-active-text)" : "var(--ax-sidebar-muted)" }}
         >
           {icon}
         </span>
-        <span className={`text-[14px] flex-1 ${active ? "font-medium text-primary" : "font-normal text-primary"}`}>
+        <span
+          className={`text-[14px] flex-1 ${active ? "font-semibold" : "font-normal"}`}
+          style={{ color: active ? "var(--ax-active-text)" : "var(--ax-sidebar-link)" }}
+        >
           {label}
         </span>
         {badge != null && (
-          <span className="min-w-[18px] h-[18px] px-1.5 rounded text-[10px] font-bold flex items-center justify-center bg-accent-100 text-accent-300">{badge}</span>
+          <span
+            className="min-w-[18px] h-[18px] px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center"
+            style={{ background: "var(--ax-sidebar-badge-bg)", color: "var(--ax-sidebar-badge-text)" }}
+          >
+            {badge}
+          </span>
         )}
       </div>
     </Link>
@@ -52,8 +67,8 @@ function SidebarSection({ label, children }: { label: string; children: React.Re
   return (
     <div className="mb-1.5">
       <div className="flex items-center justify-between px-3 py-1 mb-0.5">
-        <span className="text-[11px] font-medium tracking-[0.05em] text-muted uppercase">{label}</span>
-        <ChevronDown className="w-3 h-3 text-muted" />
+        <span className="text-[11px] font-semibold tracking-[0.05em] uppercase" style={{ color: "var(--ax-sidebar-section)" }}>{label}</span>
+        <ChevronDown className="w-3 h-3" style={{ color: "var(--ax-sidebar-section)" }} />
       </div>
       {children}
     </div>
@@ -65,41 +80,67 @@ function ChannelItem({
 }: {
   href: string; label: string; active?: boolean; hasDot?: boolean; count?: number;
 }) {
+  const activeStyle: CSSProperties | undefined = active
+    ? {
+        background: "var(--ax-active-bg)",
+        border: "1px solid var(--ax-active-border)",
+        boxShadow: "var(--ax-active-shadow)",
+      }
+    : { border: "1px solid transparent" };
+
   return (
     <Link to={href} className="block">
-      <div className={`relative flex items-center justify-between px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-        active ? "bg-accent-100" : "hover:bg-white/[0.04]"
-      }`}>
+      <div className="relative flex items-center justify-between px-3 py-1.5 rounded-lg transition-colors cursor-pointer hover:bg-[var(--ax-hover)]" style={activeStyle}>
         {active && (
           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
-            style={{ background: "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)" }} />
+            style={{ background: "var(--ax-primary-action-bg)" }} />
         )}
         <div className="flex items-center gap-2">
-          <Pin className="w-[9px] h-[15px] text-muted shrink-0" />
-          <span className={`text-[13px] ${active ? "text-primary font-medium" : "text-muted"}`}>{label}</span>
+          <Pin className="w-[9px] h-[15px] shrink-0" style={{ color: active ? "var(--ax-active-text)" : "var(--ax-sidebar-muted)" }} />
+          <span className={`text-[13px] ${active ? "font-semibold" : "font-normal"}`} style={{ color: active ? "var(--ax-active-text)" : "var(--ax-sidebar-muted)" }}>{label}</span>
         </div>
         {hasDot && <div className="w-2 h-2 rounded-full bg-red-400" />}
-        {count != null && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-accent-100 text-accent-300">{count}</span>}
+        {count != null && (
+          <span
+            className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+            style={{ background: "var(--ax-sidebar-badge-bg)", color: "var(--ax-sidebar-badge-text)" }}
+          >
+            {count}
+          </span>
+        )}
       </div>
     </Link>
   );
 }
 
 function HashChannelItem({ href, label, active, count }: { href: string; label: string; active?: boolean; count?: number }) {
+  const activeStyle: CSSProperties | undefined = active
+    ? {
+        background: "var(--ax-active-bg)",
+        border: "1px solid var(--ax-active-border)",
+        boxShadow: "var(--ax-active-shadow)",
+      }
+    : { border: "1px solid transparent" };
+
   return (
     <Link to={href} className="block">
-      <div className={`relative flex items-center justify-between px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-        active ? "bg-accent-100" : "hover:bg-white/[0.04]"
-      }`}>
+      <div className="relative flex items-center justify-between px-3 py-1.5 rounded-lg transition-colors cursor-pointer hover:bg-[var(--ax-hover)]" style={activeStyle}>
         {active && (
           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
-            style={{ background: "linear-gradient(rgb(59,130,255) 17%,rgb(0,219,232) 100%)" }} />
+            style={{ background: "var(--ax-primary-action-bg)" }} />
         )}
         <div className="flex items-center gap-2">
-          <span className="text-muted/50 text-[15px] font-medium leading-none">#</span>
-          <span className={`text-[13px] ${active ? "text-primary font-medium" : "text-muted"}`}>{label}</span>
+          <span className="text-[15px] font-medium leading-none" style={{ color: active ? "var(--ax-active-text)" : "var(--ax-sidebar-muted)", opacity: active ? 1 : 0.8 }}>#</span>
+          <span className={`text-[13px] ${active ? "font-semibold" : "font-normal"}`} style={{ color: active ? "var(--ax-active-text)" : "var(--ax-sidebar-muted)" }}>{label}</span>
         </div>
-        {count != null && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-accent-100 text-accent-300">{count}</span>}
+        {count != null && (
+          <span
+            className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+            style={{ background: "var(--ax-sidebar-badge-bg)", color: "var(--ax-sidebar-badge-text)" }}
+          >
+            {count}
+          </span>
+        )}
       </div>
     </Link>
   );
@@ -135,25 +176,25 @@ export default function AppShell({ children }: AppShellProps) {
   return (
     <div className="fixed inset-0 flex bg-surface overflow-hidden" style={{ background: "var(--ax-bg)" }}>
       {/* Decorative orbs */}
-      <div className="pointer-events-none absolute right-[-80px] top-[-160px] w-[303px] h-[278px] rounded-full opacity-[0.28] blur-[70px] z-0"
+      <div className="theme-orb pointer-events-none absolute right-[-80px] top-[-160px] w-[303px] h-[278px] rounded-full opacity-[0.28] blur-[70px] z-0"
         style={{ background: "linear-gradient(rgb(62,56,224) 0%,rgb(0,219,232) 100%)" }} />
-      <div className="pointer-events-none absolute right-[-80px] bottom-[-160px] w-[303px] h-[278px] rounded-full opacity-[0.15] blur-[70px] z-0"
+      <div className="theme-orb pointer-events-none absolute right-[-80px] bottom-[-160px] w-[303px] h-[278px] rounded-full opacity-[0.15] blur-[70px] z-0"
         style={{ background: "linear-gradient(rgb(62,56,224) 0%,rgb(0,219,232) 100%)" }} />
 
       {/* ── Sidebar ── */}
       {!hideGlobalSidebar && (
-      <aside className="w-64 flex-shrink-0 hidden lg:flex flex-col border-r border-hairline relative z-10 py-6 overflow-hidden"
-        style={{ width: "var(--ax-sidebar-w)", backgroundColor: "rgba(10,13,18,0.82)", boxShadow: "1px 0 8px rgba(255,255,255,0.15)" }}>
+      <aside className="app-sidebar w-64 flex-shrink-0 hidden lg:flex flex-col border-r border-hairline relative z-10 py-6 overflow-hidden"
+        style={{ width: "var(--ax-sidebar-w)", background: "var(--ax-sidebar-bg)", boxShadow: "1px 0 8px var(--ax-border), 12px 0 34px -30px rgba(30,64,175,0.45)" }}>
 
         {/* Logo */}
-        <Link to="/" className="block px-6 pb-5 border-b border-hairline hover:bg-white/[0.02] transition-colors">
+        <Link to="/" className="block px-6 pb-5 border-b border-hairline hover:bg-[var(--ax-hover)] transition-colors">
           <div 
             className="w-[128px] h-[19px] flex items-center font-bold text-primary text-[19px] leading-none tracking-[-0.04em]"
-            style={{ opacity: 1 }}
+            style={{ opacity: 1, color: "var(--ax-sidebar-title)" }}
           >
             Accelerator<span className="text-[#3B82FF]">X</span>
           </div>
-          <div className="text-[10px] text-muted tracking-[0.1em] uppercase leading-[15px] mt-1.5">Discussion Platform</div>
+          <div className="text-[10px] tracking-[0.1em] uppercase leading-[15px] mt-1.5" style={{ color: "var(--ax-sidebar-section)" }}>Discussion Platform</div>
         </Link>
 
         {/* Main nav */}
@@ -209,9 +250,9 @@ export default function AppShell({ children }: AppShellProps) {
           {/* Course groups */}
           <SidebarSection label="COURSE GROUPS">
             {activeBatches.slice(0, 3).map((b) => (
-              <Link key={b.id} to={`/batch/${b.id}`} className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/[0.04] transition-colors cursor-pointer">
-                <Folder className="w-[13px] h-[13px] text-muted" />
-                <span className="text-[13px] text-muted truncate">{b.name}</span>
+              <Link key={b.id} to={`/batch/${b.id}`} className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[var(--ax-hover)] transition-colors cursor-pointer">
+                <Folder className="w-[13px] h-[13px]" style={{ color: "var(--ax-sidebar-muted)" }} />
+                <span className="text-[13px] truncate" style={{ color: "var(--ax-sidebar-muted)" }}>{b.name}</span>
               </Link>
             ))}
           </SidebarSection>
@@ -219,15 +260,15 @@ export default function AppShell({ children }: AppShellProps) {
           <div className="h-px bg-hairline mx-2 my-3" />
 
           {isMentor && (
-            <Link to="/mentor" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-white/[0.04] transition-colors">
-              <BookOpen className="w-[15px] h-[15px] text-muted" />
-              <span className="text-[14px] font-normal text-primary">Mentorship</span>
+            <Link to="/mentor" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-[var(--ax-hover)] transition-colors">
+              <BookOpen className="w-[15px] h-[15px]" style={{ color: "var(--ax-sidebar-muted)" }} />
+              <span className="text-[14px] font-normal" style={{ color: "var(--ax-sidebar-link)" }}>Mentorship</span>
             </Link>
           )}
           {isLearner && (
-            <Link to="/dm?askMentor=1" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-white/[0.04] transition-colors">
-              <BookOpen className="w-[15px] h-[15px] text-muted" />
-              <span className="text-[14px] font-normal text-primary">Ask Mentor</span>
+            <Link to="/dm?askMentor=1" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-[var(--ax-hover)] transition-colors">
+              <BookOpen className="w-[15px] h-[15px]" style={{ color: "var(--ax-sidebar-muted)" }} />
+              <span className="text-[14px] font-normal" style={{ color: "var(--ax-sidebar-link)" }}>Ask Mentor</span>
             </Link>
           )}
         </div>
@@ -236,10 +277,10 @@ export default function AppShell({ children }: AppShellProps) {
         <div className="px-4 mt-2">
           <div className="h-px bg-hairline mx-2 mb-2" />
           {isAdmin && (
-            <Link to="/admin" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-white/[0.04] transition-colors mb-1">
-              <Settings className="w-[15px] h-[15px] text-muted" />
-              <span className="text-[14px] font-normal text-primary flex-1">Admin Console</span>
-              <ChevronRight className="w-3 h-3 text-muted" />
+            <Link to="/admin" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-[var(--ax-hover)] transition-colors mb-1">
+              <Settings className="w-[15px] h-[15px]" style={{ color: "var(--ax-sidebar-muted)" }} />
+              <span className="text-[14px] font-normal flex-1" style={{ color: "var(--ax-sidebar-link)" }}>Admin Console</span>
+              <ChevronRight className="w-3 h-3" style={{ color: "var(--ax-sidebar-muted)" }} />
             </Link>
           )}
 
@@ -248,13 +289,13 @@ export default function AppShell({ children }: AppShellProps) {
           <div className="flex items-center gap-2.5 px-3 py-2">
             <div className="relative flex-shrink-0">
               <div className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-base text-surface"
-                style={{ background: "linear-gradient(rgb(59,130,255) 0%,rgb(0,219,232) 100%)", boxShadow: "0 0 12px rgba(59,130,255,0.3)" }}>
+                style={{ background: "var(--ax-primary-action-bg)", color: "var(--ax-primary-action-text)", boxShadow: "var(--ax-primary-action-shadow)" }}>
                 {user?.username?.[0]?.toUpperCase() || "?"}
               </div>
               <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-surface" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[14px] font-medium text-muted truncate">{user?.username}</div>
+              <div className="text-[14px] font-semibold truncate" style={{ color: "var(--ax-sidebar-link)" }}>{user?.username}</div>
               <div className="text-[11px] text-emerald-400">Online</div>
             </div>
             <button onClick={handleLogout} className="p-1.5 text-dim hover:text-red-400 rounded transition-colors" aria-label="Sign out">

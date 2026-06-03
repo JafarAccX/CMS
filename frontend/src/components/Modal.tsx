@@ -33,13 +33,13 @@ export function Modal({ open, onClose, children, size = "md" }: ModalProps) {
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 bg-surface/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="figma-modal-backdrop z-50"
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
     >
       <div
-        className={`bg-surface-50 border border-hairline rounded-2xl w-full ${sizeMap[size]} overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200`}
+        className={`figma-modal-shell w-full ${sizeMap[size]} animate-in zoom-in-95 duration-200`}
       >
         {children}
       </div>
@@ -55,14 +55,15 @@ interface ModalHeaderProps {
 
 export function ModalHeader({ title, onClose, icon }: ModalHeaderProps) {
   return (
-    <div className="px-6 py-4 border-b border-hairline flex items-center justify-between">
+    <div className="px-6 py-4 border-b flex items-center justify-between" style={{ background: "var(--ax-modal-header-bg)", borderColor: "var(--ax-border)" }}>
       <h3 className="text-lg font-bold text-primary flex items-center gap-2">
         {icon}
         {title}
       </h3>
       <button
         onClick={onClose}
-        className="p-2 -mr-2 text-dim hover:text-primary hover:bg-surface-100 rounded-lg transition-colors"
+        className="p-2 -mr-2 text-dim hover:text-primary rounded-lg transition-colors"
+        style={{ background: "transparent" }}
         aria-label="Close dialog"
       >
         <X className="w-5 h-5" />
@@ -77,7 +78,7 @@ export function ModalBody({ children, className = "" }: { children: React.ReactN
 
 export function ModalFooter({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`px-6 py-4 bg-surface-100/50 border-t border-hairline flex gap-3 ${className}`}>
+    <div className={`px-6 py-4 border-t flex gap-3 ${className}`} style={{ background: "var(--ax-modal-footer-bg)", borderColor: "var(--ax-border)" }}>
       {children}
     </div>
   );

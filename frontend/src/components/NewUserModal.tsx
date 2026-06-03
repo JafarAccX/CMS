@@ -18,7 +18,7 @@ type NewUserModalProps = {
 };
 
 const roles = [
-  { key: "learner", label: "Learner", desc: "Access to enrolled batch channels", color: "#94a3b8", bg: "rgba(59,73,94,0.2)" },
+  { key: "learner", label: "Learner", desc: "Access to enrolled batch channels", color: "var(--ax-active-text)", bg: "rgba(59,130,255,0.12)" },
   { key: "mentor", label: "Mentor", desc: "Can manage and teach batch content", color: "rgb(0,219,232)", bg: "rgba(0,94,100,0.2)" },
   { key: "admin", label: "Admin", desc: "Full platform administration access", color: "rgb(175,198,255)", bg: "rgba(79,124,255,0.15)" },
 ];
@@ -51,34 +51,34 @@ export default function NewUserModal({ form, pending, onChange, onClose, onSubmi
   return (
     <div className="figma-modal-backdrop">
       <div
-        className="figma-modal-shell relative"
-        style={{ background: "linear-gradient(145deg,rgba(18,27,31,0.96),rgba(7,9,13,0.98))" }}
+        className="new-user-modal figma-modal-shell relative"
+        style={{ background: "linear-gradient(145deg,rgb(var(--surface-100) / 0.96),rgb(var(--surface-50) / 0.98))" }}
       >
         <div className="pointer-events-none absolute -left-32 -top-32 h-64 w-64 rounded-full bg-[rgb(82,141,255)] opacity-10 mix-blend-screen" />
 
-        <div className="flex shrink-0 items-center justify-between border-b border-[rgba(66,71,84,0.3)] bg-[rgba(16,20,22,0.5)] px-6 py-5">
+        <div className="new-user-modal-header flex shrink-0 items-center justify-between border-b px-6 py-5" style={{ background: "var(--ax-modal-header-bg)", borderColor: "var(--ax-border)" }}>
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-b from-accent-400 to-accent-cyan text-surface">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: "var(--ax-primary-action-bg)", color: "var(--ax-primary-action-text)" }}>
               <UserPlus className="h-4 w-4" />
             </div>
             <div>
               <div className="text-lg font-bold tracking-[-0.01em] text-primary">Create New User</div>
-              <div className="text-[13px] text-[#8c90a0]">Add a new user to the AcceleratorX platform</div>
+              <div className="text-[13px]" style={{ color: "var(--ax-muted)" }}>Add a new user to the AcceleratorX platform</div>
             </div>
           </div>
-          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-md text-[#8c90a0] transition-colors hover:bg-white/[0.06] hover:text-primary" aria-label="Close new user modal">
+          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-md text-[#8c90a0] transition-colors hover:bg-[var(--ax-hover-strong)] hover:text-primary" aria-label="Close new user modal">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pt-6">
-          <div className="mb-6 flex items-center gap-4 rounded-xl border border-[rgb(30,41,59)] bg-[rgb(7,9,13)] px-5 py-4">
+          <div className="new-user-preview mb-6 flex items-center gap-4 rounded-xl border px-5 py-4" style={{ background: "var(--ax-modal-accent-panel)", borderColor: "var(--ax-border)" }}>
             <div
               className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-xl text-lg font-bold transition-all"
               style={{
-                background: form.username ? `linear-gradient(140deg, ${alpha(role.color, 0.74)}, ${alpha(role.color, 0.4)})` : "rgb(30,41,59)",
-                border: `1px solid ${form.username ? alpha(role.color, 0.27) : "rgb(30,41,59)"}`,
-                color: form.username ? "#fff" : "#424c64",
+                background: form.username ? `linear-gradient(140deg, ${alpha(role.color, 0.74)}, ${alpha(role.color, 0.4)})` : "var(--ax-panel-3)",
+                border: `1px solid ${form.username ? alpha(role.color, 0.27) : "var(--ax-panel-3)"}`,
+                color: form.username ? "#fff" : "var(--ax-faint)",
               }}
             >
               {initials}
@@ -127,9 +127,9 @@ export default function NewUserModal({ form, pending, onChange, onClose, onSubmi
                     key={item.key}
                     onClick={() => onChange({ ...form, role: item.key })}
                     className="relative rounded-[10px] border p-3.5 text-left transition-all"
-                    style={{ borderColor: active ? alpha(item.color, 0.4) : "rgb(30,41,59)", background: active ? item.bg : "rgb(7,9,13)" }}
+                    style={{ borderColor: active ? alpha(item.color, 0.42) : "var(--ax-border)", background: active ? item.bg : "var(--ax-option-bg)" }}
                   >
-                    {active && <span className="absolute right-2.5 top-2.5 flex h-4 w-4 items-center justify-center rounded-full bg-gradient-to-b from-accent-400 to-accent-cyan text-surface"><Check className="h-3 w-3" /></span>}
+                    {active && <span className="absolute right-2.5 top-2.5 flex h-4 w-4 items-center justify-center rounded-full" style={{ background: "var(--ax-primary-action-bg)", color: "var(--ax-primary-action-text)" }}><Check className="h-3 w-3" /></span>}
                     <span className={`mb-1 block text-[13px] font-bold ${active ? "text-primary" : "text-muted"}`}>{item.label}</span>
                     <span className="block text-[11px] leading-snug text-dim">{item.desc}</span>
                   </button>
@@ -138,8 +138,8 @@ export default function NewUserModal({ form, pending, onChange, onClose, onSubmi
             </div>
           </div>
 
-          <button onClick={() => setSendWelcome((value) => !value)} className="mb-5 flex w-full items-center gap-3 rounded-[10px] border border-[rgb(30,41,59)] bg-[rgb(7,9,13)] p-3.5 text-left transition-colors hover:border-white/10">
-            <span className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border ${sendWelcome ? "border-transparent bg-gradient-to-b from-accent-400 to-accent-cyan text-surface" : "border-[rgb(30,41,59)]"}`}>
+          <button onClick={() => setSendWelcome((value) => !value)} className="new-user-welcome mb-5 flex w-full items-center gap-3 rounded-[10px] border p-3.5 text-left transition-colors hover:border-accent-300/30" style={{ background: "var(--ax-modal-accent-panel)", borderColor: "var(--ax-border)" }}>
+            <span className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border ${sendWelcome ? "border-transparent" : "border-[rgb(30,41,59)]"}`} style={sendWelcome ? { background: "var(--ax-primary-action-bg)", color: "var(--ax-primary-action-text)" } : undefined}>
               {sendWelcome && <Check className="h-3 w-3" />}
             </span>
             <span>
@@ -149,9 +149,9 @@ export default function NewUserModal({ form, pending, onChange, onClose, onSubmi
           </button>
         </div>
 
-        <div className="flex shrink-0 gap-2.5 border-t border-[rgba(66,71,84,0.2)] bg-[rgba(16,20,22,0.4)] px-6 py-4">
-          <button onClick={onClose} className="h-11 flex-1 rounded-[10px] border border-[rgb(30,41,59)] text-sm text-dim transition-colors hover:bg-white/[0.04] hover:text-primary">Cancel</button>
-          <button onClick={onSubmit} disabled={!isValid || pending} className="h-11 flex-[2] rounded-[10px] bg-gradient-to-b from-accent-400 to-accent-cyan text-sm font-bold text-surface shadow-[0_0_20px_rgba(59,130,255,0.3)] transition disabled:cursor-not-allowed disabled:bg-none disabled:bg-[rgb(30,41,59)] disabled:text-faint disabled:shadow-none">
+        <div className="new-user-modal-footer flex shrink-0 gap-2.5 border-t px-6 py-4" style={{ background: "var(--ax-modal-footer-bg)", borderColor: "var(--ax-border)" }}>
+          <button onClick={onClose} className="h-11 flex-1 rounded-[10px] border text-sm text-dim transition-colors hover:bg-[var(--ax-hover)] hover:text-primary" style={{ borderColor: "var(--ax-border)" }}>Cancel</button>
+          <button onClick={onSubmit} disabled={!isValid || pending} className="h-11 flex-[2] rounded-[10px] text-sm font-bold shadow-[0_0_20px_rgba(59,130,255,0.3)] transition disabled:cursor-not-allowed disabled:bg-none disabled:shadow-none" style={!isValid || pending ? { background: "var(--ax-disabled-bg)", color: "var(--ax-disabled-text)" } : { background: "var(--ax-primary-action-bg)", color: "var(--ax-primary-action-text)" }}>
             {pending ? "Creating..." : "Create User Account"}
           </button>
         </div>

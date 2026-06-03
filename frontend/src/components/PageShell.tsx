@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import ThemeToggle from "./ThemeToggle";
 
 interface PageShellProps {
   title: string;
@@ -26,7 +27,10 @@ export default function PageShell({ title, icon, backTo = "/", actions, children
             {icon && <span className="text-accent-300">{icon}</span>}
             <h1 className="text-xl font-bold text-primary">{title}</h1>
           </div>
-          {actions && <div className="flex items-center gap-3">{actions}</div>}
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            {actions}
+          </div>
         </div>
       </nav>
       {children}

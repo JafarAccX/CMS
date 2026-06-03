@@ -382,7 +382,7 @@ export default function ChannelChatPage() {
       <main className="flex-1 flex min-h-0 flex-col min-w-0">
         <header
           className="h-16 border-b border-hairline flex items-center justify-between px-6 shrink-0 z-20"
-          style={{ backgroundColor: "rgba(10,12,17,0.6)", backdropFilter: "blur(24px)" }}>
+          style={{ backgroundColor: "var(--ax-glass)", backdropFilter: "blur(24px)" }}>
           <div className="flex items-center gap-2.5">
             <button onClick={() => setIsMobileSidebarOpen(true)} className="p-2 -ml-2 text-dim hover:text-primary lg:hidden">
               <Hash className="w-6 h-6" />
@@ -430,7 +430,7 @@ export default function ChannelChatPage() {
           {channelMessages.map((msg) => {
             const isMe = String(msg.sender_id).toLowerCase() === String(user?.id).toLowerCase();
             return (
-              <div key={msg.id} className={`group flex gap-3 py-1.5 px-2 hover:bg-white/[0.02] rounded-lg msg-enter ${msg.isOptimistic ? "is-optimistic" : ""} ${isMe ? "flex-row-reverse" : ""}`}>
+              <div key={msg.id} className={`group flex gap-3 py-1.5 px-2 hover:bg-[var(--ax-hover)] rounded-lg msg-enter ${msg.isOptimistic ? "is-optimistic" : ""} ${isMe ? "flex-row-reverse" : ""}`}>
                 {!isMe && (
                   <button onClick={() => startDmWith(msg.sender_id)} className="avatar w-9 h-9 text-[13px] shrink-0 mt-0.5 cursor-pointer hover:ring-2 hover:ring-accent-400/50 transition-all" title={`Message ${msg.sender.username}`}>
                     {msg.sender.username[0].toUpperCase()}
@@ -530,7 +530,7 @@ export default function ChannelChatPage() {
         </div>
         <TypingIndicator users={currentTyping} />
         {canSend ? (
-          <div className="shrink-0 p-4 border-t border-hairline flex flex-col gap-2" style={{ background: "rgba(5,7,10,0.42)" }}>
+          <div className="shrink-0 p-4 border-t border-hairline flex flex-col gap-2" style={{ background: "rgb(var(--surface) / 0.42)" }}>
             {replyingTo && (
               <div className="flex items-center gap-2 bg-accent-50 border border-accent-200 rounded-[10px] px-3 py-2">
                 <Reply className="w-4 h-4 text-accent-400 shrink-0" />

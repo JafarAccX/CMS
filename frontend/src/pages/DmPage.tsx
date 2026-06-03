@@ -38,16 +38,28 @@ const learnerPalette: AvatarVisual[] = [
 
 function avatarVisual(user: { id?: string; role?: string }, index = 0): AvatarVisual {
   const role = (user?.role || "").toLowerCase();
-  if (role === "mentor") return { bg: "rgba(82,141,255,0.2)", border: "rgba(175,198,255,0.3)", color: "rgb(175,198,255)" };
-  if (role === "admin") return { bg: "rgba(124,92,255,0.2)", border: "rgba(183,139,255,0.3)", color: "rgb(183,139,255)" };
+  if (role === "mentor") {
+    return {
+      bg: "var(--ax-dm-avatar-mentor-bg)",
+      border: "var(--ax-dm-avatar-mentor-border)",
+      color: "var(--ax-dm-avatar-mentor-text)",
+    };
+  }
+  if (role === "admin") {
+    return {
+      bg: "var(--ax-dm-avatar-admin-bg)",
+      border: "var(--ax-dm-avatar-admin-border)",
+      color: "var(--ax-dm-avatar-admin-text)",
+    };
+  }
   const seed = user?.id ? Array.from(String(user.id)).reduce((sum, char) => sum + char.charCodeAt(0), 0) : index;
   return learnerPalette[seed % learnerPalette.length];
 }
 
 const coloredBadge: Record<string, { bg: string; color: string; label: string }> = {
   mentor: { bg: "rgba(0,94,100,0.2)", color: "rgb(0,219,232)", label: "MENTOR" },
-  admin: { bg: "rgba(79,124,255,0.15)", color: "#afc6ff", label: "ADMIN" },
-  learner: { bg: "rgba(59,73,94,0.2)", color: "#94a3b8", label: "LEARNER" },
+  admin: { bg: "rgba(79,124,255,0.15)", color: "var(--accent-300)", label: "ADMIN" },
+  learner: { bg: "rgba(59,73,94,0.2)", color: "var(--ax-muted)", label: "LEARNER" },
 };
 
 function badgeFor(role?: string) {
@@ -92,7 +104,7 @@ function Avatar({
   size = 40,
   online,
   showDot = true,
-  borderColor = "#101416",
+  borderColor = "var(--ax-bg)",
   glow = false,
 }: {
   user: { id?: string; username?: string; role?: string };
@@ -125,7 +137,7 @@ function Avatar({
       >
         {user?.username?.[0]?.toUpperCase()}
       </div>
-      {showDot && (
+      {showDot && online && (
         <span
           style={{
             position: "absolute",
@@ -134,9 +146,9 @@ function Avatar({
             width: dot,
             height: dot,
             borderRadius: "50%",
-            background: online ? "rgb(34,197,94)" : "rgb(50,53,56)",
+            background: "rgb(34,197,94)",
             border: `2px solid ${borderColor}`,
-            boxShadow: online ? "0 0 5px rgba(34,197,94,0.5)" : "none",
+            boxShadow: "0 0 5px rgba(34,197,94,0.5)",
           }}
         />
       )}
@@ -149,12 +161,12 @@ function NeutralBadge({ role }: { role?: string }) {
     <span
       style={{
         borderRadius: 4,
-        background: "#323538",
+        background: "var(--ax-panel-3)",
         padding: "2px 6px",
         fontSize: 9,
         fontWeight: 700,
         letterSpacing: "0.45px",
-        color: "rgba(255,255,255,0.5)",
+        color: "var(--ax-muted)",
         textTransform: "uppercase",
         flexShrink: 0,
         lineHeight: "9px",
@@ -173,7 +185,7 @@ function Section({ label, children }: { label: string; children: React.ReactNode
           fontSize: 11,
           fontWeight: 700,
           letterSpacing: "0.55px",
-          color: "#8c90a0",
+          color: "var(--ax-muted)",
           textTransform: "uppercase",
           padding: "0 12px",
         }}
@@ -214,7 +226,7 @@ function ContactRow({
           transition: "background 0.15s, border-color 0.15s",
         }}
         onMouseEnter={(event) => {
-          if (!active) event.currentTarget.style.background = "rgba(50,53,56,0.4)";
+          if (!active) event.currentTarget.style.background = "var(--ax-hover)";
         }}
         onMouseLeave={(event) => {
           if (!active) event.currentTarget.style.background = "transparent";
@@ -224,7 +236,7 @@ function ContactRow({
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.52px", color: "#e0e3e6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.52px", color: "var(--ax-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {other.username}
               </span>
               <NeutralBadge role={other.role} />
@@ -234,7 +246,7 @@ function ContactRow({
                 fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.66px",
-                color: unread ? "rgb(36,175,18)" : "rgba(255,255,255,0.5)",
+                color: unread ? "rgb(36,175,18)" : "var(--ax-muted)",
                 whiteSpace: "nowrap",
                 flexShrink: 0,
               }}
@@ -250,7 +262,7 @@ function ContactRow({
                 fontSize: 14,
                 lineHeight: "21px",
                 letterSpacing: "0.14px",
-                color: unread ? "#e0e3e6" : "#c2c6d6",
+                color: unread ? "#e0e3e6" : "var(--ax-text)",
                 fontWeight: unread ? 700 : 400,
                 whiteSpace: "nowrap",
                 overflow: "hidden",
@@ -319,7 +331,7 @@ function WelcomeCanvas({
           maxWidth: "100%",
           borderRadius: 16,
           background: "linear-gradient(rgba(78,249,240,0.05) 0%, rgba(255,255,255,0.05) 100%)",
-          border: "1px solid rgb(30,41,59)",
+          border: "1px solid var(--ax-panel-3)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
           boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
@@ -346,26 +358,26 @@ function WelcomeCanvas({
             width: 80,
             height: 80,
             borderRadius: 16,
-            background: "rgba(50,53,56,0.3)",
-            border: "1px solid rgba(66,71,84,0.2)",
+            background: "var(--ax-field-bg)",
+            border: "1px solid var(--ax-field-border)",
             boxShadow: "inset 0 2px 4px 1px rgba(0,0,0,0.05)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            color: "#424754",
+            color: "var(--ax-dim)",
             marginBottom: 16,
           }}
         >
           <MessagesSquare size={34} strokeWidth={1.6} />
         </div>
 
-        <h2 className="dm-welcome-h1" style={{ fontSize: 32, fontWeight: 700, lineHeight: "40px", letterSpacing: "-1.44px", textAlign: "center", color: "#e0e3e6", marginBottom: 16 }}>
+        <h2 className="dm-welcome-h1" style={{ fontSize: 32, fontWeight: 700, lineHeight: "40px", letterSpacing: "-1.44px", textAlign: "center", color: "var(--ax-text)", marginBottom: 16 }}>
           Your Workspace
           <br />
           Communications
         </h2>
 
-        <p style={{ fontSize: 18, lineHeight: "28.8px", letterSpacing: "-0.18px", textAlign: "center", color: "#c2c6d6", maxWidth: 524, marginBottom: 26 }}>
+        <p style={{ fontSize: 18, lineHeight: "28.8px", letterSpacing: "-0.18px", textAlign: "center", color: "var(--ax-text)", maxWidth: 524, marginBottom: 26 }}>
           Select a conversation from the sidebar or start a new direct message to collaborate with mentors and peers.
         </p>
 
@@ -400,7 +412,7 @@ function WelcomeCanvas({
                 fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.55px",
-                color: "rgba(255,255,255,0.6)",
+                color: "var(--ax-muted)",
                 textTransform: "uppercase",
                 paddingBottom: 8,
                 borderBottom: "1px solid rgba(66,71,84,0.15)",
@@ -416,8 +428,8 @@ function WelcomeCanvas({
                   onClick={() => onStart(person.id)}
                   style={{
                     borderRadius: 12,
-                    background: "rgb(16,21,29)",
-                    border: "1px solid rgb(30,41,59)",
+                    background: "var(--ax-panel-2)",
+                    border: "1px solid var(--ax-panel-3)",
                     padding: 16,
                     display: "flex",
                     alignItems: "center",
@@ -430,23 +442,23 @@ function WelcomeCanvas({
                   }}
                   onMouseEnter={(event) => {
                     event.currentTarget.style.borderColor = "rgba(82,141,255,0.4)";
-                    event.currentTarget.style.background = "rgb(18,24,33)";
+                    event.currentTarget.style.background = "var(--ax-panel-3)";
                   }}
                   onMouseLeave={(event) => {
-                    event.currentTarget.style.borderColor = "rgb(30,41,59)";
-                    event.currentTarget.style.background = "rgb(16,21,29)";
+                    event.currentTarget.style.borderColor = "var(--ax-border)";
+                    event.currentTarget.style.background = "var(--ax-panel-2)";
                   }}
                 >
-                  <Avatar user={person} index={i} size={48} online={onlineUsers.has(person.id)} borderColor="#10151d" />
+                  <Avatar user={person} index={i} size={48} online={onlineUsers.has(person.id)} borderColor="var(--ax-panel-2)" />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.52px", color: "#e0e3e6", marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.52px", color: "var(--ax-text)", marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {person.username}
                     </div>
-                    <div style={{ fontSize: 14, lineHeight: "21px", letterSpacing: "0.14px", color: "#c2c6d6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <div style={{ fontSize: 14, lineHeight: "21px", letterSpacing: "0.14px", color: "var(--ax-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {person.email || titleRole(person.role)}
                     </div>
                   </div>
-                  <ArrowRight size={16} style={{ color: "rgba(255,255,255,0.6)", flexShrink: 0 }} />
+                  <ArrowRight size={16} style={{ color: "var(--ax-muted)", flexShrink: 0 }} />
                 </button>
               ))}
             </div>
@@ -481,7 +493,7 @@ function PickerRow({ user, index, online, onStart }: { user: any; index: number;
         transition: "background 0.15s",
       }}
       onMouseEnter={(event) => {
-        event.currentTarget.style.background = "rgba(50,53,56,0.4)";
+        event.currentTarget.style.background = "var(--ax-hover)";
       }}
       onMouseLeave={(event) => {
         event.currentTarget.style.background = "transparent";
@@ -490,16 +502,16 @@ function PickerRow({ user, index, online, onStart }: { user: any; index: number;
       <Avatar user={user} index={index} size={40} online={online} />
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.52px", color: "#e0e3e6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.52px", color: "var(--ax-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {user.username}
           </span>
           <NeutralBadge role={user.role} />
         </div>
-        <span style={{ fontSize: 14, lineHeight: "21px", letterSpacing: "0.14px", color: "#c2c6d6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <span style={{ fontSize: 14, lineHeight: "21px", letterSpacing: "0.14px", color: "var(--ax-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {user.email || titleRole(user.role)}
         </span>
       </div>
-      <ArrowRight size={16} style={{ color: "rgba(255,255,255,0.6)", flexShrink: 0 }} />
+      <ArrowRight size={16} style={{ color: "var(--ax-muted)", flexShrink: 0 }} />
     </button>
   );
 }
@@ -535,7 +547,7 @@ function StartConversationPanel({
         style={{
           position: "fixed",
           inset: 0,
-          background: "rgba(5,7,10,0.5)",
+          background: "rgb(var(--surface) / 0.5)",
           backdropFilter: "blur(2px)",
           WebkitBackdropFilter: "blur(2px)",
           opacity: open ? 1 : 0,
@@ -555,8 +567,8 @@ function StartConversationPanel({
           maxWidth: "90vw",
           height: "100vh",
           borderRadius: "16px 0 0 16px",
-          background: "rgba(16,20,22,0.6)",
-          border: "1px solid rgba(66,71,84,0.1)",
+          background: "rgb(var(--surface-50) / 0.6)",
+          border: "1px solid var(--ax-field-border)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
           boxShadow: "-2px 0 18px rgba(0,0,0,0.45)",
@@ -567,9 +579,9 @@ function StartConversationPanel({
           zIndex: 50,
         }}
       >
-        <div style={{ padding: "24px 24px 16px", borderBottom: "1px solid rgba(66,71,84,0.1)", display: "flex", flexDirection: "column", gap: 16, flexShrink: 0 }}>
+        <div style={{ padding: "24px 24px 16px", borderBottom: "1px solid var(--ax-field-border)", display: "flex", flexDirection: "column", gap: 16, flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-            <h2 style={{ fontSize: 24, fontWeight: 700, lineHeight: "28.8px", letterSpacing: "-0.48px", color: "#e0e3e6" }}>{title}</h2>
+            <h2 style={{ fontSize: 24, fontWeight: 700, lineHeight: "28.8px", letterSpacing: "-0.48px", color: "var(--ax-text)" }}>{title}</h2>
             <button
               type="button"
               onClick={onClose}
@@ -583,18 +595,18 @@ function StartConversationPanel({
                 justifyContent: "center",
                 background: "none",
                 border: "none",
-                color: "#8c90a0",
+                color: "var(--ax-muted)",
                 cursor: "pointer",
                 flexShrink: 0,
                 transition: "background 0.15s, color 0.15s",
               }}
               onMouseEnter={(event) => {
-                event.currentTarget.style.background = "rgba(50,53,56,0.5)";
-                event.currentTarget.style.color = "#e0e3e6";
+                event.currentTarget.style.background = "var(--ax-hover-strong)";
+                event.currentTarget.style.color = "var(--ax-text)";
               }}
               onMouseLeave={(event) => {
                 event.currentTarget.style.background = "none";
-                event.currentTarget.style.color = "#8c90a0";
+                event.currentTarget.style.color = "var(--ax-muted)";
               }}
             >
               <X size={16} />
@@ -606,13 +618,13 @@ function StartConversationPanel({
               value={search}
               onChange={(event) => onSearch(event.target.value)}
               placeholder={mentorOnly ? "Search mentors..." : "Search people..."}
-              style={{ width: "100%", height: 42, borderRadius: 8, border: "1px solid rgb(30,41,59)", background: "rgb(7,9,13)", color: "#e0e3e6", fontFamily: "Poppins", fontSize: 14, padding: "0 16px 0 40px" }}
+              style={{ width: "100%", height: 42, borderRadius: 8, border: "1px solid var(--ax-panel-3)", background: "var(--ax-input-bg)", color: "var(--ax-text)", fontFamily: "Poppins", fontSize: 14, padding: "0 16px 0 40px" }}
             />
           </div>
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px" }}>
-          {empty && <p style={{ color: "#424c64", fontSize: 13, textAlign: "center", paddingTop: 40 }}>{emptyText}</p>}
+          {empty && <p style={{ color: "var(--ax-faint)", fontSize: 13, textAlign: "center", paddingTop: 40 }}>{emptyText}</p>}
           {mentors.length > 0 && (
             <Section label="Mentors">
               {mentors.map((item, index) => (
@@ -660,14 +672,14 @@ function MessageBubble({ message, isMe, activeConv }: { message: any; isMe: bool
         </div>
       )}
       <div className="dm-message-bubble" style={{ maxWidth: "62%", display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
-        {!isMe && <span style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 4 }}>{senderName}</span>}
+        {!isMe && <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ax-muted)", marginBottom: 4 }}>{senderName}</span>}
         <div
           style={{
             borderRadius: isMe ? "16px 0 16px 16px" : "0 16px 16px 16px",
             background: isMe ? "linear-gradient(135deg,rgba(59,130,255,0.25),rgba(0,219,232,0.15))" : "linear-gradient(rgb(10,14,20),rgb(12,24,37))",
-            border: `1px solid ${isMe ? "rgba(59,130,255,0.3)" : "rgb(30,41,59)"}`,
+            border: `1px solid ${isMe ? "rgba(59,130,255,0.3)" : "var(--ax-panel-3)"}`,
             padding: "10px 14px",
-            color: "#e0e3e6",
+            color: "var(--ax-text)",
             fontSize: 14,
             lineHeight: 1.6,
             opacity: message.isOptimistic ? 0.62 : 1,
@@ -675,7 +687,7 @@ function MessageBubble({ message, isMe, activeConv }: { message: any; isMe: bool
         >
           {message.content}
         </div>
-        <span style={{ fontSize: 10, color: "#424c64", marginTop: 4 }}>{format(new Date(message.created_at), "hh:mm a")}</span>
+        <span style={{ fontSize: 10, color: "var(--ax-faint)", marginTop: 4 }}>{format(new Date(message.created_at), "hh:mm a")}</span>
       </div>
     </div>
   );
@@ -697,7 +709,7 @@ function RightUtilityPanel({ activeConv, online }: { activeConv: any; online: bo
         borderRight: 0,
         borderBottom: 0,
         borderLeft: "1px solid var(--ax-border)",
-        background: "rgba(10,13,18,0.74)",
+        background: "rgb(var(--surface-50) / 0.74)",
         padding: "24px 20px",
         overflowY: "auto",
         display: "flex",
@@ -707,7 +719,7 @@ function RightUtilityPanel({ activeConv, online }: { activeConv: any; online: bo
         zIndex: 2,
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, paddingBottom: 20, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, paddingBottom: 20, borderBottom: "1px solid var(--ax-border)" }}>
         <div
           style={{
             width: 56,
@@ -727,41 +739,41 @@ function RightUtilityPanel({ activeConv, online }: { activeConv: any; online: bo
           {activeConv.otherUser.username?.[0]?.toUpperCase()}
         </div>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#e0e3e6" }}>{activeConv.otherUser.username}</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--ax-text)" }}>{activeConv.otherUser.username}</div>
           <span style={{ display: "inline-flex", marginTop: 5, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: badge.bg, color: badge.color, border: `1px solid ${badge.color}33` }}>
             {badge.label}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <div style={{ width: 7, height: 7, borderRadius: "50%", background: online ? "rgb(34,197,94)" : "#424c64", boxShadow: online ? "0 0 5px rgba(34,197,94,0.5)" : "none" }} />
-          <span style={{ fontSize: 12, color: online ? "rgb(34,197,94)" : "#6c7793" }}>{online ? "Online" : "Offline"}</span>
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: online ? "rgb(34,197,94)" : "var(--ax-faint)", boxShadow: online ? "0 0 5px rgba(34,197,94,0.5)" : "none" }} />
+          <span style={{ fontSize: 12, color: online ? "rgb(34,197,94)" : "var(--ax-dim)" }}>{online ? "Online" : "Offline"}</span>
         </div>
       </div>
 
       <div>
-        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#6c7793", marginBottom: 12, paddingBottom: 6, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>Today</div>
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ax-dim)", marginBottom: 12, paddingBottom: 6, borderBottom: "1px solid var(--ax-border)" }}>Today</div>
         {[
           { color: "rgb(59,130,255)", title: "1:1 Mentoring", sub: "with Alex Johnson", time: "2:00 PM" },
           { color: "rgb(0,219,232)", title: "Course Outline V2", sub: "Pending Approval", action: "Review" },
         ].map((item) => (
-          <div key={item.title} style={{ borderRadius: 10, background: "rgb(10,12,17)", border: "1px solid rgba(255,255,255,0.08)", padding: "14px 14px 14px 18px", marginBottom: 8, position: "relative", overflow: "hidden" }}>
+          <div key={item.title} style={{ borderRadius: 10, background: "var(--ax-panel)", border: "1px solid var(--ax-border)", padding: "14px 14px 14px 18px", marginBottom: 8, position: "relative", overflow: "hidden" }}>
             <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, background: item.color, boxShadow: `0 0 10px ${item.color}80` }} />
-            {item.time && <div style={{ fontSize: 10, color: "#6c7793", marginBottom: 2 }}>{item.time}</div>}
+            {item.time && <div style={{ fontSize: 10, color: "var(--ax-dim)", marginBottom: 2 }}>{item.time}</div>}
             {item.sub && <div style={{ fontSize: 10, color: item.color, marginBottom: 2 }}>{item.sub}</div>}
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{item.title}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ax-text)" }}>{item.title}</div>
             {item.action && <button type="button" style={{ marginTop: 6, fontSize: 11, color: item.color, background: "none", border: "none", cursor: "pointer", padding: 0 }}>{item.action} -&gt;</button>}
           </div>
         ))}
       </div>
 
       <div>
-        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#6c7793", marginBottom: 12, paddingBottom: 6, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>Shared Files</div>
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ax-dim)", marginBottom: 12, paddingBottom: 6, borderBottom: "1px solid var(--ax-border)" }}>Shared Files</div>
         {files.map((file) => (
           <div key={file} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, marginBottom: 4 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: "rgba(59,130,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "#afc6ff", flexShrink: 0 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: "rgba(59,130,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "var(--accent-300)", flexShrink: 0 }}>
               {file.split(".").pop()?.toUpperCase()}
             </div>
-            <span style={{ fontSize: 12, color: "#94a3b8", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file}</span>
+            <span style={{ fontSize: 12, color: "var(--ax-muted)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file}</span>
           </div>
         ))}
       </div>
@@ -920,7 +932,7 @@ export default function DmPage() {
   const activeOnline = activeConv ? onlineUsers.has(activeConv.otherUser.id) : false;
 
   return (
-    <div className="dm-layout" style={{ height: "100%", minHeight: 0, width: "100%", display: "flex", background: "var(--ax-bg)", color: "#e0e3e6", overflow: "hidden", position: "relative" }}>
+    <div className="dm-layout" style={{ height: "100%", minHeight: 0, width: "100%", display: "flex", background: "var(--ax-bg)", color: "var(--ax-text)", overflow: "hidden", position: "relative" }}>
       <aside
         className={`dm-contact-panel figma-panel ${activeConv ? "dm-contact-panel--has-active" : ""}`}
         style={{
@@ -931,7 +943,7 @@ export default function DmPage() {
           borderLeft: 0,
           borderBottom: 0,
           borderRight: "1px solid var(--ax-border)",
-          background: "rgba(10,13,18,0.74)",
+          background: "rgb(var(--surface-50) / 0.74)",
           display: "flex",
           flexDirection: "column",
           position: "relative",
@@ -956,18 +968,18 @@ export default function DmPage() {
           }}
         />
 
-        <div style={{ padding: "24px 24px 16px", borderBottom: "1px solid rgba(66,71,84,0.1)", position: "relative", zIndex: 1 }}>
+        <div style={{ padding: "24px 24px 16px", borderBottom: "1px solid var(--ax-field-border)", position: "relative", zIndex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <button type="button" onClick={() => navigate(-1)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.6)", display: "flex", padding: 4, cursor: "pointer" }} aria-label="Back">
+              <button type="button" onClick={() => navigate(-1)} style={{ background: "none", border: "none", color: "var(--ax-muted)", display: "flex", padding: 4, cursor: "pointer" }} aria-label="Back">
                 <ArrowLeft size={16} />
               </button>
-              <h1 style={{ fontSize: 24, fontWeight: 700, lineHeight: "28.8px", color: "#e0e3e6", letterSpacing: "-0.48px" }}>Direct Messages</h1>
+              <h1 style={{ fontSize: 24, fontWeight: 700, lineHeight: "28.8px", color: "var(--ax-text)", letterSpacing: "-0.48px" }}>Direct Messages</h1>
             </div>
             <button
               type="button"
               onClick={() => setShowDrawer(true)}
-              style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(66,71,84,0.2)", background: "rgba(50,53,56,0.3)", color: "#e0e3e6", fontSize: 13, fontWeight: 700, letterSpacing: "0.52px", cursor: "pointer" }}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 6, border: "1px solid var(--ax-field-border)", background: "var(--ax-field-bg)", color: "var(--ax-text)", fontSize: 13, fontWeight: 700, letterSpacing: "0.52px", cursor: "pointer" }}
             >
               <Plus size={11} />
               New
@@ -985,7 +997,7 @@ export default function DmPage() {
             />
             <div style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", display: "flex", gap: 3 }}>
               {["⌘", "K"].map((key) => (
-                <span key={key} style={{ minWidth: 20, height: 22, borderRadius: 4, background: "rgba(50,53,56,0.5)", border: "1px solid rgba(66,71,84,0.2)", color: "#424c64", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{key}</span>
+                <span key={key} style={{ minWidth: 20, height: 22, borderRadius: 4, background: "var(--ax-field-bg)", border: "1px solid var(--ax-field-border)", color: "var(--ax-faint)", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{key}</span>
               ))}
             </div>
           </div>
@@ -1006,29 +1018,29 @@ export default function DmPage() {
               ))}
             </Section>
           )}
-          {filteredConversations.length === 0 && <p style={{ color: "#424c64", fontSize: 13, textAlign: "center", paddingTop: 24 }}>No conversations yet</p>}
+          {filteredConversations.length === 0 && <p style={{ color: "var(--ax-faint)", fontSize: 13, textAlign: "center", paddingTop: 24 }}>No conversations yet</p>}
         </div>
       </aside>
 
       {activeConv ? (
         <main className="dm-main" style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", position: "relative", zIndex: 1 }}>
-          <header className="dm-main-header" style={{ height: 64, flexShrink: 0, background: "rgba(10,12,17,0.6)", borderBottom: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(24px)", display: "flex", alignItems: "center", padding: "0 24px", gap: 16 }}>
-            <button type="button" className="dm-chat-back" onClick={() => navigate("/dm")} style={{ background: "transparent", border: "none", color: "#94a3b8", display: "none", padding: 4 }} aria-label="Back to conversations">
+          <header className="dm-main-header" style={{ height: 64, flexShrink: 0, background: "var(--ax-glass)", borderBottom: "1px solid var(--ax-border)", backdropFilter: "blur(24px)", display: "flex", alignItems: "center", padding: "0 24px", gap: 16 }}>
+            <button type="button" className="dm-chat-back" onClick={() => navigate("/dm")} style={{ background: "transparent", border: "none", color: "var(--ax-muted)", display: "none", padding: 4 }} aria-label="Back to conversations">
               <ArrowLeft size={17} />
             </button>
-            <Avatar user={activeConv.otherUser} size={38} online={activeOnline} borderColor="#0a0d12" />
+            <Avatar user={activeConv.otherUser} size={38} online={activeOnline} borderColor="var(--ax-panel)" />
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 16, fontWeight: 700, color: "#e0e3e6" }}>{activeConv.otherUser.username}</span>
+                <span style={{ fontSize: 16, fontWeight: 700, color: "var(--ax-text)" }}>{activeConv.otherUser.username}</span>
                 <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: badgeFor(activeConv.otherUser.role).bg, color: badgeFor(activeConv.otherUser.role).color, border: `1px solid ${badgeFor(activeConv.otherUser.role).color}33` }}>
                   {badgeFor(activeConv.otherUser.role).label}
                 </span>
               </div>
-              <span style={{ fontSize: 12, color: activeOnline ? "rgb(34,197,94)" : "#6c7793" }}>{activeOnline ? "Online" : "Offline"}</span>
+              <span style={{ fontSize: 12, color: activeOnline ? "rgb(34,197,94)" : "var(--ax-dim)" }}>{activeOnline ? "Online" : "Offline"}</span>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               {[<Phone size={16} />, <Video size={16} />, <MoreVertical size={16} />].map((icon, index) => (
-                <button key={index} type="button" style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8" }}>
+                <button key={index} type="button" style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid var(--ax-border)", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ax-muted)" }}>
                   {icon}
                 </button>
               ))}
@@ -1037,9 +1049,9 @@ export default function DmPage() {
 
           <div ref={messagesScrollRef} className="figma-scroll custom-scrollbar" style={{ padding: "24px 24px 8px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 20px" }}>
-              <div style={{ flex: 1, height: 1, background: "rgb(30,41,59)" }} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#424c64", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>Today</span>
-              <div style={{ flex: 1, height: 1, background: "rgb(30,41,59)" }} />
+              <div style={{ flex: 1, height: 1, background: "var(--ax-panel-3)" }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ax-faint)", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>Today</span>
+              <div style={{ flex: 1, height: 1, background: "var(--ax-panel-3)" }} />
             </div>
             {convMessages.map((message) => (
               <MessageBubble key={message.id} message={message} isMe={String(message.sender_id).toLowerCase() === String(user?.id).toLowerCase()} activeConv={activeConv} />
@@ -1050,7 +1062,7 @@ export default function DmPage() {
           <div style={{ padding: "12px 20px 20px", flexShrink: 0 }}>
             <div className="figma-panel" style={{ borderRadius: 12, padding: 4 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px" }}>
-                <button type="button" style={{ color: "#6c7793", background: "none", border: "none", cursor: "pointer", display: "flex", padding: 4 }}>
+                <button type="button" style={{ color: "var(--ax-dim)", background: "none", border: "none", cursor: "pointer", display: "flex", padding: 4 }}>
                   <Paperclip size={15} />
                 </button>
                 <textarea
@@ -1062,14 +1074,14 @@ export default function DmPage() {
                   onKeyDown={handleKeyDown}
                   placeholder={`Message ${activeConv.otherUser.username}...`}
                   rows={1}
-                  style={{ flex: 1, resize: "none", background: "none", border: "none", color: "#e0e3e6", fontSize: 14, lineHeight: 1.6, padding: "0 4px", fontFamily: "Poppins" }}
+                  style={{ flex: 1, resize: "none", background: "none", border: "none", color: "var(--ax-text)", fontSize: 14, lineHeight: 1.6, padding: "0 4px", fontFamily: "Poppins" }}
                 />
-                <button type="button" style={{ color: "#6c7793", background: "none", border: "none", cursor: "pointer", display: "flex", padding: 4 }}>
+                <button type="button" style={{ color: "var(--ax-dim)", background: "none", border: "none", cursor: "pointer", display: "flex", padding: 4 }}>
                   <Smile size={16} />
                 </button>
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 12px 8px" }}>
-                <button type="button" onClick={handleSend} disabled={!input.trim()} style={{ display: "flex", alignItems: "center", gap: 6, border: "none", borderRadius: 6, background: figmaGradient, color: "#05070a", padding: "6px 16px", fontSize: 12, fontWeight: 600, cursor: input.trim() ? "pointer" : "not-allowed", opacity: input.trim() ? 1 : 0.5 }}>
+                <button type="button" onClick={handleSend} disabled={!input.trim()} style={{ display: "flex", alignItems: "center", gap: 6, border: "none", borderRadius: 6, background: figmaGradient, color: "var(--ax-primary-action-text)", padding: "6px 16px", fontSize: 12, fontWeight: 600, cursor: input.trim() ? "pointer" : "not-allowed", opacity: input.trim() ? 1 : 0.5 }}>
                   <Send size={14} />
                   Send
                 </button>

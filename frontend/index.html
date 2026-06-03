@@ -10,6 +10,23 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
     <title>AcceleratorX Learning</title>
+    <script>
+      // No-flash theme init: set data-theme before first paint from the
+      // persisted ui store (zustand persist key "cms-ui"). Defaults to dark.
+      (function () {
+        try {
+          var t = "dark";
+          var raw = localStorage.getItem("cms-ui");
+          if (raw) {
+            var saved = JSON.parse(raw);
+            if (saved && saved.state && saved.state.theme) t = saved.state.theme;
+          }
+          document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

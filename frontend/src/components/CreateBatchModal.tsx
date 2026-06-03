@@ -14,9 +14,9 @@ export type CreateBatchPayload = {
 const fieldStyle: CSSProperties = {
   width: "100%",
   borderRadius: 7,
-  background: "rgba(29,32,34,0.5)",
-  border: "1px solid rgba(66,71,84,0.5)",
-  color: "#e0e3e6",
+  background: "var(--ax-field-bg)",
+  border: "1px solid var(--ax-field-border)",
+  color: "var(--ax-text)",
   fontFamily: "Poppins",
   fontSize: 14,
   outline: "none",
@@ -40,7 +40,7 @@ function Toggle({ checked, onClick }: { checked: boolean; onClick: () => void })
         cursor: "pointer",
       }}
     >
-      <span style={{ width: 11, height: 11, borderRadius: "50%", background: checked ? "#05070a" : "#6c7793", display: "block" }} />
+      <span style={{ width: 11, height: 11, borderRadius: "50%", background: checked ? "var(--ax-primary-action-text)" : "var(--ax-dim)", display: "block" }} />
     </button>
   );
 }
@@ -56,7 +56,7 @@ function SectionTitle({
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#b9c1cc" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ax-muted)" }}>
         <span style={{ display: "flex" }}>{icon}</span>
         <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase" }}>{label}</span>
       </div>
@@ -87,9 +87,9 @@ function AccessCard({
       style={{
         minHeight: 64,
         borderRadius: 8,
-        border: `1px solid ${active ? tone : "rgba(148,163,184,0.18)"}`,
-        background: active ? "linear-gradient(115deg,rgba(0,219,232,0.08),rgba(59,130,255,0.06))" : "rgba(16,21,29,0.45)",
-        color: "#e0e3e6",
+        border: `1px solid ${active ? tone : "var(--ax-border)"}`,
+        background: active ? "var(--ax-option-active-bg)" : "var(--ax-option-bg)",
+        color: "var(--ax-text)",
         cursor: "pointer",
         padding: "12px 12px",
         textAlign: "left",
@@ -101,15 +101,16 @@ function AccessCard({
       <span style={{ display: "flex", color: tone, marginTop: 1 }}>{icon}</span>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: "block", fontSize: 13, fontWeight: 700, marginBottom: 3 }}>{title}</span>
-        <span style={{ display: "block", fontSize: 11, color: "#94a3b8", lineHeight: 1.35 }}>{description}</span>
+        <span style={{ display: "block", fontSize: 11, color: "var(--ax-muted)", lineHeight: 1.35 }}>{description}</span>
       </span>
       <span
         style={{
           width: 15,
           height: 15,
           borderRadius: "50%",
-          border: `1px solid ${active ? tone : "#6c7793"}`,
-          boxShadow: active ? `0 0 0 3px ${tone}22 inset` : "none",
+          border: `1px solid ${active ? tone : "var(--ax-dim)"}`,
+          background: active ? `${tone}` : "transparent",
+          boxShadow: active ? `0 0 0 3px color-mix(in srgb, ${tone} 18%, transparent)` : "none",
           flexShrink: 0,
         }}
       />
@@ -148,16 +149,16 @@ export default function CreateBatchModal({
         style={{
           width: 600,
           maxWidth: "calc(100vw - 48px)",
-          boxShadow: "0 24px 80px rgba(0,0,0,0.55), 0 0 60px rgba(0,219,232,0.05)",
+          boxShadow: "var(--ax-shadow-card), 0 0 60px rgba(0,219,232,0.05)",
         }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div style={{ padding: "22px 24px 18px", borderBottom: "1px solid rgba(148,163,184,0.13)", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+        <div style={{ padding: "22px 24px 18px", borderBottom: "1px solid var(--ax-border)", background: "var(--ax-modal-header-bg)", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
           <div>
             <h2 style={{ fontSize: 18, lineHeight: "24px", fontWeight: 700, letterSpacing: "-0.01em", marginBottom: 6 }}>Initialize New Batch</h2>
-            <p style={{ fontSize: 13, color: "#94a3b8" }}>Define the parameters for a new learning node.</p>
+            <p style={{ fontSize: 13, color: "var(--ax-muted)" }}>Define the parameters for a new learning node.</p>
           </div>
-          <button type="button" onClick={onClose} style={{ background: "none", border: "none", color: "#94a3b8", display: "flex", padding: 5, cursor: "pointer" }}>
+          <button type="button" onClick={onClose} style={{ background: "none", border: "none", color: "var(--ax-muted)", display: "flex", padding: 5, cursor: "pointer" }}>
             <X size={17} />
           </button>
         </div>
@@ -165,7 +166,7 @@ export default function CreateBatchModal({
         <div style={{ padding: "18px 24px 22px" }}>
           <SectionTitle icon={<ShieldCheck size={14} />} label="Batch Identity" />
           <label style={{ display: "block", marginBottom: 14 }}>
-            <span style={{ display: "block", color: "#b7c0cd", fontSize: 11, fontWeight: 700, marginBottom: 7 }}>Batch Name</span>
+            <span style={{ display: "block", color: "var(--ax-muted)", fontSize: 11, fontWeight: 700, marginBottom: 7 }}>Batch Name</span>
             <input
               value={form.name}
               onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
@@ -175,7 +176,7 @@ export default function CreateBatchModal({
             />
           </label>
           <label style={{ display: "block", marginBottom: 26 }}>
-            <span style={{ display: "block", color: "#b7c0cd", fontSize: 11, fontWeight: 700, marginBottom: 7 }}>Mission Brief</span>
+            <span style={{ display: "block", color: "var(--ax-muted)", fontSize: 11, fontWeight: 700, marginBottom: 7 }}>Mission Brief</span>
             <textarea
               value={form.description}
               onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
@@ -189,7 +190,7 @@ export default function CreateBatchModal({
             label="Access Configuration"
             action={
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ color: "#b9c1cc", fontSize: 11, fontWeight: 800, letterSpacing: "0.1em" }}>HIDE</span>
+                <span style={{ color: "var(--ax-muted)", fontSize: 11, fontWeight: 800, letterSpacing: "0.1em" }}>HIDE</span>
                 <Toggle checked={hidden} onClick={() => setHidden((value) => !value)} />
               </div>
             }
@@ -200,7 +201,7 @@ export default function CreateBatchModal({
               icon={<Globe2 size={18} />}
               title="Public"
               description="Visible to all users in the network."
-              tone="rgb(0,219,232)"
+              tone="var(--ax-primary-action-bg)"
               onClick={() => {
                 setHidden(false);
                 setForm((prev) => ({ ...prev, type: "public" }));
@@ -226,11 +227,11 @@ export default function CreateBatchModal({
           />
         </div>
 
-        <div style={{ padding: "16px 24px", borderTop: "1px solid rgba(148,163,184,0.13)", background: "rgba(5,7,10,0.24)", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12 }}>
+        <div style={{ padding: "16px 24px", borderTop: "1px solid var(--ax-border)", background: "var(--ax-modal-footer-bg)", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12 }}>
           <button
             type="button"
             onClick={onClose}
-            style={{ width: 98, height: 34, borderRadius: 5, border: "1px solid rgba(148,163,184,0.25)", background: "transparent", color: "#e0e3e6", fontSize: 12, fontWeight: 700, fontFamily: "Poppins", cursor: "pointer" }}
+            style={{ width: 98, height: 34, borderRadius: 5, border: "1px solid var(--ax-border)", background: "transparent", color: "var(--ax-text)", fontSize: 12, fontWeight: 700, fontFamily: "Poppins", cursor: "pointer" }}
           >
             Cancel
           </button>
@@ -243,8 +244,8 @@ export default function CreateBatchModal({
               height: 34,
               borderRadius: 5,
               border: "none",
-              background: isValid ? figmaGradient : "rgba(59,130,255,0.35)",
-              color: isValid ? "#05070a" : "#94a3b8",
+              background: isValid ? figmaGradient : "var(--ax-disabled-bg)",
+              color: isValid ? "var(--ax-primary-action-text)" : "var(--ax-disabled-text)",
               fontSize: 12,
               fontWeight: 800,
               fontFamily: "Poppins",
