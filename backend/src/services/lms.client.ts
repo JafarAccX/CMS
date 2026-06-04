@@ -69,6 +69,15 @@ export interface LmsLearnerData {
 let sessionToken: string | null = null;
 let sessionFetchedAt = 0;
 const SESSION_TTL_MS = 60 * 60 * 1000; // 1 hour (LMS Customer session timeout is 7 days)
+const LMS_FETCH_TIMEOUT_MS = 8_000; // 8s hard timeout — prevents login hang if LMS is slow
+
+function lmsFetch(url: string, options: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LMS_FETCH_TIMEOUT_MS);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() =>
+    clearTimeout(timer)
+  );
+}
 
 function generateSignature(
   method: string,
@@ -109,7 +118,7 @@ async function fetchSessionToken(force = false): Promise<string> {
   const signature = generateSignature("POST", url, nounce);
 
   // LMS customer auth is phone-based (CallingCode + Mobile) — no password
-  const res = await fetch(url, {
+  const res = await lmsFetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -149,7 +158,7 @@ async function lmsGet<T>(path: string): Promise<T> {
   const nounce = new Date().toISOString();
   const signature = generateSignature("GET", url, nounce, token);
 
-  let res = await fetch(url, {
+  let res = await lmsFetch(url, {
     headers: {
       "x-api-key": LMS_API_KEY,
       "x-signature": signature,
@@ -168,7 +177,7 @@ async function lmsGet<T>(path: string): Promise<T> {
     const retryNounce = new Date().toISOString();
     const retrySignature = generateSignature("GET", url, retryNounce, token);
 
-    res = await fetch(url, {
+    res = await lmsFetch(url, {
       headers: {
         "x-api-key": LMS_API_KEY,
         "x-signature": retrySignature,

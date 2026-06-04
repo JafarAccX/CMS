@@ -7,9 +7,35 @@
  * refreshing on 401.
  */
 
+import { redisGet, redisSet } from "../utils/redis.js";
+
 const CRM_BASE_URL = process.env.CRM_BASE_URL || "http://localhost:4001";
 const CRM_SERVICE_EMAIL = process.env.CRM_SERVICE_EMAIL || "";
 const CRM_SERVICE_PASSWORD = process.env.CRM_SERVICE_PASSWORD || "";
+
+// Cache CRM customer lookups in Redis for 10 minutes.
+// The same learner triggers this on every embed SSO re-auth (every ~15 min
+// access-token expiry), so caching eliminates the CRM round-trip for repeat logins.
+const CRM_CUSTOMER_CACHE_TTL = 10 * 60; // seconds
+
+function crmCacheKey(identifier: string) {
+  return `crm:customer:${identifier.toLowerCase().trim()}`;
+}
+
+async function getCachedCustomer(identifier: string): Promise<CrmCustomer | null> {
+  try {
+    const raw = await redisGet(crmCacheKey(identifier));
+    if (raw) return JSON.parse(raw) as CrmCustomer;
+  } catch {}
+  return null;
+}
+
+async function setCachedCustomer(identifier: string, customer: CrmCustomer | null): Promise<void> {
+  if (!customer) return; // don't cache misses — a new signup should not be blocked by a cached null
+  try {
+    await redisSet(crmCacheKey(identifier), JSON.stringify(customer), CRM_CUSTOMER_CACHE_TTL);
+  } catch {}
+}
 
 // ─── Types matching CRM responses ──────────────────────────────────────────
 
@@ -237,31 +263,50 @@ export async function loginCrmStaff(
 export async function findCrmCustomerByContact(
   identifier: string
 ): Promise<CrmCustomer | null> {
-  const isEmail = identifier.includes("@");
+  const normalized = identifier.toLowerCase().trim();
+
+  // Cache hit — skip the CRM round-trip entirely.
+  const cached = await getCachedCustomer(normalized);
+  if (cached) return cached;
+
+  const isEmail = normalized.includes("@");
 
   // CRM list endpoint shape: { data: Customer[], total: number }
   type ListResp = { data: CrmCustomer[]; total: number };
 
+  let customer: CrmCustomer | null = null;
+
   if (isEmail) {
-    const enc = encodeURIComponent(identifier);
+    const enc = encodeURIComponent(normalized);
     const res = await crmGet<ListResp>(`/customers?Email=${enc}&limit=1`);
-    return res.data?.[0] ?? null;
+    customer = res.data?.[0] ?? null;
+  } else {
+    // Phone: normalize by stripping non-digits and any leading country code "91"
+    const digits = normalized.replace(/\D/g, "");
+    const candidates = new Set<string>([digits]);
+    if (digits.startsWith("91") && digits.length > 10) {
+      candidates.add(digits.slice(2));
+    }
+
+    for (const num of candidates) {
+      const res = await crmGet<ListResp>(
+        `/customers?Mobile=${encodeURIComponent(num)}&limit=1`
+      );
+      if (res.data?.[0]) { customer = res.data[0]; break; }
+    }
   }
 
-  // Phone: normalize by stripping non-digits and any leading country code "91"
-  const digits = identifier.replace(/\D/g, "");
-  const candidates = new Set<string>([digits]);
-  if (digits.startsWith("91") && digits.length > 10) {
-    candidates.add(digits.slice(2));
+  // Cache by the identifier used AND by the canonical email/phone from the
+  // returned record so future lookups by either value are instant.
+  if (customer) {
+    await Promise.all([
+      setCachedCustomer(normalized, customer),
+      customer.Email ? setCachedCustomer(customer.Email.toLowerCase(), customer) : Promise.resolve(),
+      customer.Mobile ? setCachedCustomer(String(customer.Mobile).replace(/\D/g,"").slice(-10), customer) : Promise.resolve(),
+    ]);
   }
 
-  for (const num of candidates) {
-    const res = await crmGet<ListResp>(
-      `/customers?Mobile=${encodeURIComponent(num)}&limit=1`
-    );
-    if (res.data?.[0]) return res.data[0];
-  }
-  return null;
+  return customer;
 }
 
 /**
@@ -271,10 +316,16 @@ export async function findCrmCustomerByCustId(
   custId: string
 ): Promise<CrmCustomer | null> {
   try {
+    const cacheKey = `custid:${custId}`;
+    const cached = await getCachedCustomer(cacheKey);
+    if (cached) return cached;
+
     const enc = encodeURIComponent(custId);
     type ListResp = { data: CrmCustomer[]; total: number };
     const res = await crmGet<ListResp>(`/customers?CustId=${enc}&limit=1`);
-    return res.data?.[0] ?? null;
+    const customer = res.data?.[0] ?? null;
+    if (customer) await setCachedCustomer(cacheKey, customer);
+    return customer;
   } catch {
     return null;
   }
@@ -310,6 +361,40 @@ export async function listCrmBatchMentorAssignments(): Promise<CrmBatchMentorAss
     (page, limit) =>
       `/batch-mentor-assignments?Active=true&Deleted=false&limit=${limit}&page=${page}`
   );
+}
+
+// ─── Classes ───────────────────────────────────────────────────────────────
+
+export interface CrmClass {
+  Id: string;
+  BatchId: string;
+  Topic: string;
+  Description?: string | null;
+  ClassStartDateTime: string;
+  ClassEndDateTime: string;
+  /** "UPCOMING" | "JOIN" | "COMPLETED" — updated every 5 min by CRM cron */
+  Status: string;
+  Active?: boolean | null;
+  Deleted?: boolean | null;
+  ZoomJoinURL?: string | null;
+  ZoomMeetingId?: string | null;
+  ImageUrl?: string | null;
+  IsInteractiveClass?: boolean | null;
+  ScheduledMentorId?: string | null;
+}
+
+/**
+ * Fetch active classes for a CRM batch, ordered by start time ascending.
+ * Returns [] on any CRM error so callers can degrade gracefully.
+ */
+export async function getCrmClassesForBatch(crmBatchId: string): Promise<CrmClass[]> {
+  try {
+    const path = `/classes?batchId=${encodeURIComponent(crmBatchId)}&active=true&sortBy=ClassStartDateTime&order=ASC&limit=100`;
+    const res = await crmGet<CrmPagedResponse<CrmClass>>(path);
+    return (res.data ?? []).filter((c) => c.Deleted !== true);
+  } catch {
+    return [];
+  }
 }
 
 /**

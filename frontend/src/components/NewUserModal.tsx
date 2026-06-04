@@ -20,6 +20,7 @@ type NewUserModalProps = {
 const roles = [
   { key: "learner", label: "Learner", desc: "Access to enrolled batch channels", color: "var(--ax-active-text)", bg: "rgba(59,130,255,0.12)" },
   { key: "mentor", label: "Mentor", desc: "Can manage and teach batch content", color: "rgb(0,219,232)", bg: "rgba(0,94,100,0.2)" },
+  { key: "batch_moderator", label: "Moderator", desc: "Moderates batch channels and members", color: "rgb(251,191,36)", bg: "rgba(120,90,0,0.18)" },
   { key: "admin", label: "Admin", desc: "Full platform administration access", color: "rgb(175,198,255)", bg: "rgba(79,124,255,0.15)" },
 ];
 
@@ -119,7 +120,7 @@ export default function NewUserModal({ form, pending, onChange, onClose, onSubmi
 
           <div className="mb-4">
             <label className="mb-2.5 block text-xs font-semibold tracking-[0.03em] text-muted">Initial Role</label>
-            <div className="new-user-role-grid grid grid-cols-3 gap-2.5">
+            <div className="new-user-role-grid grid grid-cols-2 gap-2.5">
               {roles.map((item) => {
                 const active = form.role === item.key;
                 return (

@@ -157,11 +157,8 @@ export async function loginUser(data: LoginInput) {
     const valid = await bcrypt.compare(data.password, localUser.password_hash);
     if (!valid) throw new UnauthorizedError("Invalid credentials");
 
-    // Fetch enriched CRM/LMS data even for existing local users
+    // Move all CRM/LMS enrichment to background — issue the token immediately.
     const customer = await findCrmCustomer(identifier, idType).catch(() => null);
-    const enriched = await fetchEnrichedData(customer ?? null).catch(() => null);
-
-    // Sync batches and profile fields asynchronously — do NOT block token issuance.
     if (customer) {
       const updates: Record<string, unknown> = {};
       if (!localUser.phone && customer.Mobile) updates.phone = String(customer.Mobile);
@@ -175,10 +172,11 @@ export async function loginUser(data: LoginInput) {
             .then((enrollments) => syncBatchMemberships(localUser.id, enrollments))
             .catch((err) => console.error("[bg] Batch sync failed:", err))
         );
+        fetchEnrichedData(customer).catch(() => {});
       });
     }
 
-    return issueTokens(localUser, enriched ?? undefined);
+    return issueTokens(localUser);
   }
 
   // Not in local DB — try CRM customer lookup (cross-system)
@@ -186,16 +184,16 @@ export async function loginUser(data: LoginInput) {
   if (customer) {
     if (!customer.Active) throw new UnauthorizedError("Your CRM account is inactive");
     const cmsUser = await findOrCreateLearnerUser(customer, data.password);
-    const enriched = await fetchEnrichedData(customer).catch(() => null);
 
-    // Fire batch sync in background — tokens are issued immediately.
+    // Fire all CRM/LMS work in background — token issued immediately.
     setImmediate(() => {
       getCustomerEnrollments(customer.CustId)
         .then((enrollments) => syncBatchMemberships(cmsUser.id, enrollments))
         .catch((err) => console.error("[bg] CRM batch sync failed:", err));
+      fetchEnrichedData(customer).catch(() => {});
     });
 
-    return issueTokens(cmsUser, enriched);
+    return issueTokens(cmsUser);
   }
 
   // No local user and no CRM match. Run a dummy compare so response timing
@@ -463,16 +461,24 @@ export async function learnerLogin(phone: string, email: string) {
     cmsUser = await prisma.user.update({ where: { id: cmsUser.id }, data: profileUpdates });
   }
 
-  // 5. Fetch enriched data — sync CRM batch memberships fires asynchronously.
-  const enriched = await fetchEnrichedData(customer).catch(() => null);
+  // 5. Issue tokens immediately — don't block on enriched data or batch sync.
+  // Both are fired in the background so the learner gets their token fast.
+  // enrichedData (CRM enrollments + LMS profile) is nice-to-have for the
+  // initial response payload; the client can re-fetch on next login if absent.
+  const tokens = await issueTokens(cmsUser);
 
   setImmediate(() => {
-    getCustomerEnrollments(customer!.CustId)
-      .then((enrollments) => syncBatchMemberships(cmsUser!.id, enrollments))
+    const _custId = customer!.CustId;
+    const _userId = cmsUser!.id;
+    // Batch membership sync
+    getCustomerEnrollments(_custId)
+      .then((enrollments) => syncBatchMemberships(_userId, enrollments))
       .catch((err) => console.error("[bg] Learner batch sync failed:", err));
+    // Enriched data pre-warm (optional — silently discarded if slow)
+    fetchEnrichedData(customer!).catch(() => {});
   });
 
-  return issueTokens(cmsUser, enriched ?? undefined);
+  return tokens;
 }
 
 function hashResetToken(token: string) {

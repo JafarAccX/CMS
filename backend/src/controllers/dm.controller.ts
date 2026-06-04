@@ -42,7 +42,8 @@ export async function sendMessage(req: Request, res: Response, next: NextFunctio
 
 export async function listDmUsers(req: Request, res: Response, next: NextFunction) {
   try {
-    const users = await dmService.listDmUsers(req.user!.id);
+    const batchMentorsOnly = req.query.batchMentors === "true";
+    const users = await dmService.listDmUsers(req.user!.id, batchMentorsOnly);
     res.status(200).json(users);
   } catch (err) { next(err); }
 }

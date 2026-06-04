@@ -1,7 +1,8 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bell, Search, Settings, Sparkles, User } from "lucide-react";
+import { Bell, Settings, Sparkles, User } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
+import WorkspaceSearch from "./WorkspaceSearch";
 
 export const figmaGradient = "var(--ax-primary-action-bg)";
 export const figmaActionText = "var(--ax-primary-action-text)";
@@ -108,51 +109,7 @@ export function FigmaTopBar({
       </div>
 
       <div className="figma-topbar-search" style={{ flex: 1, display: "flex", justifyContent: "center" }}>
-        <div style={{ position: "relative", width: 512, maxWidth: "100%", height: 42 }}>
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: 6,
-              background: "var(--ax-field-bg)",
-              border: "1px solid var(--ax-border)",
-              boxShadow: "0 1px 0 rgba(255,255,255,0.55) inset",
-              display: "flex",
-              alignItems: "center",
-              padding: "0 40px",
-            }}
-          >
-            <span style={{ fontSize: 14, color: "var(--ax-placeholder)", userSelect: "none" }}>
-              Ask AI or search workspace... (Cmd+K)
-            </span>
-          </div>
-          <span
-            style={{
-              position: "absolute",
-              left: 12,
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "var(--ax-placeholder)",
-              display: "flex",
-              pointerEvents: "none",
-            }}
-          >
-            <Search size={15} />
-          </span>
-          <span
-            style={{
-              position: "absolute",
-              right: 12,
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "var(--ax-primary-action-bg)",
-              display: "flex",
-              pointerEvents: "none",
-            }}
-          >
-            <Sparkles size={13} />
-          </span>
-        </div>
+        <WorkspaceSearch height={42} />
       </div>
 
       <div className="figma-topbar-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>

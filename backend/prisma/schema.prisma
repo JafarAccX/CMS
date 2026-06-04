@@ -116,6 +116,9 @@ model User {
   password_reset_tokens PasswordResetToken[]
   refresh_tokens        RefreshToken[]
 
+  @@index([phone])            // login by phone lookup
+  @@index([is_banned])        // DM users list filters on is_banned = false
+  @@index([role])             // role-based queries (admin, mentor, learner)
   @@map("users")
 }
 
@@ -235,6 +238,8 @@ model Membership {
   batch Batch @relation(fields: [batch_id], references: [id])
 
   @@unique([user_id, batch_id])
+  @@index([batch_id, role_in_batch])  // mentor picker: WHERE batch_id IN (...) AND role_in_batch = mentor
+  @@index([user_id])                  // memberships by user (batch list)
   @@map("memberships")
 }
 
@@ -313,7 +318,8 @@ model Notification {
 
   user User @relation(fields: [user_id], references: [id])
 
-
+  @@index([user_id, is_read])   // unread notification count per user
+  @@index([user_id, created_at(sort: Desc)])  // notifications list ordered by time
   @@map("notifications")
 }
 
@@ -363,6 +369,8 @@ model Conversation {
   messages DirectMessage[]
 
   @@unique([user_a_id, user_b_id])
+  @@index([user_a_id, updated_at(sort: Desc)])  // conversations list for user_a
+  @@index([user_b_id, updated_at(sort: Desc)])  // conversations list for user_b
   @@map("conversations")
 }
 
@@ -378,6 +386,8 @@ model DirectMessage {
   sender       User         @relation("DMSender", fields: [sender_id], references: [id])
   attachments  DirectMessageAttachment[]
 
+  @@index([conversation_id, created_at(sort: Desc)])  // message history ordered by time
+  @@index([conversation_id, is_read])                  // unread count per conversation
   @@map("direct_messages")
 }
 

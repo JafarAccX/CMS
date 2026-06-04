@@ -1,8 +1,10 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useState } from "react";
 import type { CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../store/authStore";
 import { useBatchStore } from "../store/batchStore";
+import { isEmbed } from "../embed/bridge";
 import api from "../api/client";
 import {
   Home, MessageCircle, Hash, Settings,
@@ -63,14 +65,31 @@ function NavItem({
   );
 }
 
-function SidebarSection({ label, children }: { label: string; children: React.ReactNode }) {
+function SidebarSection({
+  label,
+  children,
+  defaultOpen = true,
+}: {
+  label: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="mb-1.5">
-      <div className="flex items-center justify-between px-3 py-1 mb-0.5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between px-3 py-1 mb-0.5 rounded-md hover:bg-[var(--ax-hover)] transition-colors"
+      >
         <span className="text-[11px] font-semibold tracking-[0.05em] uppercase" style={{ color: "var(--ax-sidebar-section)" }}>{label}</span>
-        <ChevronDown className="w-3 h-3" style={{ color: "var(--ax-sidebar-section)" }} />
-      </div>
-      {children}
+        <ChevronDown
+          className="w-3 h-3 transition-transform duration-200"
+          style={{ color: "var(--ax-sidebar-section)", transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}
+        />
+      </button>
+      {open && children}
     </div>
   );
 }
@@ -186,9 +205,11 @@ export default function AppShell({ children }: AppShellProps) {
       <aside className="app-sidebar w-64 flex-shrink-0 hidden lg:flex flex-col border-r border-hairline relative z-10 py-6 overflow-hidden"
         style={{ width: "var(--ax-sidebar-w)", background: "var(--ax-sidebar-bg)", boxShadow: "1px 0 8px var(--ax-border), 12px 0 34px -30px rgba(30,64,175,0.45)" }}>
 
-        {/* Logo */}
+        {/* Logo — hidden when embedded in the LMS (the host already shows its
+            AcceleratorX brand, so the duplicate is suppressed). */}
+        {!isEmbed() && (
         <Link to="/" className="block px-6 pb-5 border-b border-hairline hover:bg-[var(--ax-hover)] transition-colors">
-          <div 
+          <div
             className="w-[128px] h-[19px] flex items-center font-bold text-primary text-[19px] leading-none tracking-[-0.04em]"
             style={{ opacity: 1, color: "var(--ax-sidebar-title)" }}
           >
@@ -196,6 +217,7 @@ export default function AppShell({ children }: AppShellProps) {
           </div>
           <div className="text-[10px] tracking-[0.1em] uppercase leading-[15px] mt-1.5" style={{ color: "var(--ax-sidebar-section)" }}>Discussion Platform</div>
         </Link>
+        )}
 
         {/* Main nav */}
         <div className="px-4 pt-4 pb-2 flex flex-col gap-0.5">
@@ -273,7 +295,9 @@ export default function AppShell({ children }: AppShellProps) {
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer — hidden when embedded in the LMS (the host sidebar already
+            shows the user's identity and owns the session). */}
+        {!isEmbed() && (
         <div className="px-4 mt-2">
           <div className="h-px bg-hairline mx-2 mb-2" />
           {isAdmin && (
@@ -303,6 +327,7 @@ export default function AppShell({ children }: AppShellProps) {
             </button>
           </div>
         </div>
+        )}
       </aside>
       )}
 

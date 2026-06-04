@@ -5,7 +5,7 @@ import api from "../api/client";
 import {
   Users, User, Shield, FileText, AlertTriangle, Check, Plus, UserPlus,
   Trash2, Megaphone, Pin, PinOff, Hash, Search,
-  Settings, Sparkles, RefreshCw,
+  Settings, RefreshCw,
 } from "lucide-react";
 import ThemeToggle from "../components/ThemeToggle";
 import { toast } from "react-hot-toast";
@@ -13,6 +13,7 @@ import { Modal, ModalHeader, ModalBody, ModalFooter } from "../components/Modal"
 import { FormTextarea } from "../components/FormField";
 import NewUserModal from "../components/NewUserModal";
 import CreateBatchModal, { type CreateBatchPayload } from "../components/CreateBatchModal";
+import WorkspaceSearch from "../components/WorkspaceSearch";
 
 type Tab = "users" | "batches" | "logs" | "modqueue";
 
@@ -286,20 +287,7 @@ export default function AdminPage() {
         style={{ background: "var(--ax-topbar-bg)", backdropFilter: "blur(24px)" }}>
         <h1 className="text-xl font-bold text-primary tracking-tight">Dashboard</h1>
         <div className="flex-1 flex justify-center">
-          <div className="app-topbar-search relative w-[480px]">
-            <button
-              type="button"
-              onClick={() => comingSoon("Workspace search")}
-              className="w-full h-10 rounded-md flex items-center px-10 border border-hairline text-left"
-              style={{ background: "var(--ax-field-bg)" }}
-              aria-label="Workspace search"
-              title="Workspace search coming soon"
-            >
-              <span className="text-sm text-faint select-none">Ask AI or search workspace… (Cmd+K)</span>
-            </button>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint pointer-events-none" />
-            <Sparkles className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-accent-400 pointer-events-none" />
-          </div>
+          <div className="w-[480px]"><WorkspaceSearch /></div>
         </div>
         <div className="app-topbar-actions flex items-center gap-2">
           <button onClick={() => setShowBroadcast(true)}
@@ -373,11 +361,17 @@ export default function AdminPage() {
               {syncCrmMutation.isPending ? "Syncing" : "Sync CRM"}
             </button>
             <div className="flex items-center gap-1 p-0.5 rounded-md border" style={{ background: "var(--ax-control-bg)", borderColor: "var(--ax-border)" }}>
-              {["all", "admin", "mentor", "learner"].map((f) => (
-                <button key={f} onClick={() => setUserFilter(f)}
+              {[
+                { value: "all", label: "All" },
+                { value: "admin", label: "Admin" },
+                { value: "mentor", label: "Mentor" },
+                { value: "batch_moderator", label: "Moderator" },
+                { value: "learner", label: "Learner" },
+              ].map(({ value, label }) => (
+                <button key={value} onClick={() => setUserFilter(value)}
                   className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
-                  style={{ background: userFilter === f ? "var(--ax-active-bg)" : "transparent", color: userFilter === f ? "var(--ax-active-text)" : "var(--ax-muted)" }}>
-                  {f}
+                  style={{ background: userFilter === value ? "var(--ax-active-bg)" : "transparent", color: userFilter === value ? "var(--ax-active-text)" : "var(--ax-muted)" }}>
+                  {label}
                 </button>
               ))}
             </div>
@@ -414,7 +408,7 @@ export default function AdminPage() {
                     <td>
                       <div className="flex items-center gap-3">
                         <div className="relative flex-shrink-0">
-                          <span className={`avatar ${u.role === "admin" ? "avatar-coral" : u.role === "mentor" ? "avatar-cyan" : "avatar-indigo"} w-9 h-9 text-[13px]`}>
+                          <span className={`avatar ${u.role === "admin" ? "avatar-coral" : u.role === "mentor" ? "avatar-cyan" : u.role === "batch_moderator" ? "avatar-amber" : "avatar-indigo"} w-9 h-9 text-[13px]`}>
                             {u.username[0].toUpperCase()}
                           </span>
                           <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2" style={{ borderColor: "var(--ax-panel)" }} />
@@ -432,6 +426,7 @@ export default function AdminPage() {
                           style={{ background: "var(--ax-field-bg)", borderColor: "var(--ax-border)" }}>
                           <option value="learner">Learner</option>
                           <option value="mentor">Mentor</option>
+                          <option value="batch_moderator">Moderator</option>
                           <option value="admin">Admin</option>
                         </select>
                         <span className="pointer-events-none absolute right-2 text-dim text-[10px]">▾</span>

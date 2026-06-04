@@ -13,7 +13,6 @@ import {
   Lock,
   Monitor,
   Save,
-  Search,
   Settings,
   Share2,
   ShieldAlert,
@@ -24,6 +23,7 @@ import api from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { figmaGradient } from "../components/FigmaShared";
 import ThemeToggle from "../components/ThemeToggle";
+import WorkspaceSearch from "../components/WorkspaceSearch";
 
 const inputStyle = {
   height: 44,
@@ -130,14 +130,7 @@ export default function ProfilePage() {
         </button>
         <h1 style={{ fontSize: 18, color: "var(--ax-text)", fontWeight: 700 }}>Profile Settings</h1>
         <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
-          <div className="app-topbar-search" style={{ position: "relative", width: 460 }}>
-            <Search size={15} color="#6c7793" style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)" }} />
-            <input
-              placeholder="Ask AI or search workspace... (Cmd+K)"
-              style={{ width: "100%", height: 38, borderRadius: 6, background: "var(--ax-input-bg)", border: "1px solid var(--ax-border)", color: "var(--ax-muted)", padding: "0 42px", fontFamily: "Poppins", fontSize: 13 }}
-            />
-            <Sparkles size={13} color="rgb(0,219,232)" style={{ position: "absolute", right: 13, top: "50%", transform: "translateY(-50%)" }} />
-          </div>
+          <div style={{ width: 460 }}><WorkspaceSearch height={38} /></div>
         </div>
         <Link to="/dm?askMentor=1" style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 6, border: "none", background: figmaGradient, color: "var(--ax-primary-action-text)", fontSize: 12, fontWeight: 600, fontFamily: "Poppins", cursor: "pointer", textDecoration: "none" }}>
           <Sparkles size={13} />

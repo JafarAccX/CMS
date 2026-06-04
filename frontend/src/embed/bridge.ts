@@ -52,14 +52,15 @@ export function postEmbedReady(): void {
   postToParent({ type: 'CMS_EMBED_READY' });
 }
 
-// Throttle re-auth requests: a burst of 401s (e.g. on load) must not spam the
-// parent with a storm of refresh requests.
+// Throttle re-auth requests: a burst of 401s + socket reconnects must not spam
+// the parent (which would re-call the rate-limited /auth/learner-login → 429).
+// 10s keeps the worst-case retry rate well under the login limiter (12/min).
 let lastReauthRequest = 0;
 
 /** Ask the parent to re-send credentials so we can re-establish the session. */
 export function requestParentReauth(): void {
   const now = Date.now();
-  if (now - lastReauthRequest < 3000) return;
+  if (now - lastReauthRequest < 10000) return;
   lastReauthRequest = now;
   postToParent({ type: 'CMS_SSO_REFRESH_NEEDED' });
 }

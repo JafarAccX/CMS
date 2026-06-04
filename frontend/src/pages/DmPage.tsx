@@ -309,6 +309,7 @@ function WelcomeCanvas({
       }}
     >
       <div
+        className="theme-orb"
         style={{
           position: "absolute",
           left: "50%",
@@ -676,7 +677,7 @@ function MessageBubble({ message, isMe, activeConv }: { message: any; isMe: bool
         <div
           style={{
             borderRadius: isMe ? "16px 0 16px 16px" : "0 16px 16px 16px",
-            background: isMe ? "linear-gradient(135deg,rgba(59,130,255,0.25),rgba(0,219,232,0.15))" : "linear-gradient(rgb(10,14,20),rgb(12,24,37))",
+            background: isMe ? "linear-gradient(135deg,rgba(59,130,255,0.25),rgba(0,219,232,0.15))" : "var(--ax-panel-2)",
             border: `1px solid ${isMe ? "rgba(59,130,255,0.3)" : "var(--ax-panel-3)"}`,
             padding: "10px 14px",
             color: "var(--ax-text)",
@@ -837,8 +838,8 @@ export default function DmPage() {
   useEffect(() => { if (msgData && conversationId) setMessages(conversationId, msgData.messages); }, [msgData, conversationId, setMessages]);
 
   const { data: dmUsers = [] } = useQuery<any[]>({
-    queryKey: ["dm-users"],
-    queryFn: async () => (await api.get("/dm/users")).data,
+    queryKey: ["dm-users", isMentorRequest],
+    queryFn: async () => (await api.get(isMentorRequest ? "/dm/users?batchMentors=true" : "/dm/users")).data,
     enabled: showDrawer || !conversationId,
   });
 
@@ -953,6 +954,7 @@ export default function DmPage() {
       >
         {/* Decorative orb */}
         <div
+          className="theme-orb"
           style={{
             position: "absolute",
             left: 69,

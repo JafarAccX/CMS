@@ -149,12 +149,53 @@ export async function getDirectMessages(conversationId: string, userId: string, 
 
 /**
  * List all users available for DM (everyone except banned users and self).
+ * When batchMentorsOnly=true, returns only mentors assigned to the same batches the current user belongs to.
  */
-export async function listDmUsers(currentUserId: string) {
+// Lightweight select shared by both paths — omits heavy relations not needed
+// for the user picker list.
+const DM_USER_SELECT = {
+  id: true,
+  username: true,
+  role: true,
+  email: true,
+  bio: true,
+  avatar_url: true,
+  created_at: true,
+} as const;
+
+export async function listDmUsers(currentUserId: string, batchMentorsOnly = false) {
+  if (batchMentorsOnly) {
+    // Run the two membership lookups in parallel to halve the round-trips.
+    const [userMemberships] = await Promise.all([
+      prisma.membership.findMany({
+        where: { user_id: currentUserId },
+        select: { batch_id: true },
+      }),
+    ]);
+    const batchIds = userMemberships.map((m) => m.batch_id);
+    if (batchIds.length === 0) return [];
+
+    const mentorMemberships = await prisma.membership.findMany({
+      where: { batch_id: { in: batchIds }, role_in_batch: "mentor" },
+      select: { user_id: true },
+      distinct: ["user_id"],
+    });
+    const mentorIds = mentorMemberships.map((m) => m.user_id).filter((id) => id !== currentUserId);
+    if (mentorIds.length === 0) return [];
+
+    return prisma.user.findMany({
+      where: { id: { in: mentorIds }, is_banned: false },
+      select: DM_USER_SELECT,
+      orderBy: { username: "asc" },
+    });
+  }
+
+  // Full user list — limit to 200 to avoid huge payloads on large orgs.
   return prisma.user.findMany({
     where: { id: { not: currentUserId }, is_banned: false },
-    select: { id: true, username: true, role: true, email: true, bio: true, phone: true, created_at: true, memberships: { select: { batch: { select: { id: true, name: true } } } } },
+    select: DM_USER_SELECT,
     orderBy: { username: "asc" },
+    take: 200,
   });
 }
 

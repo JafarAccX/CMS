@@ -7,10 +7,13 @@ import { useAuthStore } from "../store/authStore";
 import { useBatchStore } from "../store/batchStore";
 import { useNotificationStore } from "../store/notificationStore";
 import { useSocket } from "../hooks/useSocket";
+import { format, isToday, isTomorrow, isThisWeek } from "date-fns";
 import {
   ArrowRight,
   BookOpen,
   Calendar,
+  CheckCircle,
+  Clock,
   Folder,
   Hash,
   MessageSquare,
@@ -159,13 +162,72 @@ function RoomRow({ batch, index }: { batch: any; index: number }) {
   );
 }
 
-function MentorshipCard() {
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+type ClassItem = {
+  id: string;
+  topic: string;
+  startDateTime: string;
+  endDateTime: string;
+  status: "JOIN" | "UPCOMING" | "COMPLETED";
+  isInteractive: boolean;
+  batchId: string;
+  batchName: string;
+  zoomJoinUrl: string | null;
+};
+
+function formatClassTime(iso: string): string {
+  const d = new Date(iso);
+  const time = format(d, "h:mm a");
+  if (isToday(d)) return `Today, ${time}`;
+  if (isTomorrow(d)) return `Tomorrow, ${time}`;
+  if (isThisWeek(d, { weekStartsOn: 1 })) return `${format(d, "EEE")}, ${time}`;
+  return `${format(d, "MMM d")}, ${time}`;
+}
+
+function classTypeLabel(c: ClassItem) {
+  if (c.status === "JOIN") return "Live";
+  if (c.status === "COMPLETED") return "Done";
+  return c.isInteractive ? "Session" : "Class";
+}
+
+function classTypeColor(c: ClassItem) {
+  if (c.status === "JOIN") return "rgb(0,219,232)";
+  if (c.status === "COMPLETED") return "rgb(100,116,139)";
+  return "rgb(139,92,246)";
+}
+
+// ── Mentorship card (dynamic) ──────────────────────────────────────────────
+
+function MentorshipCard({ live, today }: { live: ClassItem[]; today: ClassItem[] }) {
+  const featured = live[0] ?? today[0] ?? null;
+  const isLive = featured?.status === "JOIN";
+
+  if (!featured) {
+    return (
+      <div
+        style={{
+          borderRadius: 12,
+          background: "var(--ax-card-bg)",
+          border: "1px solid var(--ax-border)",
+          boxShadow: "var(--ax-shadow-card)",
+          padding: 20,
+          textAlign: "center",
+        }}
+      >
+        <Video size={22} style={{ color: "var(--ax-dim)", margin: "0 auto 10px" }} />
+        <div style={{ fontSize: 13, color: "var(--ax-muted)" }}>No live session right now</div>
+        <div style={{ fontSize: 11, color: "var(--ax-dim)", marginTop: 4 }}>Check back when your class starts</div>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
         borderRadius: 12,
         background: "var(--ax-card-bg)",
-        border: "1px solid var(--ax-border)",
+        border: `1px solid ${isLive ? "rgba(0,219,232,0.25)" : "var(--ax-border)"}`,
         boxShadow: "var(--ax-shadow-card)",
         padding: 20,
         overflow: "hidden",
@@ -173,131 +235,137 @@ function MentorshipCard() {
       }}
     >
       <div
+        className="theme-orb"
         style={{
-          position: "absolute",
-          right: -20,
-          top: -30,
-          width: 80,
-          height: 80,
+          position: "absolute", right: -20, top: -30, width: 80, height: 80,
           borderRadius: "50%",
-          background: "linear-gradient(rgb(0,219,232) 0%,rgb(59,130,255) 100%)",
-          opacity: 0.15,
-          filter: "blur(20px)",
+          background: isLive
+            ? "linear-gradient(rgb(0,219,232) 0%,rgb(59,130,255) 100%)"
+            : "linear-gradient(rgb(139,92,246) 0%,rgb(59,130,255) 100%)",
+          opacity: 0.15, filter: "blur(20px)",
         }}
       />
+      {/* Header row */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 8,
-            backgroundColor: "rgba(0,219,232,0.1)",
-            border: "1px solid rgba(0,219,232,0.2)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "rgb(0,219,232)",
-          }}
-        >
+        <div style={{
+          width: 36, height: 36, borderRadius: 8,
+          backgroundColor: isLive ? "rgba(0,219,232,0.1)" : "rgba(139,92,246,0.1)",
+          border: `1px solid ${isLive ? "rgba(0,219,232,0.2)" : "rgba(139,92,246,0.2)"}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: isLive ? "rgb(0,219,232)" : "rgb(139,92,246)",
+        }}>
           <Video size={15} />
         </div>
-        <span style={{ fontSize: 10, color: "var(--ax-muted)" }}>Starts 2:00 PM</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {isLive && (
+            <span style={{
+              display: "flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700,
+              color: "rgb(0,219,232)", background: "rgba(0,219,232,0.12)",
+              border: "1px solid rgba(0,219,232,0.25)", borderRadius: 4, padding: "2px 7px",
+            }}>
+              <span style={{
+                width: 5, height: 5, borderRadius: "50%", background: "rgb(0,219,232)",
+                boxShadow: "0 0 6px rgb(0,219,232)", display: "inline-block",
+              }} />
+              LIVE
+            </span>
+          )}
+          <span style={{ fontSize: 10, color: "var(--ax-muted)" }}>
+            {formatClassTime(featured.startDateTime)}
+          </span>
+        </div>
       </div>
+      {/* Body */}
       <div style={{ marginBottom: 4 }}>
-        <div style={{ fontSize: 18, color: "var(--ax-text)", fontWeight: 600, lineHeight: "27px" }}>Live Session</div>
-        <div style={{ fontSize: 13, color: "var(--ax-muted)", lineHeight: "19.5px", marginTop: 4 }}>
-          Advanced Hooks Deep Dive.
+        <div style={{ fontSize: 18, color: "var(--ax-text)", fontWeight: 600, lineHeight: "27px" }}>
+          {isLive ? "Live Session" : "Upcoming Session"}
         </div>
+        <div style={{ fontSize: 13, color: "var(--ax-muted)", lineHeight: "19.5px", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {featured.topic}
+        </div>
+        {featured.batchName && (
+          <div style={{ fontSize: 11, color: "var(--ax-dim)", marginTop: 2 }}>{featured.batchName}</div>
+        )}
       </div>
+      {/* Footer */}
       <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 8 }}>
-        <div
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: "50%",
-            background: "linear-gradient(140deg,#7fe6f0,#2bb8d4 60%,#0e7490)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 10,
-            fontWeight: 700,
-            color: "#fff",
-          }}
-        >
-          M
-        </div>
-        <span style={{ fontSize: 12, color: "var(--ax-muted)" }}>with mentor</span>
-        <div style={{ flex: 1 }} />
-        <button
-          type="button"
-          style={{
-            padding: "5px 12px",
-            borderRadius: 6,
-            border: "none",
-            background: figmaGradient,
-            color: "var(--ax-primary-action-text)",
-            fontSize: 11,
-            fontWeight: 600,
-            fontFamily: "Poppins",
-            cursor: "pointer",
-          }}
-        >
-          Join Now
-        </button>
+        <Calendar size={13} style={{ color: "var(--ax-dim)", flexShrink: 0 }} />
+        <span style={{ fontSize: 12, color: "var(--ax-muted)", flex: 1 }}>
+          {isLive ? "In progress" : formatClassTime(featured.startDateTime)}
+        </span>
+        {isLive && featured.zoomJoinUrl ? (
+          <a
+            href={featured.zoomJoinUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              padding: "5px 12px", borderRadius: 6, border: "none",
+              background: figmaGradient, color: "var(--ax-primary-action-text)",
+              fontSize: 11, fontWeight: 600, fontFamily: "Poppins",
+              cursor: "pointer", textDecoration: "none",
+            }}
+          >
+            Join Now
+          </a>
+        ) : (
+          <span style={{
+            fontSize: 10, padding: "3px 9px", borderRadius: 4,
+            background: "rgba(139,92,246,0.12)", color: "rgb(139,92,246)",
+            border: "1px solid rgba(139,92,246,0.25)", fontWeight: 600,
+          }}>
+            {featured.isInteractive ? "Session" : "Class"}
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
-function UpcomingCard({ title, time, type, color }: { title: string; time: string; type: string; color: string }) {
+// ── Small class row card ──────────────────────────────────────────────────
+
+function ClassRow({ item }: { item: ClassItem }) {
+  const color = classTypeColor(item);
+  const label = classTypeLabel(item);
+  const Icon = item.status === "COMPLETED" ? CheckCircle : item.status === "JOIN" ? Video : Clock;
+
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        padding: "12px 16px",
-        borderRadius: 10,
-        background: "var(--ax-card-bg)",
-        border: "1px solid var(--ax-border)",
-        boxShadow: "var(--ax-shadow-card)",
-        marginBottom: 8,
-      }}
-    >
-      <div
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: 8,
-          backgroundColor: `${color}22`,
-          border: `1px solid ${color}44`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-          color,
-        }}
-      >
-        <Calendar size={14} />
+    <div style={{
+      display: "flex", alignItems: "center", gap: 12,
+      padding: "11px 14px", borderRadius: 10,
+      background: "var(--ax-card-bg)", border: "1px solid var(--ax-border)",
+      boxShadow: "var(--ax-shadow-card)", marginBottom: 8,
+    }}>
+      <div style={{
+        width: 32, height: 32, borderRadius: 8,
+        backgroundColor: `${color}22`, border: `1px solid ${color}44`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        flexShrink: 0, color,
+      }}>
+        <Icon size={14} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 500,
-            color: "var(--ax-text)",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {title}
+        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ax-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {item.topic}
         </div>
-        <div style={{ fontSize: 11, color: "var(--ax-dim)", marginTop: 2 }}>{time}</div>
+        <div style={{ fontSize: 11, color: "var(--ax-dim)", marginTop: 2 }}>
+          {formatClassTime(item.startDateTime)}
+          {item.batchName ? ` · ${item.batchName}` : ""}
+        </div>
       </div>
-      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: `${color}22`, color, border: `1px solid ${color}33` }}>
-        {type}
-      </span>
+      {item.status === "JOIN" && item.zoomJoinUrl ? (
+        <a
+          href={item.zoomJoinUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: `${color}22`, color, border: `1px solid ${color}33`, textDecoration: "none", fontWeight: 600 }}
+        >
+          Join
+        </a>
+      ) : (
+        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: `${color}22`, color, border: `1px solid ${color}33` }}>
+          {label}
+        </span>
+      )}
     </div>
   );
 }
@@ -360,31 +428,93 @@ export default function DashboardPage() {
     queryFn: async () => (await api.get("/notifications")).data,
   });
 
+  const { data: classesData } = useQuery<{
+    live: ClassItem[];
+    today: ClassItem[];
+    upcoming: ClassItem[];
+    completed: ClassItem[];
+  }>({
+    queryKey: ["my-classes"],
+    queryFn: async () => (await api.get("/my-classes")).data,
+    staleTime: 2 * 60 * 1000, // re-fetch every 2 min so live status stays fresh
+  });
+
   useEffect(() => { if (batchData) setBatches(batchData); }, [batchData, setBatches]);
   useEffect(() => { if (notifData) setNotifications(notifData); }, [notifData, setNotifications]);
 
   const generalBatches = batches.filter((batch) => batch.type === "general");
   const enrolledBatches = batches.filter((batch) => batch.userMembership !== null);
-  const stats = [
-    {
-      icon: <Hash size={20} />,
-      value: String(batchData?.length || 0).padStart(2, "0"),
-      label: "Channels Available",
-      iconBg: "rgba(89,149,232,0.2)",
-    },
-    {
-      icon: <TrendingUp size={20} />,
-      value: String(enrolledBatches.length || 0).padStart(2, "0"),
-      label: "Enrolled in Batches",
-      iconBg: "rgba(52,211,153,0.2)",
-    },
-    {
-      icon: <BookOpen size={20} />,
-      value: String(generalBatches.length || 0).padStart(2, "0"),
-      label: "General Open to All",
-      iconBg: "rgba(20,184,166,0.2)",
-    },
-  ];
+
+  const isLearner = user?.role === "learner";
+  const isMentor  = user?.role === "mentor";
+
+  // Stat cards are role-aware
+  const stats = isLearner
+    ? [
+        {
+          icon: <BookOpen size={20} />,
+          value: String(enrolledBatches.length || 0).padStart(2, "0"),
+          label: "My Enrolled Batches",
+          iconBg: "rgba(52,211,153,0.2)",
+        },
+        {
+          icon: <Video size={20} />,
+          value: String(classesData?.live.length || 0).padStart(2, "0"),
+          label: "Live Right Now",
+          iconBg: "rgba(0,219,232,0.2)",
+        },
+        {
+          icon: <Calendar size={20} />,
+          value: String(
+            (classesData?.today.length || 0) + (classesData?.upcoming.length || 0)
+          ).padStart(2, "0"),
+          label: "Upcoming Classes",
+          iconBg: "rgba(139,92,246,0.2)",
+        },
+      ]
+    : isMentor
+    ? [
+        {
+          icon: <Users size={20} />,
+          value: String(enrolledBatches.length || 0).padStart(2, "0"),
+          label: "My Batches",
+          iconBg: "rgba(52,211,153,0.2)",
+        },
+        {
+          icon: <Video size={20} />,
+          value: String(classesData?.live.length || 0).padStart(2, "0"),
+          label: "Live Right Now",
+          iconBg: "rgba(0,219,232,0.2)",
+        },
+        {
+          icon: <Calendar size={20} />,
+          value: String(
+            (classesData?.today.length || 0) + (classesData?.upcoming.length || 0)
+          ).padStart(2, "0"),
+          label: "Upcoming Sessions",
+          iconBg: "rgba(139,92,246,0.2)",
+        },
+      ]
+    : [
+        {
+          icon: <Hash size={20} />,
+          value: String(batchData?.length || 0).padStart(2, "0"),
+          label: "Channels Available",
+          iconBg: "rgba(89,149,232,0.2)",
+        },
+        {
+          icon: <TrendingUp size={20} />,
+          value: String(enrolledBatches.length || 0).padStart(2, "0"),
+          label: "Enrolled in Batches",
+          iconBg: "rgba(52,211,153,0.2)",
+        },
+        {
+          icon: <BookOpen size={20} />,
+          value: String(generalBatches.length || 0).padStart(2, "0"),
+          label: "General Open to All",
+          iconBg: "rgba(20,184,166,0.2)",
+        },
+      ];
 
   const displayRooms = [...(pinnedData?.pinnedBatches || []), ...generalBatches, ...enrolledBatches]
     .filter((batch, index, list) => list.findIndex((item) => item.id === batch.id) === index)
@@ -395,13 +525,15 @@ export default function DashboardPage() {
       <FigmaTopBar title="Home" />
       <div className="dashboard-layout page-scroll-content figma-scroll" style={{ padding: "32px 32px 40px", display: "flex", gap: 32 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <FigmaOverline style={{ marginBottom: 16 }}>Admin Insights</FigmaOverline>
+          <FigmaOverline style={{ marginBottom: 16 }}>
+            {isLearner ? "My Overview" : isMentor ? "Mentor Overview" : "Admin Insights"}
+          </FigmaOverline>
           <div className="responsive-stat-grid" style={{ display: "flex", gap: 16, marginBottom: 32 }}>
             {stats.map((stat) => <FigmaStatCard key={stat.label} {...stat} />)}
           </div>
 
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <FigmaOverline>Active Rooms</FigmaOverline>
+            <FigmaOverline>{isLearner ? "My Rooms" : isMentor ? "My Batch Rooms" : "Active Rooms"}</FigmaOverline>
             <Link to="/batches" style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#4f7cff", textDecoration: "none" }}>
               View all <ArrowRight size={14} />
             </Link>
@@ -429,14 +561,60 @@ export default function DashboardPage() {
         </div>
 
         <div className="dashboard-side-panel" style={{ width: 300, flexShrink: 0 }}>
+
+          {/* ── Mentorship: live / today's first class ── */}
           <FigmaOverline style={{ marginBottom: 16 }}>Mentorship</FigmaOverline>
-          <MentorshipCard />
+          <MentorshipCard
+            live={classesData?.live ?? []}
+            today={classesData?.today ?? []}
+          />
 
-          <FigmaOverline style={{ margin: "28px 0 16px" }}>Upcoming</FigmaOverline>
-          <UpcomingCard title="React Hooks Deep Dive" time="Today, 2:00 PM" type="Live" color="rgb(0,219,232)" />
-          <UpcomingCard title="System Design Review" time="Tomorrow, 11:00 AM" type="Session" color="rgb(139,92,246)" />
-          <UpcomingCard title="UI/UX Critique" time="Thu, 3:30 PM" type="Workshop" color="rgb(52,211,153)" />
+          {/* ── Today's classes (if more than the featured one) ── */}
+          {(() => {
+            const live = classesData?.live ?? [];
+            const today = classesData?.today ?? [];
+            // Skip the first item already shown in the big card
+            const featured = live[0] ?? today[0];
+            const extraLive = featured && live[0]?.id === featured.id ? live.slice(1) : live;
+            const extraToday = featured && today[0]?.id === featured.id ? today.slice(1) : today;
+            const extras = [...extraLive, ...extraToday];
+            if (extras.length === 0) return null;
+            return (
+              <>
+                <FigmaOverline style={{ margin: "24px 0 12px" }}>Today</FigmaOverline>
+                {extras.map((c) => <ClassRow key={c.id} item={c} />)}
+              </>
+            );
+          })()}
 
+          {/* ── Upcoming classes ── */}
+          {(classesData?.upcoming?.length ?? 0) > 0 && (
+            <>
+              <FigmaOverline style={{ margin: "24px 0 12px" }}>Upcoming</FigmaOverline>
+              {classesData!.upcoming.map((c) => <ClassRow key={c.id} item={c} />)}
+            </>
+          )}
+
+          {/* ── Recently completed ── */}
+          {(classesData?.completed?.length ?? 0) > 0 && (
+            <>
+              <FigmaOverline style={{ margin: "24px 0 12px" }}>Completed</FigmaOverline>
+              {classesData!.completed.map((c) => <ClassRow key={c.id} item={c} />)}
+            </>
+          )}
+
+          {/* ── Empty state when no classes at all ── */}
+          {classesData &&
+            classesData.live.length === 0 &&
+            classesData.today.length === 0 &&
+            classesData.upcoming.length === 0 &&
+            classesData.completed.length === 0 && (
+              <div style={{ textAlign: "center", padding: "16px 0", color: "var(--ax-dim)", fontSize: 12 }}>
+                No classes scheduled yet.
+              </div>
+            )}
+
+          {/* ── Quick Links ── */}
           <FigmaOverline style={{ margin: "28px 0 16px" }}>Quick Links</FigmaOverline>
           {user?.role === "admin" && <QuickLink href="/admin" icon={<Shield size={14} />} label="Admin Console" />}
           {user?.role === "admin" && <QuickLink href="/batches" icon={<Folder size={15} />} label="Manage Batches" />}

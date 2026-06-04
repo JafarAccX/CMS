@@ -10,6 +10,7 @@ import {
 import ThemeToggle from "../components/ThemeToggle";
 import { toast } from "react-hot-toast";
 import NotificationDropdown from "../components/NotificationDropdown";
+import WorkspaceSearch from "../components/WorkspaceSearch";
 
 export default function BatchPage() {
   const { id: batchId } = useParams<{ id: string }>();
@@ -48,15 +49,7 @@ export default function BatchPage() {
           {batch?.is_pinned && <span className="chip chip-accent text-[9px] flex items-center gap-1"><Pin className="w-2.5 h-2.5" />Pinned</span>}
         </div>
         <div className="flex-1 flex justify-center">
-          <div className="app-topbar-search relative w-[480px]">
-            <div className="w-full h-10 rounded-md flex items-center px-10 border border-hairline" style={{ backgroundColor: "var(--ax-panel)" }}>
-              <span className="text-sm text-faint select-none">Ask AI or search workspace… (Cmd+K)</span>
-            </div>
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-faint pointer-events-none">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            </span>
-            <Sparkles className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-accent-400 pointer-events-none" />
-          </div>
+          <div className="w-[480px]"><WorkspaceSearch /></div>
         </div>
         <div className="app-topbar-actions flex items-center gap-2">
           <button className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold"

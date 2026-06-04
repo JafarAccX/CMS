@@ -18,6 +18,7 @@ import * as mentorCtrl from "../controllers/mentor.controller.js";
 import * as profileCtrl from "../controllers/profile.controller.js";
 import * as dmCtrl from "../controllers/dm.controller.js";
 import * as learnerCtrl from "../controllers/learner.controller.js";
+import * as classesCtrl from "../controllers/classes.controller.js";
 import uploadRoutes from "./upload.routes.js";
 
 const router = Router();
@@ -124,6 +125,9 @@ router.get("/mentor/batches/:id/members", requireRole("mentor"), mentorCtrl.list
 
 // ── Learner ──────────────────────────────────────────────
 router.get("/learner/enrollments", learnerCtrl.getMyEnrollments);
+
+// ── Classes (CRM-backed) ─────────────────────────────────
+router.get("/my-classes", classesCtrl.getMyClasses);
 
 // ── Direct Messages ───────────────────────────────────────
 router.get("/dm/users", dmCtrl.listDmUsers);

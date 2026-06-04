@@ -156,14 +156,21 @@ export async function handleVerifyOtp(req: Request, res: Response, next: NextFun
 
     if (user.is_banned) throw new ForbiddenError("Your account has been banned.");
 
-    const sources = await fetchEnrichedData(crmCustomer).catch(() => null);
+    // Issue tokens immediately — enriched CRM/LMS data fires in background.
     const accessToken = generateAccessToken(user as any);
     const refreshToken = await createRefreshSession(user.id);
 
     setRefreshCookie(res, refreshToken);
 
     const { password_hash: _, ...userWithoutPassword } = user as any;
-    res.status(200).json({ user: userWithoutPassword, accessToken, sources });
+    res.status(200).json({ user: userWithoutPassword, accessToken, sources: null });
+
+    // Background: pre-warm enriched data (CRM enrollments + LMS profile).
+    if (crmCustomer) {
+      setImmediate(() => {
+        fetchEnrichedData(crmCustomer!).catch(() => {});
+      });
+    }
   } catch (err) {
     next(err);
   }

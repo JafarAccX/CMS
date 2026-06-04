@@ -287,6 +287,11 @@
     display: none;
   }
 
+  /* Drop the blue radial tint from page backgrounds in light mode. */
+  :root[data-theme="light"] .figma-page {
+    background: var(--ax-bg);
+  }
+
   :root[data-theme="light"] .card,
   :root[data-theme="light"] .btn-surface {
     background: var(--ax-card-bg);

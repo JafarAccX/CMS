@@ -56,3 +56,8 @@ Thumbs.db
 
 # Assistant settings
 .claude/
+
+# Graphify outputs
+graphify-out/
+backend/graphify-out/
+

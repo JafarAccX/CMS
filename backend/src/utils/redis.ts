@@ -54,20 +54,27 @@ let redis: Redis | MemoryCache | null = null;
 let isMemoryFallback = false;
 
 try {
+  // Upstash (and any rediss:// URL) requires TLS. ioredis enables TLS
+  // automatically when the URL scheme is rediss://, but we also pass
+  // tls: {} explicitly so self-signed / managed certs are accepted.
+  const isTls = REDIS_URL.startsWith("rediss://");
+
   const client = new Redis(REDIS_URL, {
-    maxRetriesPerRequest: 1,
+    maxRetriesPerRequest: 0,  // fail fast — don't queue while retrying
     retryStrategy(times) {
-      if (times > 1) {
+      if (times >= 1) {
         if (!isMemoryFallback) {
-          console.info("ℹ️  Redis unavailable after retries — switching to Memory Fallback for local development.");
+          console.info("ℹ️  Redis unavailable — switching to in-memory cache.");
           isMemoryFallback = true;
           redis = new MemoryCache();
         }
-        return null; // stop retrying
+        return null;
       }
-      return 1000;
+      return 500;
     },
     lazyConnect: true,
+    connectTimeout: 5000,   // 5s — enough for Upstash cold start
+    ...(isTls ? { tls: {} } : {}),
   });
 
   client.on("error", (err) => {
