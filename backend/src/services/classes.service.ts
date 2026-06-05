@@ -1,5 +1,6 @@
 import prisma from "../utils/prisma.js";
-import { getCrmClassesForBatch, type CrmClass } from "./crm.client.js";
+import { redisGet, redisSet } from "../utils/redis.js";
+import { getCrmClassesForBatchStrict, type CrmClass } from "./crm.client.js";
 
 export interface ClassItem {
   id: string;
@@ -21,6 +22,51 @@ export interface UserClassesResponse {
   completed: ClassItem[];
 }
 
+const EMPTY_CLASSES: UserClassesResponse = { live: [], today: [], upcoming: [], completed: [] };
+const CLASSES_FRESH_TTL_SECONDS = 60;
+const CLASSES_STALE_TTL_SECONDS = 24 * 60 * 60;
+const refreshInflight = new Map<string, Promise<UserClassesResponse>>();
+
+function classesFreshKey(userId: string) {
+  return `classes:user:${userId}:fresh`;
+}
+
+function classesStaleKey(userId: string) {
+  return `classes:user:${userId}:stale`;
+}
+
+async function readCachedClasses(key: string): Promise<UserClassesResponse | null> {
+  try {
+    const raw = await redisGet(key);
+    return raw ? (JSON.parse(raw) as UserClassesResponse) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeCachedClasses(userId: string, data: UserClassesResponse) {
+  const payload = JSON.stringify(data);
+  await Promise.all([
+    redisSet(classesFreshKey(userId), payload, CLASSES_FRESH_TTL_SECONDS),
+    redisSet(classesStaleKey(userId), payload, CLASSES_STALE_TTL_SECONDS),
+  ]);
+}
+
+function refreshClassesCache(userId: string) {
+  const existing = refreshInflight.get(userId);
+  if (existing) return existing;
+
+  const refresh = fetchUserClassesFromCrm(userId)
+    .then(async (data) => {
+      await writeCachedClasses(userId, data);
+      return data;
+    })
+    .finally(() => refreshInflight.delete(userId));
+
+  refreshInflight.set(userId, refresh);
+  return refresh;
+}
+
 /**
  * Fetch and categorise CRM classes for all batches the user belongs to.
  *
@@ -31,6 +77,26 @@ export interface UserClassesResponse {
  *   completed – Status = COMPLETED, most-recent first (max 3)
  */
 export async function getUserClasses(userId: string): Promise<UserClassesResponse> {
+  const fresh = await readCachedClasses(classesFreshKey(userId));
+  if (fresh) return fresh;
+
+  const stale = await readCachedClasses(classesStaleKey(userId));
+  if (stale) {
+    void refreshClassesCache(userId).catch((err) => {
+      console.error("[classes] Background CRM refresh failed:", err);
+    });
+    return stale;
+  }
+
+  try {
+    return await refreshClassesCache(userId);
+  } catch (err) {
+    console.error("[classes] CRM class fetch failed and no cache is available:", err);
+    return EMPTY_CLASSES;
+  }
+}
+
+async function fetchUserClassesFromCrm(userId: string): Promise<UserClassesResponse> {
   const memberships = await prisma.membership.findMany({
     where: { user_id: userId },
     include: { batch: { select: { id: true, name: true, crm_batch_id: true } } },
@@ -45,17 +111,25 @@ export async function getUserClasses(userId: string): Promise<UserClassesRespons
   }
 
   if (batchMap.size === 0) {
-    return { live: [], today: [], upcoming: [], completed: [] };
+    return EMPTY_CLASSES;
   }
 
-  // Fetch classes for all batches in parallel; individual failures are swallowed
-  const settled = await Promise.allSettled(
-    [...batchMap.keys()].map((id) => getCrmClassesForBatch(id))
-  );
-
+  // Fetch classes in parallel but capped at 5 concurrent CRM requests.
+  // Firing all at once for large batch counts floods the CRM and slows the response.
+  const batchIds = [...batchMap.keys()];
+  const CONCURRENCY = 5;
   const raw: CrmClass[] = [];
-  for (const r of settled) {
-    if (r.status === "fulfilled") raw.push(...r.value);
+
+  for (let i = 0; i < batchIds.length; i += CONCURRENCY) {
+    const chunk = batchIds.slice(i, i + CONCURRENCY);
+    const settled = await Promise.allSettled(chunk.map((id) => getCrmClassesForBatchStrict(id)));
+    const rejected = settled.filter((r) => r.status === "rejected");
+    if (rejected.length === chunk.length) {
+      throw new Error("CRM class fetch failed for all batches in a chunk");
+    }
+    for (const r of settled) {
+      if (r.status === "fulfilled") raw.push(...r.value);
+    }
   }
 
   // Deduplicate by CRM Id

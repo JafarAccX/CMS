@@ -4,10 +4,21 @@ type BatchWithSettings = Batch & { batch_settings: BatchSettings | null };
 
 /**
  * Check if a user can access a batch.
- * - guest: only general batches with allow_guests = true
- * - learner/mentor: must have a membership row
- * - paid batch: subscription_status must be "active"
- * - admin: always true
+ *
+ * Access model:
+ *   - admin              → always allowed
+ *   - guest              → only `general` batches that explicitly allow guests
+ *   - public / general   → any registered user
+ *   - private / paid / hidden → must hold a Membership row
+ *
+ * Paid-batch note:
+ *   Payment is enforced by the CRM sync — the CRM only provisions a Membership
+ *   for learners who are legitimately enrolled (i.e. have paid). The Membership
+ *   row IS the proof of payment; no separate in-app subscription_status check is
+ *   needed here. If a future in-app paywall is added (e.g. Razorpay gate), add:
+ *     if (batch.is_paid && user.subscription_status !== "active") return false;
+ *   Do NOT add that check yet — it would immediately lock out all CRM-synced
+ *   learners whose subscription_status stays "free" by default.
  */
 export function canAccessBatch(
   user: User,
@@ -27,7 +38,8 @@ export function canAccessBatch(
     return true;
   }
 
-  // Must have membership for private/paid/hidden batches
+  // private / paid / hidden: membership (CRM-granted or admin-granted) is required.
+  // Membership presence is the access credential — see paid-batch note above.
   if (!membership) return false;
 
   return true;

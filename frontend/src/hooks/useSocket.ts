@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from "react";
 import { io } from "socket.io-client";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../store/authStore";
 import { useMessageStore } from "../store/messageStore";
 import { useNotificationStore } from "../store/notificationStore";
@@ -17,6 +18,7 @@ export function useSocketInit() {
   const socket = useSocketStore((s) => s.socket);
   const setSocket = useSocketStore((s) => s.setSocket);
   const setIsConnected = useSocketStore((s) => s.setIsConnected);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!accessToken) {
@@ -61,6 +63,17 @@ export function useSocketInit() {
       const { activeChannelId, activeConversationId } = useSocketStore.getState();
       if (activeChannelId) newSocket.emit("join_channel", { channelId: activeChannelId });
       if (activeConversationId) newSocket.emit("join_dm", { conversationId: activeConversationId });
+
+      // Client recovery: on every (re)connect, refetch the active room's messages
+      // from the DB (the source of truth). This closes any gap for events the
+      // client missed while it was disconnected — the other half of the outbox.
+      if (activeChannelId) {
+        queryClient.invalidateQueries({ queryKey: ["messages", activeChannelId] });
+      }
+      if (activeConversationId) {
+        queryClient.invalidateQueries({ queryKey: ["dm-messages", activeConversationId] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["dm-conversations"] });
     });
 
     newSocket.on("connect_error", async (err) => {
@@ -163,7 +176,7 @@ export function useSocketInit() {
     return () => {
       // keep socket alive across navigation
     };
-  }, [accessToken, socket, setSocket, setIsConnected]);
+  }, [accessToken, socket, setSocket, setIsConnected, queryClient]);
 }
 
 export function useSocket() {

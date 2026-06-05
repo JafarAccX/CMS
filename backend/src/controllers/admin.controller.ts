@@ -5,6 +5,7 @@ import { syncCrmBatchesAndPeople } from "../services/crm-sync.service.js";
 import * as messageService from "../services/message.service.js";
 import { requireParam } from "../utils/params.js";
 import prisma from "../utils/prisma.js";
+import { getMetricsSnapshot } from "../utils/metrics.js";
 
 export async function getStats(req: Request, res: Response, next: NextFunction) {
   try {
@@ -23,6 +24,14 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
     const search = typeof req.query.search === "string" ? req.query.search : undefined;
     const result = await adminService.listUsers(page, limit, role, search);
     res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getMetrics(_req: Request, res: Response, next: NextFunction) {
+  try {
+    res.status(200).json(getMetricsSnapshot());
   } catch (err) {
     next(err);
   }

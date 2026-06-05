@@ -797,6 +797,7 @@ export default function DmPage() {
   const [input, setInput] = useState("");
   const [conversationSearch, setConversationSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showDrawer, setShowDrawer] = useState(false);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -814,6 +815,12 @@ export default function DmPage() {
       setUserSearch("");
     }
   }, [isMentorRequest]);
+
+  // Debounce the search input by 350ms before hitting the backend
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(userSearch), 350);
+    return () => clearTimeout(t);
+  }, [userSearch]);
 
   useEffect(() => {
     if (!showDrawer) return;
@@ -838,8 +845,14 @@ export default function DmPage() {
   useEffect(() => { if (msgData && conversationId) setMessages(conversationId, msgData.messages); }, [msgData, conversationId, setMessages]);
 
   const { data: dmUsers = [] } = useQuery<any[]>({
-    queryKey: ["dm-users", isMentorRequest],
-    queryFn: async () => (await api.get(isMentorRequest ? "/dm/users?batchMentors=true" : "/dm/users")).data,
+    queryKey: ["dm-users", isMentorRequest, debouncedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (isMentorRequest) params.set("batchMentors", "true");
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+      const qs = params.toString();
+      return (await api.get(`/dm/users${qs ? `?${qs}` : ""}`)).data;
+    },
     enabled: showDrawer || !conversationId,
   });
 
@@ -867,10 +880,8 @@ export default function DmPage() {
   const pinnedConversations = filteredConversations.filter((conversation) => isPinnedRole(conversation.otherUser.role));
   const recentConversations = filteredConversations.filter((conversation) => !isPinnedRole(conversation.otherUser.role));
 
-  const drawerUsers = dmUsers.filter((item: any) => {
-    const query = userSearch.trim().toLowerCase();
-    return !query || item.username?.toLowerCase().includes(query) || item.email?.toLowerCase().includes(query);
-  });
+  // Server already filters by search term — just use dmUsers directly
+  const drawerUsers = dmUsers;
   const drawerMentors = drawerUsers.filter((item: any) => {
     const role = (item.role || "").toLowerCase();
     return isMentorRequest ? role === "mentor" : isPinnedRole(role);

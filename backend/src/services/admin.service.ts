@@ -2,6 +2,7 @@ import prisma from "../utils/prisma.js";
 import bcrypt from "bcrypt";
 import type { Prisma, UserRole } from "@prisma/client";
 import { revokeAllUserSessions } from "./session.service.js";
+import { allocateChannelMessageSeq } from "./message-sequence.service.js";
 
 const USER_ROLES: UserRole[] = ["admin", "mentor", "batch_moderator", "learner", "guest"];
 
@@ -196,18 +197,23 @@ export async function broadcastMessage(content: string, senderId: string, channe
 
   const messages = [];
   for (const ch of channels) {
-    const msg = await prisma.message.create({
+    const msg = await prisma.$transaction(async (tx) => {
+      const seqId = await allocateChannelMessageSeq(tx, ch.id);
+
+      return tx.message.create({
       data: {
         channel_id: ch.id,
         sender_id: senderId,
         content: `📢 **BROADCAST**: ${content}`,
         message_type: "system",
+        seq_id: seqId,
       },
       include: {
         sender: { select: { id: true, username: true, role: true } },
         attachments: true,
         reactions: { select: { id: true, emoji: true, user_id: true, user: { select: { username: true } } } },
       },
+      });
     });
     messages.push({ ...msg, channelId: ch.id });
   }

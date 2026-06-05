@@ -73,7 +73,7 @@ router.get("/pinned", channelCtrl.listPinned);
 
 // ── Members ───────────────────────────────────────────────
 router.get("/batches/:id/members", memberCtrl.listMembers);
-router.post("/batches/:id/members", requireRole("admin", "batch_moderator"), memberCtrl.addMember);
+router.post("/batches/:id/members", requireRole("admin"), memberCtrl.addMember);
 router.delete("/batches/:id/members/:userId", requireRole("admin"), memberCtrl.removeMember);
 router.patch("/batches/:id/members/:userId/role", requireRole("admin"), memberCtrl.updateMemberRole);
 
@@ -106,6 +106,7 @@ router.post("/profile/change-password", profileCtrl.changePassword);
 
 // ── Admin ─────────────────────────────────────────────────
 router.get("/admin/stats", requireRole("admin"), adminCtrl.getStats);
+router.get("/admin/metrics", requireRole("admin"), adminCtrl.getMetrics);
 router.get("/admin/users", requireRole("admin"), adminCtrl.listUsers);
 router.post("/admin/users", requireRole("admin"), adminCtrl.createUser);
 router.patch("/admin/users/:id/ban", requireRole("admin"), adminCtrl.toggleBanUser);

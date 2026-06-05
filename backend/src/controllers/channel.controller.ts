@@ -77,7 +77,7 @@ export async function toggleBatchPin(req: Request, res: Response, next: NextFunc
 
 export async function listPinned(req: Request, res: Response, next: NextFunction) {
   try {
-    const result = await channelService.listPinnedForUser(req.user!.id);
+    const result = await channelService.listPinnedForUser(req.user!.id, req.user!.role);
     res.status(200).json(result);
   } catch (err) {
     next(err);

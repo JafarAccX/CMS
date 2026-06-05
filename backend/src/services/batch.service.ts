@@ -5,9 +5,8 @@ import type { CreateBatchInput, UpdateBatchInput } from "../validators/index.js"
 import { logAdminAction } from "./admin.service.js";
 
 export async function listBatches(user: NonNullable<Express.Request["user"]>) {
-  const fullUser = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
-
-  const isLearner = fullUser.role === "learner";
+  // req.user already contains role from the authenticate middleware — no extra DB lookup needed
+  const isLearner = user.role === "learner";
 
   const batches = await prisma.batch.findMany({
     where: isLearner
@@ -25,15 +24,18 @@ export async function listBatches(user: NonNullable<Express.Request["user"]>) {
       : undefined, // admins/mentors see all
     include: {
       batch_settings: true,
-      memberships: { select: { user_id: true, role_in_batch: true } },
+      memberships: {
+        where: { user_id: user.id },
+        select: { user_id: true, role_in_batch: true },
+      },
       _count: { select: { channels: true, memberships: true } },
     },
     orderBy: { created_at: "asc" },
   });
 
-  return batches.map((batch) => {
-    const membership = batch.memberships.find((m) => m.user_id === user.id) || null;
-    const hasAccess = canAccessBatch(fullUser, batch, membership as any);
+  return batches.map(({ memberships, ...batch }) => {
+    const membership = memberships[0] || null;
+    const hasAccess = canAccessBatch(user as any, batch, membership as any);
     return {
       ...batch,
       hasAccess,

@@ -2,13 +2,14 @@ import type { Request, Response, NextFunction } from "express";
 import * as dmService from "../services/dm.service.js";
 import { z } from "zod";
 import { requireParam } from "../utils/params.js";
+import { BadRequestError } from "../utils/errors.js";
 
 const sendDmSchema = z.object({ content: z.string().min(1).max(5000) });
 const startDmSchema = z.object({ targetUserId: z.string().uuid() });
 
 export async function listConversations(req: Request, res: Response, next: NextFunction) {
   try {
-    const conversations = await dmService.listConversations(req.user!.id);
+    const conversations = await dmService.listConversations(req.user!.id, req.user!.role);
     res.status(200).json(conversations);
   } catch (err) { next(err); }
 }
@@ -16,7 +17,7 @@ export async function listConversations(req: Request, res: Response, next: NextF
 export async function startConversation(req: Request, res: Response, next: NextFunction) {
   try {
     const { targetUserId } = startDmSchema.parse(req.body);
-    const conversation = await dmService.getOrCreateConversation(req.user!.id, targetUserId);
+    const conversation = await dmService.getOrCreateConversation(req.user!.id, targetUserId, req.user!.role);
     res.status(200).json(conversation);
   } catch (err) { next(err); }
 }
@@ -35,7 +36,9 @@ export async function sendMessage(req: Request, res: Response, next: NextFunctio
   try {
     const { content } = sendDmSchema.parse(req.body);
     const conversationId = requireParam(req.params.id, "id");
-    const message = await dmService.sendDirectMessage(conversationId, req.user!.id, content);
+    // The outbox event is written in the same transaction; the relay delivers it
+    // in real time within ~2s, so REST-sent DMs reach the recipient too.
+    const { message } = await dmService.sendDirectMessage(conversationId, req.user!.id, content);
     res.status(201).json(message);
   } catch (err) { next(err); }
 }
@@ -43,7 +46,8 @@ export async function sendMessage(req: Request, res: Response, next: NextFunctio
 export async function listDmUsers(req: Request, res: Response, next: NextFunction) {
   try {
     const batchMentorsOnly = req.query.batchMentors === "true";
-    const users = await dmService.listDmUsers(req.user!.id, batchMentorsOnly);
+    const search = typeof req.query.search === "string" ? req.query.search : "";
+    const users = await dmService.listDmUsers(req.user!.id, batchMentorsOnly, req.user!.role, search);
     res.status(200).json(users);
   } catch (err) { next(err); }
 }
@@ -58,8 +62,9 @@ export async function getUserStatus(req: Request, res: Response, next: NextFunct
 
 export async function getUsersStatus(req: Request, res: Response, next: NextFunction) {
   try {
-    const userIds = (req.query.ids as string || "").split(",").filter(Boolean);
+    const userIds = [...new Set((req.query.ids as string || "").split(",").filter(Boolean))];
     if (userIds.length === 0) return res.status(200).json({});
+    if (userIds.length > 200) throw new BadRequestError("A maximum of 200 user IDs may be checked at once");
     const statuses = await dmService.checkUsersOnline(userIds);
     res.status(200).json(statuses);
   } catch (err) { next(err); }

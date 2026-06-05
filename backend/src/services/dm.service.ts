@@ -1,12 +1,46 @@
 import prisma from "../utils/prisma.js";
 import { NotFoundError, ForbiddenError } from "../utils/errors.js";
-import { redisGet } from "../utils/redis.js";
+import { redisGet, redisMGet } from "../utils/redis.js";
+import { enqueueOutbox } from "./outbox.service.js";
+import { allocateConversationMessageSeq } from "./message-sequence.service.js";
+import type { UserRole } from "@prisma/client";
+
+const DM_USER_BASIC_SELECT = {
+  id: true,
+  username: true,
+  role: true,
+  avatar_url: true,
+} as const;
+
+const DM_USER_PRIVILEGED_SELECT = {
+  ...DM_USER_BASIC_SELECT,
+  bio: true,
+  phone: true,
+  email: true,
+  created_at: true,
+  memberships: { select: { batch: { select: { id: true, name: true } } } },
+} as const;
+
+const DM_MESSAGE_SENDER_SELECT = {
+  id: true,
+  username: true,
+  role: true,
+  avatar_url: true,
+} as const;
+
+function canViewDmProfileDetails(role: UserRole) {
+  return role === "admin" || role === "mentor" || role === "batch_moderator";
+}
+
+function dmUserSelect(role: UserRole) {
+  return canViewDmProfileDetails(role) ? DM_USER_PRIVILEGED_SELECT : DM_USER_BASIC_SELECT;
+}
 
 /**
  * Get or create a conversation between two users.
  * Always stores the smaller UUID as user_a to guarantee uniqueness.
  */
-export async function getOrCreateConversation(userId1: string, userId2: string) {
+export async function getOrCreateConversation(userId1: string, userId2: string, requesterRole: UserRole) {
   if (userId1 === userId2) throw new ForbiddenError("Cannot message yourself");
 
   // Ensure consistent ordering for the unique constraint
@@ -15,8 +49,8 @@ export async function getOrCreateConversation(userId1: string, userId2: string) 
   let conversation = await prisma.conversation.findUnique({
     where: { user_a_id_user_b_id: { user_a_id: userAId, user_b_id: userBId } },
     include: {
-      user_a: { select: { id: true, username: true, role: true, bio: true, phone: true, email: true, created_at: true, memberships: { select: { batch: { select: { id: true, name: true } } } } } },
-      user_b: { select: { id: true, username: true, role: true, bio: true, phone: true, email: true, created_at: true, memberships: { select: { batch: { select: { id: true, name: true } } } } } },
+      user_a: { select: dmUserSelect(requesterRole) },
+      user_b: { select: dmUserSelect(requesterRole) },
       _count: { select: { messages: true } },
     },
   });
@@ -32,8 +66,8 @@ export async function getOrCreateConversation(userId1: string, userId2: string) 
     conversation = await prisma.conversation.create({
       data: { user_a_id: userAId, user_b_id: userBId },
       include: {
-        user_a: { select: { id: true, username: true, role: true, bio: true, phone: true, email: true, created_at: true, memberships: { select: { batch: { select: { id: true, name: true } } } } } },
-        user_b: { select: { id: true, username: true, role: true, bio: true, phone: true, email: true, created_at: true, memberships: { select: { batch: { select: { id: true, name: true } } } } } },
+        user_a: { select: dmUserSelect(requesterRole) },
+        user_b: { select: dmUserSelect(requesterRole) },
         _count: { select: { messages: true } },
       },
     });
@@ -45,12 +79,12 @@ export async function getOrCreateConversation(userId1: string, userId2: string) 
 /**
  * List all conversations for a user with last message preview.
  */
-export async function listConversations(userId: string) {
+export async function listConversations(userId: string, requesterRole: UserRole) {
   const conversations = await prisma.conversation.findMany({
     where: { OR: [{ user_a_id: userId }, { user_b_id: userId }] },
     include: {
-      user_a: { select: { id: true, username: true, role: true, bio: true, phone: true, email: true, created_at: true, memberships: { select: { batch: { select: { id: true, name: true } } } } } },
-      user_b: { select: { id: true, username: true, role: true, bio: true, phone: true, email: true, created_at: true, memberships: { select: { batch: { select: { id: true, name: true } } } } } },
+      user_a: { select: dmUserSelect(requesterRole) },
+      user_b: { select: dmUserSelect(requesterRole) },
       messages: {
         orderBy: { created_at: "desc" },
         take: 1,
@@ -75,13 +109,20 @@ export async function listConversations(userId: string) {
 
 /**
  * Send a direct message.
+ *
+ * The message, the conversation touch, and the real-time outbox event all commit
+ * in ONE transaction — so the "receive_dm" event can never be lost even if the
+ * process crashes right after the DB write. Returns the outbox row so the caller
+ * can fast-path publish it; otherwise the outbox relay delivers it within ~2s.
+ *
  * NOTE: Notification creation is handled by the socket handler to avoid duplicates.
  */
 export async function sendDirectMessage(
-  conversationId: string, 
-  senderId: string, 
-  content?: string, 
-  attachments?: { file_url: string; file_name: string; file_size: number; mime_type: string }[]
+  conversationId: string,
+  senderId: string,
+  content?: string,
+  attachments?: { file_url: string; file_name: string; file_size: number; mime_type: string }[],
+  tempId?: string
 ) {
   const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
   if (!conversation) throw new NotFoundError("Conversation not found");
@@ -91,32 +132,49 @@ export async function sendDirectMessage(
     throw new ForbiddenError("You are not part of this conversation");
   }
 
-  const message = await prisma.directMessage.create({
-    data: { 
-      conversation_id: conversationId, 
-      sender_id: senderId, 
-      content: content || "",
-      ...(attachments && attachments.length > 0 && {
-        attachments: {
-          create: attachments.map(a => ({
-            file_url: a.file_url,
-            file_name: a.file_name,
-            file_size: a.file_size,
-            mime_type: a.mime_type
-          }))
-        }
-      })
-    },
-    include: { 
-      sender: { select: { id: true, username: true, role: true, bio: true, phone: true, email: true, created_at: true, memberships: { select: { batch: { select: { id: true, name: true } } } } } },
-      attachments: true
-    },
+  const otherId = conversation.user_a_id === senderId ? conversation.user_b_id : conversation.user_a_id;
+
+  const { message, outboxEvent } = await prisma.$transaction(async (tx) => {
+    const seqId = await allocateConversationMessageSeq(tx, conversationId);
+
+    const message = await tx.directMessage.create({
+      data: {
+        conversation_id: conversationId,
+        sender_id: senderId,
+        content: content || "",
+        seq_id: seqId,
+        ...(attachments && attachments.length > 0 && {
+          attachments: {
+            create: attachments.map((a) => ({
+              file_url: a.file_url,
+              file_name: a.file_name,
+              file_size: a.file_size,
+              mime_type: a.mime_type,
+            })),
+          },
+        }),
+      },
+      include: {
+        sender: { select: DM_MESSAGE_SENDER_SELECT },
+        attachments: true,
+      },
+    });
+
+    // Touch conversation's updated_at (same transaction)
+    await tx.conversation.update({ where: { id: conversationId }, data: { updated_at: new Date() } });
+
+    const outboxEvent = await enqueueOutbox(tx, {
+      aggregate: "dm",
+      aggregateId: conversationId,
+      event: "receive_dm",
+      rooms: [`dm:${conversationId}`, `user:${otherId}`],
+      payload: { ...message, tempId },
+    });
+
+    return { message, outboxEvent };
   });
 
-  // Touch conversation's updated_at
-  await prisma.conversation.update({ where: { id: conversationId }, data: { updated_at: new Date() } });
-
-  return message;
+  return { message, outboxEvent, otherId };
 }
 
 
@@ -134,8 +192,8 @@ export async function getDirectMessages(conversationId: string, userId: string, 
     where: { conversation_id: conversationId },
     take: limit,
     ...(cursor && { skip: 1, cursor: { id: cursor } }),
-    orderBy: { created_at: "desc" },
-    include: { sender: { select: { id: true, username: true, role: true, bio: true, phone: true, email: true, created_at: true, memberships: { select: { batch: { select: { id: true, name: true } } } } } }, attachments: true },
+    orderBy: { seq_id: "desc" },
+    include: { sender: { select: DM_MESSAGE_SENDER_SELECT }, attachments: true },
   });
 
   // Mark unread messages from the OTHER user as read
@@ -144,34 +202,34 @@ export async function getDirectMessages(conversationId: string, userId: string, 
     data: { is_read: true },
   });
 
-  return { messages: messages.reverse(), nextCursor: messages.length === limit ? messages[0]?.id : null };
+  const nextCursor = messages.length === limit ? messages[messages.length - 1]?.id : null;
+  return { messages: messages.reverse(), nextCursor };
 }
 
 /**
  * List all users available for DM (everyone except banned users and self).
  * When batchMentorsOnly=true, returns only mentors assigned to the same batches the current user belongs to.
  */
-// Lightweight select shared by both paths — omits heavy relations not needed
-// for the user picker list.
-const DM_USER_SELECT = {
-  id: true,
-  username: true,
-  role: true,
-  email: true,
-  bio: true,
-  avatar_url: true,
-  created_at: true,
-} as const;
+export async function listDmUsers(
+  currentUserId: string,
+  batchMentorsOnly = false,
+  requesterRole: UserRole,
+  search = ""
+) {
+  const searchFilter = search.trim()
+    ? {
+        OR: [
+          { username: { contains: search.trim(), mode: "insensitive" as const } },
+          { email:    { contains: search.trim(), mode: "insensitive" as const } },
+        ],
+      }
+    : {};
 
-export async function listDmUsers(currentUserId: string, batchMentorsOnly = false) {
   if (batchMentorsOnly) {
-    // Run the two membership lookups in parallel to halve the round-trips.
-    const [userMemberships] = await Promise.all([
-      prisma.membership.findMany({
-        where: { user_id: currentUserId },
-        select: { batch_id: true },
-      }),
-    ]);
+    const userMemberships = await prisma.membership.findMany({
+      where: { user_id: currentUserId },
+      select: { batch_id: true },
+    });
     const batchIds = userMemberships.map((m) => m.batch_id);
     if (batchIds.length === 0) return [];
 
@@ -184,18 +242,18 @@ export async function listDmUsers(currentUserId: string, batchMentorsOnly = fals
     if (mentorIds.length === 0) return [];
 
     return prisma.user.findMany({
-      where: { id: { in: mentorIds }, is_banned: false },
-      select: DM_USER_SELECT,
+      where: { id: { in: mentorIds }, is_banned: false, ...searchFilter },
+      select: dmUserSelect(requesterRole),
       orderBy: { username: "asc" },
     });
   }
 
-  // Full user list — limit to 200 to avoid huge payloads on large orgs.
+  // Keep payloads bounded; the pg_trgm indexes keep broad searches fast.
   return prisma.user.findMany({
-    where: { id: { not: currentUserId }, is_banned: false },
-    select: DM_USER_SELECT,
+    where: { id: { not: currentUserId }, is_banned: false, ...searchFilter },
+    select: dmUserSelect(requesterRole),
     orderBy: { username: "asc" },
-    take: 200,
+    take: 100,
   });
 }
 
@@ -211,11 +269,6 @@ export async function checkUserOnline(userId: string): Promise<boolean> {
  * Check online status for multiple users at once.
  */
 export async function checkUsersOnline(userIds: string[]): Promise<Record<string, boolean>> {
-  const result: Record<string, boolean> = {};
-  await Promise.all(
-    userIds.map(async (id) => {
-      result[id] = await checkUserOnline(id);
-    })
-  );
-  return result;
+  const values = await redisMGet(userIds.map((id) => `user:online:${id}`));
+  return Object.fromEntries(userIds.map((id, index) => [id, values[index] !== null]));
 }

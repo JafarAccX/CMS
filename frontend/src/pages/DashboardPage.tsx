@@ -31,6 +31,92 @@ function colorsForBatch(index: number, count: number) {
   return Array.from({ length: amount }, (_, offset) => avatarColors[(index + offset) % avatarColors.length]);
 }
 
+function PinnedChannelRow({ channel, index }: { channel: any; index: number }) {
+  const href = `/batch/${channel.batch?.id}`;
+  return (
+    <Link to={href} style={{ textDecoration: "none", display: "block" }}>
+      <div
+        style={{
+          borderRadius: 12,
+          background: "var(--ax-card-bg)",
+          border: "1px solid var(--ax-border)",
+          boxShadow: "var(--ax-shadow-card)",
+          padding: "16px 20px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          transition: "background 0.14s, border-color 0.14s, transform 0.14s",
+          cursor: "pointer",
+          marginBottom: 8,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "var(--ax-card-hover-bg)";
+          e.currentTarget.style.borderColor = "var(--ax-border-strong)";
+          e.currentTarget.style.transform = "translateY(-1px)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "var(--ax-card-bg)";
+          e.currentTarget.style.borderColor = "var(--ax-border)";
+          e.currentTarget.style.transform = "translateY(0)";
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1, minWidth: 0 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 8,
+            background: "var(--ax-tile-bg)", border: "1px solid var(--ax-border)",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <span style={{ fontSize: 16, color: "var(--accent-300)", fontWeight: 700 }}>#</span>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ax-text)" }}>{channel.name}</span>
+              <span style={{
+                fontSize: 10, color: "var(--ax-muted)", background: "var(--ax-pill-bg)",
+                border: "1px solid var(--ax-border)", borderRadius: 4, padding: "1px 6px",
+              }}>
+                Channel
+              </span>
+            </div>
+            <div style={{ fontSize: 13, color: "var(--ax-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 380 }}>
+              {channel.batch?.name ?? ""}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+              <span style={{ fontSize: 12, color: "var(--ax-dim)", fontWeight: 500 }}>
+                {channel._count?.messages || 0} messages
+              </span>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "rgb(43,206,52)", boxShadow: "0 0 5px rgba(43,206,52,0.5)" }} />
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
+          <FigmaAvatarStack colors={colorsForBatch(index, 3)} />
+          <button
+            type="button"
+            style={{
+              padding: "6px 14px", borderRadius: 6, border: "1px solid var(--ax-panel-3)",
+              background: "transparent", color: "var(--ax-muted)", fontSize: 12,
+              fontFamily: "Poppins", cursor: "pointer", transition: "all 0.14s", whiteSpace: "nowrap",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(59,130,255,0.1)";
+              e.currentTarget.style.color = "var(--accent-300)";
+              e.currentTarget.style.borderColor = "rgba(59,130,255,0.3)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = "var(--ax-muted)";
+              e.currentTarget.style.borderColor = "var(--ax-border)";
+            }}
+          >
+            Open -&gt;
+          </button>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 function RoomRow({ batch, index }: { batch: any; index: number }) {
   const members = batch._count?.memberships || 0;
   const channels = batch._count?.channels || 0;
@@ -436,7 +522,7 @@ export default function DashboardPage() {
   }>({
     queryKey: ["my-classes"],
     queryFn: async () => (await api.get("/my-classes")).data,
-    staleTime: 2 * 60 * 1000, // re-fetch every 2 min so live status stays fresh
+    refetchInterval: 2 * 60 * 1000, // poll every 2 min so JOIN/UPCOMING status stays current
   });
 
   useEffect(() => { if (batchData) setBatches(batchData); }, [batchData, setBatches]);
@@ -516,9 +602,15 @@ export default function DashboardPage() {
         },
       ];
 
-  const displayRooms = [...(pinnedData?.pinnedBatches || []), ...generalBatches, ...enrolledBatches]
-    .filter((batch, index, list) => list.findIndex((item) => item.id === batch.id) === index)
-    .slice(0, 6);
+  const pinnedBatches  = pinnedData?.pinnedBatches  ?? [];
+  const pinnedChannels = pinnedData?.pinnedChannels ?? [];
+
+  // Admin sees only pinned rooms; everyone else sees their own enrolled/general rooms
+  const displayRooms = user?.role === "admin"
+    ? []  // admin uses pinnedBatches + pinnedChannels directly in JSX
+    : [...pinnedBatches, ...generalBatches, ...enrolledBatches]
+        .filter((b, i, arr) => arr.findIndex((x) => x.id === b.id) === i)
+        .slice(0, 6);
 
   return (
     <>
@@ -540,22 +632,39 @@ export default function DashboardPage() {
           </div>
 
           <div>
-            {displayRooms.length > 0 ? (
-              displayRooms.map((batch, index) => <RoomRow key={batch.id} batch={batch} index={index} />)
+            {user?.role === "admin" ? (
+              // Admin: only pinned batches + pinned channels
+              pinnedBatches.length === 0 && pinnedChannels.length === 0 ? (
+                <div style={{
+                  borderRadius: 12, backgroundColor: "var(--ax-panel)",
+                  border: "1px solid var(--ax-border)", padding: 32,
+                  textAlign: "center", color: "var(--ax-dim)", fontSize: 14,
+                }}>
+                  No pinned rooms yet. Pin a batch or channel to show it here.
+                </div>
+              ) : (
+                <>
+                  {pinnedBatches.map((batch, index) => (
+                    <RoomRow key={batch.id} batch={batch} index={index} />
+                  ))}
+                  {pinnedChannels.map((channel, index) => (
+                    <PinnedChannelRow key={channel.id} channel={channel} index={pinnedBatches.length + index} />
+                  ))}
+                </>
+              )
             ) : (
-              <div
-                style={{
-                  borderRadius: 12,
-                  backgroundColor: "var(--ax-panel)",
-                  border: "1px solid var(--ax-border)",
-                  padding: 32,
-                  textAlign: "center",
-                  color: "var(--ax-dim)",
-                  fontSize: 14,
-                }}
-              >
-                No active rooms yet.
-              </div>
+              // Learner / Mentor: enrolled + general rooms
+              displayRooms.length > 0 ? (
+                displayRooms.map((batch, index) => <RoomRow key={batch.id} batch={batch} index={index} />)
+              ) : (
+                <div style={{
+                  borderRadius: 12, backgroundColor: "var(--ax-panel)",
+                  border: "1px solid var(--ax-border)", padding: 32,
+                  textAlign: "center", color: "var(--ax-dim)", fontSize: 14,
+                }}>
+                  No active rooms yet.
+                </div>
+              )
             )}
           </div>
         </div>

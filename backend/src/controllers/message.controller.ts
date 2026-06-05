@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import * as messageService from "../services/message.service.js";
 import { sendMessageSchema, flagMessageSchema } from "../validators/index.js";
 import { requireParam } from "../utils/params.js";
+import { BadRequestError } from "../utils/errors.js";
 
 export async function listMessages(req: Request, res: Response, next: NextFunction) {
   try {
@@ -14,7 +15,7 @@ export async function listMessages(req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    const result = await messageService.listMessages(channelId, req.user!.id, cursor, limit);
+    const result = await messageService.listMessages(channelId, req.user!, cursor, limit);
     res.status(200).json(result);
   } catch (err) {
     next(err);
@@ -23,7 +24,6 @@ export async function listMessages(req: Request, res: Response, next: NextFuncti
 
 export async function createMessage(req: Request, res: Response, next: NextFunction) {
   try {
-    const data = sendMessageSchema.parse(req.body);
     const attachments: any[] = [];
 
     // Handle uploaded files
@@ -38,10 +38,16 @@ export async function createMessage(req: Request, res: Response, next: NextFunct
       }
     }
 
+    const data = sendMessageSchema.parse(req.body);
+    const content = data.content?.trim() || "";
+    if (!content && attachments.length === 0) {
+      throw new BadRequestError("Message must contain text or an attachment");
+    }
+
     const message = await messageService.createMessage(
       data.channel_id,
       req.user!.id,
-      data.content,
+      content,
       data.message_type || (attachments.length > 0 ? "file" : "text"),
       data.parent_id,
       attachments

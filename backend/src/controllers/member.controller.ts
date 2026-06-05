@@ -6,7 +6,7 @@ import { requireParam } from "../utils/params.js";
 export async function listMembers(req: Request, res: Response, next: NextFunction) {
   try {
     const batchId = requireParam(req.params.id, "id");
-    const members = await memberService.listMembers(batchId);
+    const members = await memberService.listMembers(batchId, req.user!.id, req.user!.role);
     res.status(200).json(members);
   } catch (err) {
     next(err);

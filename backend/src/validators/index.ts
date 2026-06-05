@@ -74,7 +74,7 @@ export const updateMemberRoleSchema = z.object({
 // ─── Messages ──────────────────────────────────────────────
 export const sendMessageSchema = z.object({
   channel_id: z.string().uuid(),
-  content: z.string().min(1).max(5000),
+  content: z.string().max(5000).optional(),
   message_type: z.enum(["text", "file", "system"]).optional(),
   parent_id: z.string().uuid().optional(),
 });

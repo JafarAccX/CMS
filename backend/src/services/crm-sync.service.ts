@@ -1,5 +1,7 @@
 import { Prisma, type BatchType, type User, type Batch } from "@prisma/client";
 import prisma from "../utils/prisma.js";
+import { ConflictError } from "../utils/errors.js";
+import { redisDelIfValue, redisSetNx } from "../utils/redis.js";
 import {
   getBatchStudents,
   listCrmBatchMentorAssignments,
@@ -11,6 +13,8 @@ import {
 } from "./crm.client.js";
 
 const CRM_MANAGED_PASSWORD = "CRM_MANAGED";
+const CRM_SYNC_LOCK_KEY = "lock:admin:sync-crm";
+const CRM_SYNC_LOCK_TTL_SECONDS = 30 * 60;
 
 export type CrmSyncResult = {
   batches: { created: number; updated: number; skipped: number };
@@ -25,6 +29,20 @@ type BatchSyncContext = {
 };
 
 export async function syncCrmBatchesAndPeople(actorId: string): Promise<CrmSyncResult> {
+  const lockToken = `${actorId}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  const lockAcquired = await redisSetNx(CRM_SYNC_LOCK_KEY, lockToken, CRM_SYNC_LOCK_TTL_SECONDS);
+  if (!lockAcquired) {
+    throw new ConflictError("CRM sync is already running");
+  }
+
+  try {
+    return await runCrmBatchesAndPeopleSync(actorId);
+  } finally {
+    await redisDelIfValue(CRM_SYNC_LOCK_KEY, lockToken);
+  }
+}
+
+async function runCrmBatchesAndPeopleSync(actorId: string): Promise<CrmSyncResult> {
   const result: CrmSyncResult = {
     batches: { created: 0, updated: 0, skipped: 0 },
     students: { created: 0, updated: 0, memberships: 0 },
@@ -40,14 +58,16 @@ export async function syncCrmBatchesAndPeople(actorId: string): Promise<CrmSyncR
     listCrmBatchMentorAssignments(),
   ]);
 
+  // Sync all batches concurrently (8 at a time) — each does 3-5 DB queries
+  // so serial iteration was the main wall-time bottleneck for large CRM orgs.
+  // JS is single-threaded so result counter increments are safe across workers.
   const batchByCrmId = new Map<string, Batch>();
-  for (const crmBatch of crmBatches) {
+  await mapWithConcurrency(crmBatches, 8, async (crmBatch) => {
     try {
       if (crmBatch.Deleted === true) {
         result.batches.skipped += 1;
-        continue;
+        return;
       }
-
       const syncedBatch = await syncBatch(crmBatch, context, result);
       if (syncedBatch && crmBatch.Id) {
         batchByCrmId.set(crmBatch.Id, syncedBatch);
@@ -56,7 +76,7 @@ export async function syncCrmBatchesAndPeople(actorId: string): Promise<CrmSyncR
       result.batches.skipped += 1;
       result.errors.push(`Batch ${crmBatch.Id || crmBatch.Batch || "unknown"}: ${(err as Error).message}`);
     }
-  }
+  });
 
   await mapWithConcurrency(crmBatches, 12, async (crmBatch) => {
     const cmsBatch = crmBatch.Id ? batchByCrmId.get(crmBatch.Id) : null;
@@ -81,10 +101,11 @@ export async function syncCrmBatchesAndPeople(actorId: string): Promise<CrmSyncR
     }
   });
 
+  // Sync mentors concurrently (10 at a time).
   const mentorByCrmId = new Map<string, User>();
-  for (const crmMentor of crmMentors) {
+  await mapWithConcurrency(crmMentors, 10, async (crmMentor) => {
     try {
-      if (crmMentor.Active === false) continue;
+      if (crmMentor.Active === false) return;
       const { user, created, updated } = await syncMentor(crmMentor);
       if (created) result.mentors.created += 1;
       if (updated) result.mentors.updated += 1;
@@ -92,21 +113,22 @@ export async function syncCrmBatchesAndPeople(actorId: string): Promise<CrmSyncR
     } catch (err) {
       result.errors.push(`Mentor ${crmMentor.Id || crmMentor.Email || "unknown"}: ${(err as Error).message}`);
     }
-  }
+  });
 
-  for (const assignment of crmAssignments) {
+  // Wire mentor assignments concurrently (10 at a time).
+  await mapWithConcurrency(crmAssignments, 10, async (assignment) => {
     try {
-      if (assignment.Active === false || assignment.Deleted === true) continue;
+      if (assignment.Active === false || assignment.Deleted === true) return;
       const batch = batchByCrmId.get(assignment.BatchId);
       const mentor = mentorByCrmId.get(assignment.MentorId);
-      if (!batch || !mentor) continue;
+      if (!batch || !mentor) return;
       if (await ensureMembership(mentor.id, batch.id, "mentor", true)) {
         result.mentors.memberships += 1;
       }
     } catch (err) {
       result.errors.push(`Mentor assignment ${assignment.Id || "unknown"}: ${(err as Error).message}`);
     }
-  }
+  });
 
   await prisma.adminLog.create({
     data: {
@@ -354,17 +376,15 @@ async function findUserByCrmOrContact({
   email: string;
   phone: string | null;
 }) {
-  const byCrm = await prisma.user.findUnique({ where: { crm_customer_id: crmCustomerId } });
-  if (byCrm) return byCrm;
-
-  const byEmail = await prisma.user.findUnique({ where: { email } });
-  if (byEmail) return byEmail;
-
-  if (phone) {
-    return prisma.user.findFirst({ where: { phone } });
-  }
-
-  return null;
+  // Fire all three lookups in parallel — they are independent DB reads.
+  // Previously they ran sequentially, wasting 2 round-trips even when the
+  // first lookup was a hit.
+  const [byCrm, byEmail, byPhone] = await Promise.all([
+    prisma.user.findUnique({ where: { crm_customer_id: crmCustomerId } }),
+    prisma.user.findUnique({ where: { email } }),
+    phone ? prisma.user.findFirst({ where: { phone } }) : null,
+  ]);
+  return byCrm ?? byEmail ?? byPhone ?? null;
 }
 
 async function createStudentUser({

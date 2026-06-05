@@ -10,7 +10,10 @@ import {
 } from "../validators/index.js";
 import { redisSet, redisDel } from "../utils/redis.js";
 import { parseMentions } from "../services/message.service.js";
+import { allocateChannelMessageSeq } from "../services/message-sequence.service.js";
 import { sendDirectMessage } from "../services/dm.service.js";
+import { enqueueOutbox, publishNow } from "../services/outbox.service.js";
+import { incrementCounter } from "../utils/metrics.js";
 
 interface ServerToClientEvents {
   receive_message: (message: any) => void;
@@ -102,6 +105,7 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
 
   io.on("connection", (socket) => {
     const { userId, username } = socket.data;
+    incrementCounter("socket_connections_total", { event: "connect" });
     console.log(`🔌 Socket connected: ${username} (${socket.id})`);
 
     // Personal room for private notifications
@@ -153,33 +157,51 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
           return;
         }
 
-        const message = await prisma.message.create({
-          data: {
-            channel_id: channelId,
-            sender_id: userId,
-            content: content || "",
-            message_type: messageType || "text",
-            parent_id: parentId,
-            ...(attachments && attachments.length > 0 && {
-              attachments: {
-                create: attachments.map((a) => ({
-                  file_url: a.file_url,
-                  file_name: a.file_name,
-                  file_size: a.file_size,
-                  mime_type: a.mime_type,
-                })),
-              },
-            }),
-          },
-          include: {
-            sender: { select: { id: true, username: true, role: true } },
-            parent: { select: { id: true, content: true, sender: { select: { id: true, username: true } } } },
-            attachments: true,
-            reactions: { select: { id: true, emoji: true, user_id: true, user: { select: { username: true } } } },
-          },
+        // Atomic write: the message and its outbox event commit together, so the
+        // real-time event can never be lost even if the process crashes here.
+        const { message, outboxEvent } = await prisma.$transaction(async (tx) => {
+          const seqId = await allocateChannelMessageSeq(tx, channelId);
+
+          const message = await tx.message.create({
+            data: {
+              channel_id: channelId,
+              sender_id: userId,
+              content: content || "",
+              message_type: messageType || "text",
+              parent_id: parentId,
+              seq_id: seqId,
+              ...(attachments && attachments.length > 0 && {
+                attachments: {
+                  create: attachments.map((a) => ({
+                    file_url: a.file_url,
+                    file_name: a.file_name,
+                    file_size: a.file_size,
+                    mime_type: a.mime_type,
+                  })),
+                },
+              }),
+            },
+            include: {
+              sender: { select: { id: true, username: true, role: true } },
+              parent: { select: { id: true, content: true, sender: { select: { id: true, username: true } } } },
+              attachments: true,
+              reactions: { select: { id: true, emoji: true, user_id: true, user: { select: { username: true } } } },
+            },
+          });
+
+          const outboxEvent = await enqueueOutbox(tx, {
+            aggregate: "channel",
+            aggregateId: channelId,
+            event: "receive_message",
+            rooms: [`channel:${channelId}`],
+            payload: { ...message, tempId },
+          });
+
+          return { message, outboxEvent };
         });
 
-        io.to(`channel:${channelId}`).emit("receive_message", { ...message, tempId });
+        // Fast path: emit now and mark published. If this fails, the relay retries.
+        await publishNow(io, outboxEvent);
 
         // Mentions are resolved against the parent batch's members
         const mentionedIds = content ? await parseMentions(content, channel.batch_id) : [];
@@ -278,28 +300,31 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
       try {
         const { conversationId, content, tempId, attachments } = socketSendDmSchema.parse(data);
 
-        const message = await sendDirectMessage(conversationId, userId, content?.trim(), attachments);
+        // Message + outbox event commit atomically inside sendDirectMessage.
+        const { message, outboxEvent, otherId } = await sendDirectMessage(
+          conversationId,
+          userId,
+          content?.trim(),
+          attachments,
+          tempId
+        );
 
-        const conv = await prisma.conversation.findUnique({ where: { id: conversationId } });
-        if (conv) {
-          const otherId = conv.user_a_id === userId ? conv.user_b_id : conv.user_a_id;
+        // Fast path: deliver now and mark published (relay retries on failure).
+        await publishNow(io, outboxEvent);
 
-          io.to(`dm:${conversationId}`).to(`user:${otherId}`).emit("receive_dm", { ...message, tempId });
-
-          try {
-            const notif = await prisma.notification.create({
-              data: {
-                user_id: otherId,
-                type: "new_message",
-                ref_id: message.id,
-                sender_id: userId,
-                content_preview: content?.trim() || "Sent an attachment",
-              },
-            });
-            io.to(`user:${otherId}`).emit("notify_user", notif);
-          } catch (notifErr) {
-            console.error("DM notification error:", notifErr);
-          }
+        try {
+          const notif = await prisma.notification.create({
+            data: {
+              user_id: otherId,
+              type: "new_message",
+              ref_id: message.id,
+              sender_id: userId,
+              content_preview: content?.trim() || "Sent an attachment",
+            },
+          });
+          io.to(`user:${otherId}`).emit("notify_user", notif);
+        } catch (notifErr) {
+          console.error("DM notification error:", notifErr);
         }
       } catch (err) {
         console.error("send_dm error:", err);
@@ -342,6 +367,7 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
     socket.on("disconnect", () => {
       clearInterval(heartbeatInterval);
       redisDel(`user:online:${userId}`);
+      incrementCounter("socket_connections_total", { event: "disconnect" });
       io.emit("user_offline", { userId });
       console.log(`🔌 Socket disconnected: ${username}`);
     });

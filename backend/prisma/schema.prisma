@@ -210,9 +210,19 @@ model Channel {
   messages        Message[]
   pinned_messages PinnedMessage[]
   mod_queue       ModQueue[]
+  message_sequence ChannelMessageSequence?
 
   @@index([batch_id])
   @@map("channels")
+}
+
+model ChannelMessageSequence {
+  channel_id String @id @db.Uuid
+  last_seq   Int    @default(0)
+
+  channel Channel @relation(fields: [channel_id], references: [id], onDelete: Cascade)
+
+  @@map("channel_message_sequences")
 }
 
 model BatchSettings {
@@ -252,6 +262,7 @@ model Message {
   is_deleted   Boolean     @default(false)
   deleted_at   DateTime?
   parent_id    String?     @db.Uuid
+  seq_id       Int
   created_at   DateTime    @default(now())
 
   channel     Channel             @relation(fields: [channel_id], references: [id], onDelete: Cascade)
@@ -263,7 +274,8 @@ model Message {
   mod_queue   ModQueue[]
   reactions   MessageReaction[]
 
-  @@index([channel_id])
+  @@unique([channel_id, seq_id])
+  @@index([channel_id, seq_id(sort: Desc)])
   @@map("messages")
 }
 
@@ -367,11 +379,21 @@ model Conversation {
   user_a   User             @relation("ConvUserA", fields: [user_a_id], references: [id])
   user_b   User             @relation("ConvUserB", fields: [user_b_id], references: [id])
   messages DirectMessage[]
+  message_sequence ConversationMessageSequence?
 
   @@unique([user_a_id, user_b_id])
   @@index([user_a_id, updated_at(sort: Desc)])  // conversations list for user_a
   @@index([user_b_id, updated_at(sort: Desc)])  // conversations list for user_b
   @@map("conversations")
+}
+
+model ConversationMessageSequence {
+  conversation_id String @id @db.Uuid
+  last_seq        Int    @default(0)
+
+  conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@map("conversation_message_sequences")
 }
 
 model DirectMessage {
@@ -380,13 +402,15 @@ model DirectMessage {
   sender_id       String   @db.Uuid
   content         String
   is_read         Boolean  @default(false)
+  seq_id          Int
   created_at      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversation_id], references: [id])
   sender       User         @relation("DMSender", fields: [sender_id], references: [id])
   attachments  DirectMessageAttachment[]
 
-  @@index([conversation_id, created_at(sort: Desc)])  // message history ordered by time
+  @@unique([conversation_id, seq_id])
+  @@index([conversation_id, seq_id(sort: Desc)])      // message history ordered by deterministic sequence
   @@index([conversation_id, is_read])                  // unread count per conversation
   @@map("direct_messages")
 }
@@ -416,4 +440,24 @@ model MessageReaction {
 
   @@unique([message_id, user_id, emoji])
   @@map("message_reactions")
+}
+
+// Transactional outbox: real-time events are written here in the SAME DB
+// transaction as the domain row (message / DM). A relay publishes them to
+// Socket.IO and marks them published. Guarantees an event is never lost even
+// if the process crashes between the DB commit and the socket emit.
+model OutboxEvent {
+  id           BigInt    @id @default(autoincrement())
+  aggregate    String    // 'channel' | 'dm' | 'notification'
+  aggregate_id String    @db.Uuid // channelId | conversationId | userId — used for resync queries
+  event        String    // socket event name, e.g. 'receive_message'
+  rooms        String[]  // socket rooms to emit to, e.g. ['channel:abc'] or ['dm:x','user:y']
+  payload      Json
+  published    Boolean   @default(false)
+  created_at   DateTime  @default(now())
+  published_at DateTime?
+
+  @@index([published, id])                  // relay: drain unpublished in order
+  @@index([aggregate, aggregate_id, id])     // resync: events for a channel/conversation since cursor
+  @@map("outbox_events")
 }

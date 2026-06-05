@@ -80,17 +80,16 @@ export async function getChannel(channelId: string, userId: string) {
  * Create a channel. Allowed: admin, batch_moderator (in their batch).
  */
 export async function createChannel(batchId: string, name: string, actorId: string) {
-  const [user, membership] = await Promise.all([
+  const [user, membership, batch] = await Promise.all([
     getActor(actorId),
     getMembership(actorId, batchId),
+    prisma.batch.findUnique({ where: { id: batchId } }),
   ]);
 
+  if (!batch) throw new NotFoundError("Batch not found");
   if (!isAdmin(user) && !isBatchModerator(user, membership)) {
     throw new ForbiddenError("Only admins and batch moderators can create channels");
   }
-
-  const batch = await prisma.batch.findUnique({ where: { id: batchId } });
-  if (!batch) throw new NotFoundError("Batch not found");
 
   const channel = await prisma.channel.create({
     data: {
@@ -214,32 +213,50 @@ export async function toggleBatchPin(batchId: string, actorId: string) {
  *   - admin sees all pinned items
  *   - everyone else sees pinned items in batches they're a member of OR general batches
  */
-export async function listPinnedForUser(userId: string) {
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-  const isAdminUser = user.role === "admin";
+export async function listPinnedForUser(userId: string, userRole?: string) {
+  // Accept role from req.user to avoid a redundant DB lookup.
+  // Fall back to fetching if not provided (e.g. called internally without role).
+  const isAdminUser = userRole
+    ? userRole === "admin"
+    : (await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { role: true } })).role === "admin";
 
-  // ── Pinned batches the user can see ────────────────────────
-  const batchAccessFilter = isAdminUser
-    ? {}
-    : {
-        OR: [
-          { memberships: { some: { user_id: userId } } },
-          { type: "general" as const },
-        ],
-      };
+  const membershipFilter = {
+    OR: [
+      { memberships: { some: { user_id: userId } } },
+      { type: "general" as const },
+    ],
+  };
+  const batchAccessFilter = isAdminUser ? {} : membershipFilter;
 
-  const pinnedBatchesRaw = await prisma.batch.findMany({
-    where: { is_pinned: true, ...batchAccessFilter },
-    include: {
-      batch_settings: true,
-      _count: { select: { channels: true, memberships: true } },
-      memberships: {
-        where: { user_id: userId },
-        select: { user_id: true, role_in_batch: true },
+  // Run both pinned queries in parallel — they are independent of each other
+  const [pinnedBatchesRaw, pinnedChannels] = await Promise.all([
+    prisma.batch.findMany({
+      where: { is_pinned: true, ...batchAccessFilter },
+      include: {
+        batch_settings: true,
+        _count: { select: { channels: true, memberships: true } },
+        memberships: {
+          where: { user_id: userId },
+          select: { user_id: true, role_in_batch: true },
+        },
       },
-    },
-    orderBy: { created_at: "asc" },
-  });
+      orderBy: { created_at: "asc" },
+    }),
+    prisma.channel.findMany({
+      where: {
+        is_pinned: true,
+        batch: {
+          is_pinned: false, // batch's own pin would already surface it
+          ...(isAdminUser ? {} : membershipFilter),
+        },
+      },
+      include: {
+        _count: { select: { messages: true } },
+        batch: { select: { id: true, name: true, type: true } },
+      },
+      orderBy: { created_at: "asc" },
+    }),
+  ]);
 
   const pinnedBatches = pinnedBatchesRaw.map((b) => {
     const userMembership = b.memberships[0] || null;
@@ -247,39 +264,9 @@ export async function listPinnedForUser(userId: string) {
     return { ...rest, hasAccess: true, userMembership };
   });
 
-  // ── Pinned channels the user can see (skip channels whose batch
-  //    is already in pinnedBatches to avoid visual duplication) ─
+  // Defensive: drop channels whose batch already surfaces as a pinned batch
   const pinnedBatchIds = new Set(pinnedBatches.map((b) => b.id));
+  const filteredPinnedChannels = pinnedChannels.filter((c) => !pinnedBatchIds.has(c.batch.id));
 
-  const pinnedChannels = await prisma.channel.findMany({
-    where: {
-      is_pinned: true,
-      batch: {
-        is_pinned: false, // batch's own pin would already surface it
-        ...(isAdminUser
-          ? {}
-          : {
-              OR: [
-                { memberships: { some: { user_id: userId } } },
-                { type: "general" as const },
-              ],
-            }),
-      },
-    },
-    include: {
-      _count: { select: { messages: true } },
-      batch: { select: { id: true, name: true, type: true } },
-    },
-    orderBy: { created_at: "asc" },
-  });
-
-  // Defensive: drop any channels whose batch ended up in pinnedBatches anyway
-  const filteredPinnedChannels = pinnedChannels.filter(
-    (c) => !pinnedBatchIds.has(c.batch.id)
-  );
-
-  return {
-    pinnedBatches,
-    pinnedChannels: filteredPinnedChannels,
-  };
+  return { pinnedBatches, pinnedChannels: filteredPinnedChannels };
 }

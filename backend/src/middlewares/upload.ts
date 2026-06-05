@@ -10,9 +10,6 @@ const ALLOWED_MIMES = [
   "image/png",
   "image/gif",
   "image/webp",
-  "image/svg+xml",
-  "image/bmp",
-  "image/tiff",
   // Documents
   "application/pdf",
   "application/msword",
@@ -23,12 +20,6 @@ const ALLOWED_MIMES = [
   "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
   "text/plain",
   "text/csv",
-  // Archives
-  "application/zip",
-  "application/x-zip-compressed",
-  "application/x-rar-compressed",
-  "application/x-7z-compressed",
-  "application/gzip",
   // Audio
   "audio/mpeg",
   "audio/ogg",
@@ -45,12 +36,34 @@ const ALLOWED_MIMES = [
   "video/webm",
   "video/ogg",
   "video/quicktime",
-  "video/x-msvideo",
-  // Other
-  "application/json",
-  "application/xml",
-  "application/octet-stream",
 ];
+
+const ALLOWED_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".xls",
+  ".xlsx",
+  ".ppt",
+  ".pptx",
+  ".txt",
+  ".csv",
+  ".mp3",
+  ".ogg",
+  ".wav",
+  ".webm",
+  ".aac",
+  ".mp4",
+  ".m4a",
+  ".mkv",
+  ".flac",
+  ".mov",
+]);
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
@@ -64,10 +77,11 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
-  if (ALLOWED_MIMES.includes(file.mimetype)) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ALLOWED_MIMES.includes(file.mimetype) && ALLOWED_EXTENSIONS.has(ext)) {
     cb(null, true);
   } else {
-    cb(new BadRequestError(`File type ${file.mimetype} is not allowed`));
+    cb(new BadRequestError(`File type ${file.mimetype || ext || "unknown"} is not allowed`));
   }
 };
 

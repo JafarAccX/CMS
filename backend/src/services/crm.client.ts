@@ -8,6 +8,8 @@
  */
 
 import { redisGet, redisSet } from "../utils/redis.js";
+import { logger } from "../utils/logger.js";
+import { incrementCounter, observeHistogram } from "../utils/metrics.js";
 
 const CRM_BASE_URL = process.env.CRM_BASE_URL || "http://localhost:4001";
 const CRM_SERVICE_EMAIL = process.env.CRM_SERVICE_EMAIL || "";
@@ -130,6 +132,7 @@ type CrmPagedResponse<T> = {
 
 let serviceAccessToken: string | null = null;
 let serviceTokenFetchedAt = 0;
+let tokenInflight: Promise<string> | null = null; // deduplicates concurrent token fetches
 const SERVICE_TOKEN_TTL_MS = 12 * 60 * 1000; // 12 min (CRM tokens last 15 min)
 const FETCH_TIMEOUT_MS = 10_000; // 10 s hard timeout on every CRM call
 
@@ -141,69 +144,97 @@ function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Respo
   );
 }
 
+function recordCrmRequest(path: string, startedAt: number, success: boolean, status: number | "auth" | "error") {
+  const durationMs = Date.now() - startedAt;
+  const route = path.split("?")[0];
+  const labels = { route, status, success };
+  incrementCounter("crm_requests_total", labels);
+  observeHistogram("crm_request_duration_ms", durationMs, labels);
+  logger[success ? "info" : "warn"]("crm_request", {
+    route,
+    status,
+    success,
+    durationMs,
+  });
+}
+
 async function fetchServiceToken(force = false): Promise<string> {
   const now = Date.now();
-  if (
-    !force &&
-    serviceAccessToken &&
-    now - serviceTokenFetchedAt < SERVICE_TOKEN_TTL_MS
-  ) {
+  // Return cached token if still fresh and not forcing a refresh
+  if (!force && serviceAccessToken && now - serviceTokenFetchedAt < SERVICE_TOKEN_TTL_MS) {
     return serviceAccessToken;
   }
 
-  if (!CRM_SERVICE_EMAIL || !CRM_SERVICE_PASSWORD) {
-    throw new Error(
-      "CRM_SERVICE_EMAIL / CRM_SERVICE_PASSWORD env vars are missing — cannot reach CRM."
-    );
-  }
+  // Deduplicate: if another request is already fetching the token, reuse its promise.
+  // This prevents N parallel CRM logins when the token is cold/expired.
+  if (!force && tokenInflight) return tokenInflight;
 
-  const res = await fetchWithTimeout(`${CRM_BASE_URL}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      email: CRM_SERVICE_EMAIL,
-      password: CRM_SERVICE_PASSWORD,
-    }),
+  tokenInflight = (async () => {
+    if (!CRM_SERVICE_EMAIL || !CRM_SERVICE_PASSWORD) {
+      throw new Error(
+        "CRM_SERVICE_EMAIL / CRM_SERVICE_PASSWORD env vars are missing — cannot reach CRM."
+      );
+    }
+
+    const res = await fetchWithTimeout(`${CRM_BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: CRM_SERVICE_EMAIL, password: CRM_SERVICE_PASSWORD }),
+    });
+
+    if (!res.ok) throw new Error(`CRM service-account login failed: ${res.status}`);
+
+    const data = (await res.json()) as CrmStaffLoginResponse;
+    serviceAccessToken = data.accessToken;
+    serviceTokenFetchedAt = Date.now();
+    return data.accessToken;
+  })().finally(() => {
+    tokenInflight = null;
   });
 
-  if (!res.ok) {
-    throw new Error(`CRM service-account login failed: ${res.status}`);
-  }
-
-  const data = (await res.json()) as CrmStaffLoginResponse;
-  serviceAccessToken = data.accessToken;
-  serviceTokenFetchedAt = now;
-  return data.accessToken;
+  return tokenInflight;
 }
 
 async function crmGet<T>(path: string): Promise<T> {
+  const startedAt = Date.now();
   let token: string;
   try {
     token = await fetchServiceToken();
   } catch (err) {
+    recordCrmRequest(path, startedAt, false, "auth");
     throw new Error(`CRM service-account auth failed: ${(err as Error).message}`);
   }
 
-  let res = await fetchWithTimeout(`${CRM_BASE_URL}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  // Retry once on 401 with a fresh token
-  if (res.status === 401) {
-    try {
-      token = await fetchServiceToken(true);
-    } catch {
-      throw new Error(`CRM token refresh failed`);
-    }
-    res = await fetchWithTimeout(`${CRM_BASE_URL}${path}`, {
+  try {
+    let res = await fetchWithTimeout(`${CRM_BASE_URL}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-  }
 
-  if (!res.ok) {
-    throw new Error(`CRM GET ${path} failed: ${res.status}`);
+    // Retry once on 401 with a fresh token
+    if (res.status === 401) {
+      try {
+        token = await fetchServiceToken(true);
+      } catch {
+        recordCrmRequest(path, startedAt, false, "auth");
+        throw new Error(`CRM token refresh failed`);
+      }
+      res = await fetchWithTimeout(`${CRM_BASE_URL}${path}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    }
+
+    if (!res.ok) {
+      recordCrmRequest(path, startedAt, false, res.status);
+      throw new Error(`CRM GET ${path} failed: ${res.status}`);
+    }
+
+    recordCrmRequest(path, startedAt, true, res.status);
+    return (await res.json()) as T;
+  } catch (err) {
+    if ((err as Error).message.startsWith("CRM ")) throw err;
+    recordCrmRequest(path, startedAt, false, "error");
+    throw err;
   }
-  return (await res.json()) as T;
 }
 
 async function fetchAllPages<T>(
@@ -387,14 +418,22 @@ export interface CrmClass {
  * Fetch active classes for a CRM batch, ordered by start time ascending.
  * Returns [] on any CRM error so callers can degrade gracefully.
  */
+async function fetchCrmClassesForBatch(crmBatchId: string): Promise<CrmClass[]> {
+  const path = `/classes?batchId=${encodeURIComponent(crmBatchId)}&active=true&sortBy=ClassStartDateTime&order=ASC&limit=100`;
+  const res = await crmGet<CrmPagedResponse<CrmClass>>(path);
+  return (res.data ?? []).filter((c) => c.Deleted !== true);
+}
+
 export async function getCrmClassesForBatch(crmBatchId: string): Promise<CrmClass[]> {
   try {
-    const path = `/classes?batchId=${encodeURIComponent(crmBatchId)}&active=true&sortBy=ClassStartDateTime&order=ASC&limit=100`;
-    const res = await crmGet<CrmPagedResponse<CrmClass>>(path);
-    return (res.data ?? []).filter((c) => c.Deleted !== true);
+    return await fetchCrmClassesForBatch(crmBatchId);
   } catch {
     return [];
   }
+}
+
+export async function getCrmClassesForBatchStrict(crmBatchId: string): Promise<CrmClass[]> {
+  return fetchCrmClassesForBatch(crmBatchId);
 }
 
 /**

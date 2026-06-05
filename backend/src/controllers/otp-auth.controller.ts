@@ -20,6 +20,7 @@ import {
   NotFoundError,
   AppError,
 } from "../utils/errors.js";
+import { incrementCounter } from "../utils/metrics.js";
 
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 
@@ -102,8 +103,13 @@ export async function handleVerifyOtp(req: Request, res: Response, next: NextFun
 
     const otpResult = await verifyOtp(identifier, data.otpCode, data.requestId);
     if (!otpResult.success) {
+      incrementCounter("otp_verify_total", {
+        provider: data.provider,
+        result: otpResult.message?.startsWith("Too many attempts") ? "locked" : "failed",
+      });
       throw new UnauthorizedError(otpResult.message ?? "Invalid OTP");
     }
+    incrementCounter("otp_verify_total", { provider: data.provider, result: "success" });
 
     let user;
     let crmCustomer = null;

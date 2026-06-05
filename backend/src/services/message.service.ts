@@ -2,6 +2,7 @@ import prisma from "../utils/prisma.js";
 import { NotFoundError, ForbiddenError } from "../utils/errors.js";
 import { canAccessBatch, canSendMessage, canModerate } from "../utils/permissions.js";
 import { logAdminAction } from "./admin.service.js";
+import { allocateChannelMessageSeq } from "./message-sequence.service.js";
 
 /**
  * Resolve a channel + parent batch + caller's membership for permission checks.
@@ -23,10 +24,30 @@ async function loadChannelContext(channelId: string, userId: string) {
   return { channel, user, membership };
 }
 
-export async function listMessages(channelId: string, userId: string, cursor?: string, limit = 50) {
-  const { channel, user, membership } = await loadChannelContext(channelId, userId);
+export async function listMessages(
+  channelId: string,
+  user: { id: string; role: string },
+  cursor?: string,
+  limit = 50
+) {
+  // Single query for channel + batch + batch_settings + THIS user's membership.
+  // Avoids the extra round-trips (and the redundant full-user fetch — req.user
+  // from the auth middleware already carries the role canAccessBatch needs).
+  const channel = await prisma.channel.findUnique({
+    where: { id: channelId },
+    include: {
+      batch: {
+        include: {
+          batch_settings: true,
+          memberships: { where: { user_id: user.id }, select: { user_id: true, role_in_batch: true } },
+        },
+      },
+    },
+  });
+  if (!channel) throw new NotFoundError("Channel not found");
 
-  if (!canAccessBatch(user, channel.batch, membership)) {
+  const membership = channel.batch.memberships[0] ?? null;
+  if (!canAccessBatch(user as any, channel.batch, membership as any)) {
     throw new ForbiddenError("You do not have access to this channel");
   }
 
@@ -37,7 +58,7 @@ export async function listMessages(channelId: string, userId: string, cursor?: s
       skip: 1,
       cursor: { id: cursor },
     }),
-    orderBy: { created_at: "desc" },
+    orderBy: { seq_id: "desc" },
     include: {
       sender: {
         select: { id: true, username: true, role: true, is_banned: true },
@@ -87,33 +108,38 @@ export async function createMessage(
     }
   }
 
-  const message = await prisma.message.create({
-    data: {
-      channel_id: channelId,
-      sender_id: senderId,
-      content,
-      message_type: messageType,
-      parent_id: parentId,
-      ...(attachments &&
-        attachments.length > 0 && {
-          attachments: {
-            create: attachments,
-          },
-        }),
-    },
-    include: {
-      sender: {
-        select: { id: true, username: true, role: true },
+  const message = await prisma.$transaction(async (tx) => {
+    const seqId = await allocateChannelMessageSeq(tx, channelId);
+
+    return tx.message.create({
+      data: {
+        channel_id: channelId,
+        sender_id: senderId,
+        content,
+        message_type: messageType,
+        parent_id: parentId,
+        seq_id: seqId,
+        ...(attachments &&
+          attachments.length > 0 && {
+            attachments: {
+              create: attachments,
+            },
+          }),
       },
-      attachments: true,
-      parent: {
-        select: {
-          id: true,
-          content: true,
-          sender: { select: { id: true, username: true } },
+      include: {
+        sender: {
+          select: { id: true, username: true, role: true },
+        },
+        attachments: true,
+        parent: {
+          select: {
+            id: true,
+            content: true,
+            sender: { select: { id: true, username: true } },
+          },
         },
       },
-    },
+    });
   });
 
   // Handle mentions (resolved against the parent batch's members)
