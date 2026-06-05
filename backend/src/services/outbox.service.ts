@@ -76,16 +76,33 @@ export async function publishNow(io: Server, row: PublishableEvent): Promise<voi
  * Drain a batch of unpublished events. Uses SELECT ... FOR UPDATE SKIP LOCKED so
  * multiple backend nodes can run the relay without double-processing the same row.
  */
-async function drainOnce(io: Server): Promise<number> {
+/**
+ * Drain a batch of unpublished events.
+ *
+ * `filter.aggregateId` (optional) — restricts the query to a single aggregate.
+ * Used by integration tests so they only drain their own rows and don't race
+ * against the production relay running on the same database.
+ */
+export async function drainOnce(io: Server, filter?: { aggregateId?: string }): Promise<number> {
   return prisma.$transaction(async (tx) => {
-    const rows = await tx.$queryRaw<PublishableEvent[]>`
-      SELECT id, rooms, event, payload, created_at
-      FROM outbox_events
-      WHERE published = false
-      ORDER BY id ASC
-      LIMIT 100
-      FOR UPDATE SKIP LOCKED
-    `;
+    const rows = filter?.aggregateId
+      ? await tx.$queryRaw<PublishableEvent[]>`
+          SELECT id, rooms, event, payload, created_at
+          FROM outbox_events
+          WHERE published = false
+            AND aggregate_id = ${filter.aggregateId}::uuid
+          ORDER BY id ASC
+          LIMIT 100
+          FOR UPDATE SKIP LOCKED
+        `
+      : await tx.$queryRaw<PublishableEvent[]>`
+          SELECT id, rooms, event, payload, created_at
+          FROM outbox_events
+          WHERE published = false
+          ORDER BY id ASC
+          LIMIT 100
+          FOR UPDATE SKIP LOCKED
+        `;
     if (rows.length === 0) return 0;
 
     const now = Date.now();
