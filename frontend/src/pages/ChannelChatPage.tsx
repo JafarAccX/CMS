@@ -82,18 +82,21 @@ export default function ChannelChatPage() {
     queryKey: ["channel", channelId],
     queryFn: async () => (await api.get(`/channels/${channelId}`)).data,
     enabled: !!channelId,
+    staleTime: 5 * 60_000,     // channel metadata doesn't change mid-session
   });
 
   const { data: channels } = useQuery({
     queryKey: ["channels", batchId],
     queryFn: async () => (await api.get(`/batches/${batchId}/channels`)).data,
     enabled: !!batchId,
+    staleTime: 2 * 60_000,     // channel list changes rarely
   });
 
   const { data: msgData } = useQuery({
     queryKey: ["messages", channelId],
     queryFn: async () => (await api.get(`/messages?channel_id=${channelId}`)).data,
     enabled: !!channelId,
+    staleTime: 5 * 60_000,     // socket delivers new messages in real time; REST is initial load
   });
   useEffect(() => {
     if (msgData && channelId) setMessages(channelId, msgData.messages);
@@ -103,12 +106,14 @@ export default function ChannelChatPage() {
     queryKey: ["members", batchId],
     queryFn: async () => (await api.get(`/batches/${batchId}/members`)).data,
     enabled: !!batchId,
+    staleTime: 2 * 60_000,     // member list changes rarely mid-session
   });
 
   const { data: dmConversations } = useQuery({
     queryKey: ["dm-conversations-badge"],
     queryFn: async () => (await api.get("/dm/conversations")).data,
-    refetchInterval: 15000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,   // socket pushes receive_dm events; poll is just a fallback
   });
   const totalUnreadDm = dmConversations?.reduce((sum: number, c: any) => sum + (c.unreadCount || 0), 0) || 0;
 

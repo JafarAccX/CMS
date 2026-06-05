@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { clearAuthUserCache } from "../middlewares/auth.js";
 import { z } from "zod";
 import * as adminService from "../services/admin.service.js";
 import { syncCrmBatchesAndPeople } from "../services/crm-sync.service.js";
@@ -50,6 +51,8 @@ export async function toggleBanUser(req: Request, res: Response, next: NextFunct
   try {
     const userId = requireParam(req.params.id, "id");
     const user = await adminService.toggleBanUser(userId, req.user!.id);
+    // Evict cached user so the ban takes effect on the next request
+    void clearAuthUserCache(userId);
     res.status(200).json(user);
   } catch (err) {
     next(err);
@@ -61,6 +64,8 @@ export async function updateUserRole(req: Request, res: Response, next: NextFunc
     const userId = requireParam(req.params.id, "id");
     const role = z.enum(["admin", "mentor", "batch_moderator", "learner", "guest"]).parse(req.body?.role);
     const user = await adminService.updateUserRole(userId, role, req.user!.id);
+    // Evict cached user so the new role takes effect on the next request
+    void clearAuthUserCache(userId);
     res.status(200).json(user);
   } catch (err) {
     next(err);

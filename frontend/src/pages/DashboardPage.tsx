@@ -504,14 +504,17 @@ export default function DashboardPage() {
   const { data: batchData } = useQuery({
     queryKey: ["batches"],
     queryFn: async () => (await api.get("/batches")).data,
+    staleTime: 60_000,          // batches change rarely; reuse for 60 s
   });
   const { data: pinnedData } = useQuery({
     queryKey: ["pinned-rooms"],
     queryFn: async () => (await api.get("/pinned")).data as { pinnedBatches: any[]; pinnedChannels: any[] },
+    staleTime: 60_000,          // pin state is toggled by admin, not real-time
   });
   const { data: notifData } = useQuery({
     queryKey: ["notifications"],
     queryFn: async () => (await api.get("/notifications")).data,
+    staleTime: 30_000,          // socket pushes new notifs; REST is initial load only
   });
 
   const { data: classesData } = useQuery<{

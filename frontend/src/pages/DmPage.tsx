@@ -834,6 +834,7 @@ export default function DmPage() {
   const { data: convData, refetch: refetchConvs } = useQuery({
     queryKey: ["dm-conversations"],
     queryFn: async () => (await api.get("/dm/conversations")).data,
+    staleTime: 30_000,         // socket pushes receive_dm; REST is initial + fallback
   });
   useEffect(() => { if (convData) setConversations(convData); }, [convData, setConversations]);
 
@@ -841,6 +842,7 @@ export default function DmPage() {
     queryKey: ["dm-messages", conversationId],
     queryFn: async () => (await api.get(`/dm/conversations/${conversationId}/messages`)).data,
     enabled: !!conversationId,
+    staleTime: 5 * 60_000,    // socket streams new DMs; REST loads history on open
   });
   useEffect(() => { if (msgData && conversationId) setMessages(conversationId, msgData.messages); }, [msgData, conversationId, setMessages]);
 
@@ -854,6 +856,7 @@ export default function DmPage() {
       return (await api.get(`/dm/users${qs ? `?${qs}` : ""}`)).data;
     },
     enabled: showDrawer || !conversationId,
+    staleTime: 60_000,         // user list changes rarely; re-search if needed
   });
 
   useEffect(() => {
