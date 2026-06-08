@@ -6,11 +6,27 @@ import { logAdminAction } from "./admin.service.js";
 /**
  * List mod-queue items. Optional filters by channel or batch.
  */
-export async function listModQueue(filters?: { channelId?: string; batchId?: string }, _userId?: string) {
+export async function listModQueue(filters?: { channelId?: string; batchId?: string }, userId?: string, userRole?: string) {
+  const assignedMentorBatchIds = userRole === "mentor" && userId
+    ? (await prisma.membership.findMany({
+        where: { user_id: userId, role_in_batch: "mentor" },
+        select: { batch_id: true },
+      })).map((membership) => membership.batch_id)
+    : null;
+  const scopedBatchId = assignedMentorBatchIds
+    ? filters?.batchId
+      ? assignedMentorBatchIds.filter((batchId) => batchId === filters.batchId)
+      : assignedMentorBatchIds
+    : null;
+
   return prisma.modQueue.findMany({
     where: {
       ...(filters?.channelId && { channel_id: filters.channelId }),
-      ...(filters?.batchId && { channel: { batch_id: filters.batchId } }),
+      ...((filters?.batchId || scopedBatchId) && {
+        channel: {
+          batch_id: scopedBatchId ? { in: scopedBatchId } : filters!.batchId,
+        },
+      }),
     },
     include: {
       message: {

@@ -7,7 +7,7 @@ export async function listModQueue(req: Request, res: Response, next: NextFuncti
   try {
     const batchId = req.query.batch_id as string | undefined;
     const channelId = req.query.channel_id as string | undefined;
-    const queue = await modqueueService.listModQueue({ batchId, channelId }, req.user!.id);
+    const queue = await modqueueService.listModQueue({ batchId, channelId }, req.user!.id, req.user!.role);
     res.status(200).json(queue);
   } catch (err) {
     next(err);

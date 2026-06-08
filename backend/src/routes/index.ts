@@ -86,7 +86,7 @@ router.delete("/messages/:id/unpin", messageCtrl.unpinMessage);
 router.post("/messages/:id/flag", messageCtrl.flagMessage);
 
 // ── Mod Queue ─────────────────────────────────────────────
-router.get("/mod-queue", requireRole("admin", "batch_moderator"), modqueueCtrl.listModQueue);
+router.get("/mod-queue", requireRole("admin", "batch_moderator", "mentor"), modqueueCtrl.listModQueue);
 router.patch("/mod-queue/:id", requireRole("admin", "batch_moderator"), modqueueCtrl.updateModQueue);
 
 // ── Notifications ─────────────────────────────────────────
