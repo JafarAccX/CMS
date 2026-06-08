@@ -119,6 +119,8 @@ model User {
   @@index([phone])            // login by phone lookup
   @@index([is_banned])        // DM users list filters on is_banned = false
   @@index([role])             // role-based queries (admin, mentor, learner)
+  @@index([created_at(sort: Desc)]) // admin users pagination ordered newest first
+  @@index([role, created_at(sort: Desc)]) // filtered admin users pagination
   @@map("users")
 }
 

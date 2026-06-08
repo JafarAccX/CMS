@@ -132,10 +132,12 @@ export default function ProfilePage() {
         <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
           <div style={{ width: 460 }}><WorkspaceSearch height={38} /></div>
         </div>
-        <Link to="/dm?askMentor=1" style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 6, border: "none", background: figmaGradient, color: "var(--ax-primary-action-text)", fontSize: 12, fontWeight: 600, fontFamily: "Poppins", cursor: "pointer", textDecoration: "none" }}>
-          <Sparkles size={13} />
-          Ask Mentor
-        </Link>
+        {user?.role?.toLowerCase() === "learner" && (
+          <Link to="/dm?askMentor=1" style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 6, border: "none", background: figmaGradient, color: "var(--ax-primary-action-text)", fontSize: 12, fontWeight: 600, fontFamily: "Poppins", cursor: "pointer", textDecoration: "none" }}>
+            <Sparkles size={13} />
+            Ask Mentor
+          </Link>
+        )}
         <ThemeToggle />
         <Bell size={16} color="#94a3b8" />
         <Settings size={16} color="#94a3b8" />

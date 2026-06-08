@@ -38,9 +38,11 @@ export default function WorkspaceSearch({ height = 40 }: { height?: number }) {
       { id: "direct", label: "Direct messages", description: "Open your conversations", href: "/dm", icon: <MessageCircle size={15} /> },
       { id: "rooms", label: "Rooms", description: "Browse all learning rooms", href: "/batches", icon: <Hash size={15} /> },
       { id: "profile", label: "Profile settings", description: "Manage your profile", href: "/profile", icon: <User size={15} /> },
-      { id: "mentor", label: "Ask Mentor", description: "Start a mentor conversation", href: "/dm?askMentor=1", icon: <Sparkles size={15} /> },
     ];
 
+    if (user?.role?.toLowerCase() === "learner") {
+      items.push({ id: "mentor", label: "Ask Mentor", description: "Start a mentor conversation", href: "/dm?askMentor=1", icon: <Sparkles size={15} /> });
+    }
     if (user?.role === "admin") {
       items.push({ id: "admin", label: "Admin console", description: "Manage users and workspace", href: "/admin", icon: <Settings size={15} /> });
     }

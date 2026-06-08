@@ -10,8 +10,14 @@
 import { redisGet, redisSet } from "../utils/redis.js";
 import { logger } from "../utils/logger.js";
 import { incrementCounter, observeHistogram } from "../utils/metrics.js";
+import { createHmac } from "node:crypto";
 
 const CRM_BASE_URL = process.env.CRM_BASE_URL || "http://localhost:4001";
+const CRM_MENTOR_LOOKUP_BASE_URL =
+  process.env.CRM_MENTOR_LOOKUP_BASE_URL ||
+  process.env.CRM_INTERNAL_BASE_URL ||
+  CRM_BASE_URL;
+const CRM_INTERNAL_HMAC_SECRET = process.env.CRM_INTERNAL_HMAC_SECRET || "";
 const CRM_SERVICE_EMAIL = process.env.CRM_SERVICE_EMAIL || "";
 const CRM_SERVICE_PASSWORD = process.env.CRM_SERVICE_PASSWORD || "";
 
@@ -144,6 +150,15 @@ function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Respo
   );
 }
 
+function signInternalBody(timestamp: string, body: string): string {
+  if (!CRM_INTERNAL_HMAC_SECRET) {
+    throw new Error("CRM_INTERNAL_HMAC_SECRET is missing - cannot verify mentor credentials.");
+  }
+  return createHmac("sha256", CRM_INTERNAL_HMAC_SECRET)
+    .update(`${timestamp}.${body}`)
+    .digest("hex");
+}
+
 function recordCrmRequest(path: string, startedAt: number, success: boolean, status: number | "auth" | "error") {
   const durationMs = Date.now() - startedAt;
   const route = path.split("?")[0];
@@ -237,6 +252,44 @@ async function crmGet<T>(path: string): Promise<T> {
   }
 }
 
+async function crmPostInternal<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  const startedAt = Date.now();
+  const timestamp = String(Date.now());
+  const bodyText = JSON.stringify(body ?? {});
+  const signature = signInternalBody(timestamp, bodyText);
+
+  try {
+    const res = await fetchWithTimeout(
+      `${CRM_MENTOR_LOOKUP_BASE_URL.replace(/\/$/, "")}${path}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-timestamp": timestamp,
+          "x-internal-signature": signature,
+        },
+        body: bodyText,
+      }
+    );
+
+    if (res.status === 401 || res.status === 403 || res.status === 404) {
+      recordCrmRequest(path, startedAt, false, res.status);
+      return null as T;
+    }
+    if (!res.ok) {
+      recordCrmRequest(path, startedAt, false, res.status);
+      throw new Error(`CRM POST ${path} failed: ${res.status}`);
+    }
+
+    recordCrmRequest(path, startedAt, true, res.status);
+    return (await res.json()) as T;
+  } catch (err) {
+    if ((err as Error).message.startsWith("CRM ")) throw err;
+    recordCrmRequest(path, startedAt, false, "error");
+    throw err;
+  }
+}
+
 async function fetchAllPages<T>(
   buildPath: (page: number, limit: number) => string,
   limit = 100
@@ -285,6 +338,18 @@ export async function loginCrmStaff(
   } catch {
     return null;
   }
+}
+
+export async function verifyCrmMentorLogin(
+  email: string,
+  password: string
+): Promise<CrmMentor | null> {
+  const res = await crmPostInternal<{ success?: boolean; mentor?: CrmMentor | null } | null>(
+    "/internal/mentors/verify-login",
+    { email: email.trim().toLowerCase(), password }
+  );
+  if (!res?.success || !res.mentor?.Id) return null;
+  return res.mentor;
 }
 
 /**

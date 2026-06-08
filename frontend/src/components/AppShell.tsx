@@ -187,10 +187,16 @@ export default function AppShell({ children }: AppShellProps) {
   const hideGlobalSidebar = pathname.startsWith("/profile");
   const isAdmin = user?.role === "admin";
   const isMentor = user?.role === "mentor";
-  const isLearner = user?.role === "learner";
+  const isLearner = user?.role?.toLowerCase() === "learner";
 
   const pinnedChannels = pinnedData?.pinnedChannels || [];
-  const activeBatches = batches.filter((b) => b.userMembership !== null || b.type === "general").slice(0, 5);
+  const activeBatches = batches
+    .filter((b) => (
+      isMentor
+        ? b.userMembership?.role_in_batch === "mentor" || b.type === "general" || b.type === "public"
+        : b.userMembership !== null || b.type === "general"
+    ))
+    .slice(0, 5);
 
   return (
     <div className="fixed inset-0 flex bg-surface overflow-hidden" style={{ background: "var(--ax-bg)" }}>

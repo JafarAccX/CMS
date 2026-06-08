@@ -45,7 +45,11 @@ export async function listUsers(page = 1, limit = 20, role?: string, search?: st
         subscription_status: true, 
         is_banned: true, 
         created_at: true,
-        memberships: { select: { batch: { select: { name: true } } } }
+        memberships: {
+          take: 3,
+          orderBy: { joined_at: "desc" },
+          select: { batch: { select: { name: true } } },
+        },
       },
     }),
     prisma.user.count({ where }),

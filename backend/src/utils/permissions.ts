@@ -38,6 +38,11 @@ export function canAccessBatch(
     return true;
   }
 
+  // Mentors only access restricted batches assigned to them as mentor.
+  if (user.role === "mentor") {
+    return membership?.role_in_batch === "mentor";
+  }
+
   // private / paid / hidden: membership (CRM-granted or admin-granted) is required.
   // Membership presence is the access credential — see paid-batch note above.
   if (!membership) return false;

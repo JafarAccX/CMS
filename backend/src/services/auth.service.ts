@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import crypto from "crypto";
 import prisma from "../utils/prisma.js";
 import { generateAccessToken } from "../utils/jwt.js";
-import { UnauthorizedError, ConflictError, ForbiddenError } from "../utils/errors.js";
+import { UnauthorizedError, ConflictError } from "../utils/errors.js";
 import {
   createRefreshSession,
   rotateRefreshSession,
@@ -12,11 +12,13 @@ import {
 import type { RegisterInput, LoginInput } from "../validators/index.js";
 import {
   loginCrmStaff,
+  verifyCrmMentorLogin,
   findCrmCustomerByContact,
   findCrmCustomerByCustId,
   getCustomerEnrollments,
   type CrmCustomer,
   type CrmEnrollmentWithBatch,
+  type CrmMentor,
 } from "./crm.client.js";
 import {
   getLmsLearnerData,
@@ -121,18 +123,23 @@ export async function loginUser(data: LoginInput) {
         const staff = await loginCrmStaff(identifier, data.password);
         if (staff) {
           const crmRole = (staff.user.role || "").toLowerCase();
-          if (crmRole !== "admin") {
-            throw new ForbiddenError(
-              "Only CRM admins can sign in here. Other staff roles are not yet supported."
-            );
+          if (crmRole === "admin") {
+            return upsertAndIssueAdmin(staff);
           }
-          return upsertAndIssueAdmin(staff);
         }
       } catch (err) {
-        // Re-throw the explicit role rejection — don't fall back to customer flow
-        if (err instanceof ForbiddenError) throw err;
-        // Network/CRM unavailable: fall through to local-user / customer flow
+        // Network/CRM unavailable: fall through to mentor/local-user/customer flow
         console.warn("CRM staff login attempt failed, trying local fallback:", (err as Error).message);
+      }
+
+      try {
+        const mentor = await verifyCrmMentorLogin(identifier, data.password);
+        if (mentor) {
+          if (mentor.Active === false) throw new UnauthorizedError("Your mentor account is inactive");
+          return upsertAndIssueMentor(mentor);
+        }
+      } catch (err) {
+        console.warn("CRM mentor login attempt failed, trying local fallback:", (err as Error).message);
       }
     }
 
@@ -291,6 +298,64 @@ async function upsertAndIssueAdmin(staff: { user: { id: string; email: string; f
       where: { id: user.id },
       data: { role: "admin", provider: "crm" },
     });
+  }
+
+  if (user.is_banned) throw new UnauthorizedError("Your account has been banned");
+  return issueTokens(user);
+}
+
+async function upsertAndIssueMentor(crmMentor: CrmMentor) {
+  const crmMentorId = String(crmMentor.Id || "").trim();
+  const email = crmMentor.Email?.trim().toLowerCase();
+  if (!crmMentorId || !email) throw new UnauthorizedError("Invalid mentor account");
+
+  const usernameBase = crmMentor.Name?.trim() || email.split("@")[0];
+  const phone = crmMentor.Mobile ? String(crmMentor.Mobile) : null;
+  const bio = [
+    crmMentor.Designation,
+    crmMentor.Education,
+    crmMentor.AdditionalInfo,
+  ]
+    .map((value) => (value == null ? "" : String(value).trim()))
+    .filter(Boolean)
+    .join(" | ") || null;
+
+  let user =
+    (await prisma.user.findUnique({ where: { crm_mentor_id: crmMentorId } })) ??
+    (await prisma.user.findUnique({ where: { email } }));
+
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        email,
+        username: await ensureUniqueUsername(usernameBase),
+        phone,
+        bio,
+        password_hash: "CRM_MANAGED",
+        role: "mentor",
+        provider: "crm",
+        crm_mentor_id: crmMentorId,
+      },
+    });
+    await prisma.subscription.create({
+      data: { user_id: user.id, plan: "free", status: "active", started_at: new Date() },
+    });
+  } else {
+    const dataToUpdate: Record<string, unknown> = {
+      provider: "crm",
+      crm_mentor_id: user.crm_mentor_id ?? crmMentorId,
+    };
+    if (user.role !== "admin") dataToUpdate.role = "mentor";
+    if (!user.phone && phone) dataToUpdate.phone = phone;
+    if (!user.bio && bio) dataToUpdate.bio = bio;
+    if (user.email !== email) dataToUpdate.email = email;
+
+    const changed = Object.entries(dataToUpdate).some(
+      ([key, value]) => (user as any)[key] !== value
+    );
+    if (changed) {
+      user = await prisma.user.update({ where: { id: user.id }, data: dataToUpdate });
+    }
   }
 
   if (user.is_banned) throw new UnauthorizedError("Your account has been banned");

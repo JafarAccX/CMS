@@ -52,12 +52,14 @@ export default function BatchPage() {
           <div className="w-[480px]"><WorkspaceSearch /></div>
         </div>
         <div className="app-topbar-actions flex items-center gap-2">
-          <button className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold"
-            type="button"
-            onClick={() => navigate("/dm?askMentor=1")}
-            style={{ background: "var(--ax-primary-action-bg)", color: "var(--ax-primary-action-text)", boxShadow: "var(--ax-primary-action-shadow)" }}>
-            <Sparkles className="w-3.5 h-3.5" /> Ask Mentor
-          </button>
+          {user?.role?.toLowerCase() === "learner" && (
+            <button className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold"
+              type="button"
+              onClick={() => navigate("/dm?askMentor=1")}
+              style={{ background: "var(--ax-primary-action-bg)", color: "var(--ax-primary-action-text)", boxShadow: "var(--ax-primary-action-shadow)" }}>
+              <Sparkles className="w-3.5 h-3.5" /> Ask Mentor
+            </button>
+          )}
           <ThemeToggle />
           <NotificationDropdown />
           <button className="w-8 h-8 flex items-center justify-center rounded-lg text-dim hover:text-primary transition-colors"><Settings className="w-4 h-4" /></button>

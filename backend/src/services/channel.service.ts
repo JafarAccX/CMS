@@ -211,6 +211,7 @@ export async function toggleBatchPin(batchId: string, actorId: string) {
  *
  * Visibility rules:
  *   - admin sees all pinned items
+ *   - mentors see pinned items in general/public batches or assigned mentor batches
  *   - everyone else sees pinned items in batches they're a member of OR general batches
  */
 export async function listPinnedForUser(userId: string, userRole?: string) {
@@ -220,13 +221,19 @@ export async function listPinnedForUser(userId: string, userRole?: string) {
     ? userRole === "admin"
     : (await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { role: true } })).role === "admin";
 
+  const mentorFilter = {
+    OR: [
+      { memberships: { some: { user_id: userId, role_in_batch: "mentor" as const } } },
+      { type: { in: ["general" as const, "public" as const] } },
+    ],
+  };
   const membershipFilter = {
     OR: [
       { memberships: { some: { user_id: userId } } },
       { type: "general" as const },
     ],
   };
-  const batchAccessFilter = isAdminUser ? {} : membershipFilter;
+  const batchAccessFilter = isAdminUser ? {} : userRole === "mentor" ? mentorFilter : membershipFilter;
 
   // Run both pinned queries in parallel — they are independent of each other
   const [pinnedBatchesRaw, pinnedChannels] = await Promise.all([

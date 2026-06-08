@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "../api/client";
 import {
   Users, User, Shield, FileText, AlertTriangle, Check, Plus, UserPlus,
@@ -34,6 +34,29 @@ type BroadcastChannel = {
 
 type PageItem = number | "ellipsis";
 
+const ADMIN_USERS_PAGE_SIZE_KEY = "cms.admin.usersPageSize";
+const ADMIN_USERS_PREFETCH_KEY = "cms.admin.prefetchAdjacentPages";
+const USER_PAGE_SIZE_OPTIONS = [20, 50, 100];
+
+function getStoredUsersPageSize() {
+  const fallback = USER_PAGE_SIZE_OPTIONS[0];
+  try {
+    const value = Number(window.localStorage.getItem(ADMIN_USERS_PAGE_SIZE_KEY));
+    return USER_PAGE_SIZE_OPTIONS.includes(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function getStoredPrefetchPreference() {
+  try {
+    const value = window.localStorage.getItem(ADMIN_USERS_PREFETCH_KEY);
+    return value == null ? true : value === "true";
+  } catch {
+    return true;
+  }
+}
+
 function getPaginationItems(current: number, total: number): PageItem[] {
   const safeTotal = Math.max(total, 1);
   if (safeTotal <= 7) return Array.from({ length: safeTotal }, (_, index) => index + 1);
@@ -53,10 +76,12 @@ function PaginationControls({
   page,
   totalPages,
   onPageChange,
+  disabled = false,
 }: {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  disabled?: boolean;
 }) {
   const safeTotal = Math.max(totalPages, 1);
   const safePage = Math.min(Math.max(page, 1), safeTotal);
@@ -67,7 +92,7 @@ function PaginationControls({
     <div className="flex items-center gap-1">
       <button
         type="button"
-        disabled={safePage <= 1}
+        disabled={disabled || safePage <= 1}
         onClick={() => onPageChange(safePage - 1)}
         className={buttonBase}
         style={{ border: "1px solid var(--ax-border)", background: "var(--ax-field-bg)", color: "var(--ax-muted)" }}
@@ -84,6 +109,7 @@ function PaginationControls({
           <button
             type="button"
             key={item}
+            disabled={disabled}
             onClick={() => onPageChange(item)}
             className={buttonBase}
             style={{
@@ -100,7 +126,7 @@ function PaginationControls({
       )}
       <button
         type="button"
-        disabled={safePage >= safeTotal}
+        disabled={disabled || safePage >= safeTotal}
         onClick={() => onPageChange(safePage + 1)}
         className={buttonBase}
         style={{ border: "1px solid var(--ax-border)", background: "var(--ax-field-bg)", color: "var(--ax-muted)" }}
@@ -110,6 +136,27 @@ function PaginationControls({
       </button>
     </div>
   );
+}
+
+async function fetchAdminUsers({
+  page,
+  limit,
+  filter,
+  search,
+}: {
+  page: number;
+  limit: number;
+  filter: string;
+  search: string;
+}) {
+  return (await api.get("/admin/users", {
+    params: {
+      page,
+      limit,
+      role: filter !== "all" ? filter : undefined,
+      search: search || undefined,
+    },
+  })).data;
 }
 
 // ── Stat card ────────────────────────────────────────────────────
@@ -146,11 +193,14 @@ export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("users");
   const [showCreateBatch, setShowCreateBatch] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showManageMembers] = useState<string | null>(null);
   const [userFilter, setUserFilter] = useState<string>("all");
   const [userSearch, setUserSearch] = useState("");
+  const [debouncedUserSearch, setDebouncedUserSearch] = useState("");
   const [usersPage, setUsersPage] = useState(1);
-  const [usersLimit] = useState(20);
+  const [usersLimit, setUsersLimit] = useState(getStoredUsersPageSize);
+  const [prefetchAdjacentPages, setPrefetchAdjacentPages] = useState(getStoredPrefetchPreference);
   const [logsPage, setLogsPage] = useState(1);
   const [logsLimit] = useState(20);
   const [newUser, setNewUser] = useState({ username: "", email: "", phone: "", password: "", role: "learner" });
@@ -161,21 +211,46 @@ export default function AdminPage() {
   const [broadcastBatchId, setBroadcastBatchId] = useState<string | null>(null);
 
   const qc = useQueryClient();
-  useEffect(() => {
-    setUsersPage(1);
-  }, [userFilter, userSearch]);
 
-  const { data: usersData } = useQuery({
-    queryKey: ["admin-users", usersPage, usersLimit, userFilter, userSearch],
-    queryFn: async () => (await api.get("/admin/users", {
-      params: {
-        page: usersPage,
-        limit: usersLimit,
-        role: userFilter !== "all" ? userFilter : undefined,
-        search: userSearch.trim() || undefined,
-      },
-    })).data,
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setUsersPage(1);
+      setDebouncedUserSearch(userSearch.trim());
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [userSearch]);
+
+  const { data: usersData, isFetching: usersFetching, isPlaceholderData: usersPlaceholderData } = useQuery({
+    queryKey: ["admin-users", usersPage, usersLimit, userFilter, debouncedUserSearch],
+    queryFn: () => fetchAdminUsers({
+      page: usersPage,
+      limit: usersLimit,
+      filter: userFilter,
+      search: debouncedUserSearch,
+    }),
+    placeholderData: keepPreviousData,
   });
+
+  useEffect(() => {
+    if (!prefetchAdjacentPages || !usersData || usersData.page !== usersPage) return;
+
+    const adjacentPages = [usersPage - 1, usersPage + 1].filter(
+      (page) => page >= 1 && page <= usersData.totalPages
+    );
+
+    adjacentPages.forEach((page) => {
+      qc.prefetchQuery({
+        queryKey: ["admin-users", page, usersLimit, userFilter, debouncedUserSearch],
+        queryFn: () => fetchAdminUsers({
+          page,
+          limit: usersLimit,
+          filter: userFilter,
+          search: debouncedUserSearch,
+        }),
+      });
+    });
+  }, [qc, usersData, usersPage, usersLimit, userFilter, debouncedUserSearch, prefetchAdjacentPages]);
   const { data: pinnedData } = useQuery({ queryKey: ["admin-pinned"], queryFn: async () => (await api.get("/admin/pinned")).data });
   const { data: allBatchesData } = useQuery({ queryKey: ["batches"], queryFn: async () => (await api.get("/batches")).data });
   const { data: statsData } = useQuery({ queryKey: ["admin-stats"], queryFn: async () => (await api.get("/admin/stats")).data });
@@ -271,6 +346,36 @@ export default function AdminPage() {
     broadcastContent.trim() && (broadcastAll || broadcastTargets.size > 0)
   );
 
+  const setUserFilterAndReset = (filter: string) => {
+    setUsersPage(1);
+    setUserFilter(filter);
+  };
+
+  const updateUsersLimit = (limit: number) => {
+    setUsersPage(1);
+    setUsersLimit(limit);
+    try {
+      window.localStorage.setItem(ADMIN_USERS_PAGE_SIZE_KEY, String(limit));
+    } catch {
+      // Ignore private browsing/storage failures; the in-memory setting still works.
+    }
+  };
+
+  const updatePrefetchPreference = (enabled: boolean) => {
+    setPrefetchAdjacentPages(enabled);
+    try {
+      window.localStorage.setItem(ADMIN_USERS_PREFETCH_KEY, String(enabled));
+    } catch {
+      // Ignore private browsing/storage failures; the in-memory setting still works.
+    }
+  };
+
+  const refreshAdminData = () => {
+    qc.invalidateQueries({ queryKey: ["admin-users"] });
+    qc.invalidateQueries({ queryKey: ["admin-stats"] });
+    toast.success("Admin data refresh queued");
+  };
+
   const toggleBroadcastTarget = (channelId: string) => {
     setBroadcastTargets((prev) => {
       const next = new Set(prev);
@@ -296,7 +401,7 @@ export default function AdminPage() {
             <Megaphone className="w-3.5 h-3.5" /> Announcement
           </button>
           <ThemeToggle />
-          <button type="button" onClick={() => comingSoon("Settings panel")} className="w-8 h-8 flex items-center justify-center rounded-lg text-dim hover:text-primary transition-colors" aria-label="Settings" title="Settings panel coming soon"><Settings className="w-4 h-4" /></button>
+          <button type="button" onClick={() => setShowSettings(true)} className="w-8 h-8 flex items-center justify-center rounded-lg text-dim hover:text-primary transition-colors" aria-label="Open settings" title="Settings"><Settings className="w-4 h-4" /></button>
           <div className="w-px h-5 bg-hairline mx-1" />
           <Link
             to="/profile"
@@ -325,7 +430,7 @@ export default function AdminPage() {
             { label: "Active Batches", value: statsData?.totalBatches, delta: "5% vs last 30 days", iconBg: "rgba(139,92,246,0.2)", icon: <Shield className="w-5 h-5" />, filter: "all" },
           ].map((s, i) => (
             <StatCard key={i} icon={s.icon} value={s.value} label={s.label} delta={s.delta} iconBg={s.iconBg}
-              onClick={() => { setTab("users"); setUserFilter(s.filter); }} />
+              onClick={() => { setTab("users"); setUserFilterAndReset(s.filter); }} />
           ))}
         </div>
 
@@ -368,7 +473,7 @@ export default function AdminPage() {
                 { value: "batch_moderator", label: "Moderator" },
                 { value: "learner", label: "Learner" },
               ].map(({ value, label }) => (
-                <button key={value} onClick={() => setUserFilter(value)}
+                <button key={value} onClick={() => setUserFilterAndReset(value)}
                   className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
                   style={{ background: userFilter === value ? "var(--ax-active-bg)" : "transparent", color: userFilter === value ? "var(--ax-active-text)" : "var(--ax-muted)" }}>
                   {label}
@@ -393,7 +498,10 @@ export default function AdminPage() {
 
         {/* ── Users Tab ── */}
         {tab === "users" && (
-          <div className="responsive-table-wrap figma-card rounded-b-xl border-t-0">
+          <div
+            className={`responsive-table-wrap figma-card rounded-b-xl border-t-0 transition-opacity ${usersPlaceholderData ? "opacity-70" : "opacity-100"}`}
+            aria-busy={usersFetching}
+          >
             <table className="figma-table text-sm min-w-[760px]">
               <thead>
                 <tr>
@@ -469,8 +577,16 @@ export default function AdminPage() {
             </table>
 
             <div className="px-5 py-3.5 border-t flex items-center justify-between" style={{ borderColor: "var(--ax-border)" }}>
-              <span className="text-xs text-dim">Showing {usersStart}-{usersEnd} of {usersTotal} users</span>
-              <PaginationControls page={usersCurrentPage} totalPages={usersTotalPages} onPageChange={setUsersPage} />
+              <span className="text-xs text-dim flex items-center gap-2">
+                Showing {usersStart}-{usersEnd} of {usersTotal} users
+                {usersFetching && <RefreshCw className="w-3 h-3 animate-spin text-accent-300" aria-hidden="true" />}
+              </span>
+              <PaginationControls
+                page={usersCurrentPage}
+                totalPages={usersTotalPages}
+                onPageChange={setUsersPage}
+                disabled={usersFetching}
+              />
             </div>
           </div>
         )}
@@ -614,6 +730,92 @@ export default function AdminPage() {
           onSubmit={() => createUserMutation.mutate(newUser)}
         />
       )}
+
+      <Modal open={showSettings} onClose={() => setShowSettings(false)} size="lg">
+        <ModalHeader title="Dashboard Settings" onClose={() => setShowSettings(false)} icon={<Settings className="w-5 h-5 text-accent-300" />} />
+        <ModalBody className="space-y-5">
+          <section className="rounded-xl border border-hairline bg-surface-100/35 p-4">
+            <div className="mb-3 flex items-start justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-bold text-primary">Users table</h4>
+                <p className="mt-1 text-xs text-dim">Choose how much data the admin list loads per page.</p>
+              </div>
+              <span className="rounded-md border border-hairline px-2 py-1 text-[11px] font-bold text-dim">
+                {usersLimit} rows
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {USER_PAGE_SIZE_OPTIONS.map((limit) => (
+                <button
+                  key={limit}
+                  type="button"
+                  aria-pressed={usersLimit === limit}
+                  onClick={() => updateUsersLimit(limit)}
+                  className="rounded-lg border px-3 py-2 text-sm font-bold transition-all"
+                  style={{
+                    background: usersLimit === limit ? "var(--ax-active-bg)" : "var(--ax-field-bg)",
+                    borderColor: usersLimit === limit ? "rgba(59,130,255,0.38)" : "var(--ax-border)",
+                    color: usersLimit === limit ? "var(--ax-active-text)" : "var(--ax-muted)",
+                  }}
+                >
+                  {limit}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-hairline bg-surface-100/35 p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-bold text-primary">Fast page switching</h4>
+                <p className="mt-1 text-xs text-dim">Prefetch the previous and next users pages after each load.</p>
+              </div>
+              <button
+                type="button"
+                aria-pressed={prefetchAdjacentPages}
+                onClick={() => updatePrefetchPreference(!prefetchAdjacentPages)}
+                className="relative h-7 w-12 rounded-full border transition-colors"
+                style={{
+                  background: prefetchAdjacentPages ? "var(--ax-primary-action-bg)" : "var(--ax-field-bg)",
+                  borderColor: prefetchAdjacentPages ? "rgba(59,130,255,0.42)" : "var(--ax-border)",
+                }}
+              >
+                <span
+                  className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform ${prefetchAdjacentPages ? "translate-x-5" : "translate-x-1"}`}
+                />
+              </button>
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-hairline bg-surface-100/35 p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-bold text-primary">Appearance</h4>
+                <p className="mt-1 text-xs text-dim">Switch the dashboard theme.</p>
+              </div>
+              <ThemeToggle />
+            </div>
+          </section>
+        </ModalBody>
+        <ModalFooter className="justify-between">
+          <button
+            type="button"
+            onClick={refreshAdminData}
+            className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-bold text-primary transition-colors hover:text-accent-300"
+            style={{ background: "var(--ax-field-bg)", borderColor: "var(--ax-border)" }}
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh data
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowSettings(false)}
+            className="btn-primary rounded-lg px-4 py-2 text-sm font-bold"
+          >
+            Done
+          </button>
+        </ModalFooter>
+      </Modal>
 
       <Modal open={showBroadcast} onClose={() => setShowBroadcast(false)}>
         <ModalHeader title="Broadcast Announcement" onClose={() => setShowBroadcast(false)} icon={<Megaphone className="w-5 h-5 text-accent-300" />} />

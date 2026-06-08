@@ -531,11 +531,12 @@ export default function DashboardPage() {
   useEffect(() => { if (batchData) setBatches(batchData); }, [batchData, setBatches]);
   useEffect(() => { if (notifData) setNotifications(notifData); }, [notifData, setNotifications]);
 
-  const generalBatches = batches.filter((batch) => batch.type === "general");
-  const enrolledBatches = batches.filter((batch) => batch.userMembership !== null);
-
   const isLearner = user?.role === "learner";
   const isMentor  = user?.role === "mentor";
+  const generalBatches = batches.filter((batch) => batch.type === "general" || batch.type === "public");
+  const enrolledBatches = batches.filter((batch) => (
+    isMentor ? batch.userMembership?.role_in_batch === "mentor" : batch.userMembership !== null
+  ));
 
   // Stat cards are role-aware
   const stats = isLearner
@@ -608,7 +609,7 @@ export default function DashboardPage() {
   const pinnedBatches  = pinnedData?.pinnedBatches  ?? [];
   const pinnedChannels = pinnedData?.pinnedChannels ?? [];
 
-  // Admin sees only pinned rooms; everyone else sees their own enrolled/general rooms
+  // Admin sees pinned rooms; mentors see assigned rooms; learners see enrolled/general rooms.
   const displayRooms = user?.role === "admin"
     ? []  // admin uses pinnedBatches + pinnedChannels directly in JSX
     : [...pinnedBatches, ...generalBatches, ...enrolledBatches]

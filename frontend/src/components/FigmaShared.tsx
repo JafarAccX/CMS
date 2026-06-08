@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Bell, Settings, Sparkles, User } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import WorkspaceSearch from "./WorkspaceSearch";
+import { useAuthStore } from "../store/authStore";
 
 export const figmaGradient = "var(--ax-primary-action-bg)";
 export const figmaActionText = "var(--ax-primary-action-text)";
@@ -70,6 +71,8 @@ export function FigmaTopBar({
   bellSlot?: ReactNode;
 }) {
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
+  const showPrimaryAction = Boolean(onPrimary) || user?.role?.toLowerCase() === "learner";
   const iconButton: CSSProperties = {
     width: 32,
     height: 32,
@@ -113,29 +116,31 @@ export function FigmaTopBar({
       </div>
 
       <div className="figma-topbar-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <button
-          className="figma-topbar-primary"
-          type="button"
-          onClick={onPrimary || (() => navigate("/dm?askMentor=1"))}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "7px 14px",
-            borderRadius: 6,
-            border: "none",
-            cursor: "pointer",
-            fontFamily: "Poppins",
-            background: figmaGradient,
-            boxShadow: "0 0 10px rgba(59,130,255,0.3)",
-            color: figmaActionText,
-            fontSize: 13,
-            fontWeight: 500,
-          }}
-        >
-          {primaryIcon || <Sparkles size={13} />}
-          {primaryLabel}
-        </button>
+        {showPrimaryAction && (
+          <button
+            className="figma-topbar-primary"
+            type="button"
+            onClick={onPrimary || (() => navigate("/dm?askMentor=1"))}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "7px 14px",
+              borderRadius: 6,
+              border: "none",
+              cursor: "pointer",
+              fontFamily: "Poppins",
+              background: figmaGradient,
+              boxShadow: "0 0 10px rgba(59,130,255,0.3)",
+              color: figmaActionText,
+              fontSize: 13,
+              fontWeight: 500,
+            }}
+          >
+            {primaryIcon || <Sparkles size={13} />}
+            {primaryLabel}
+          </button>
+        )}
         <ThemeToggle />
         {bellSlot || (
           <button type="button" style={iconButton} aria-label="Notifications">

@@ -1,5 +1,5 @@
 import prisma from "../utils/prisma.js";
-import { NotFoundError } from "../utils/errors.js";
+import { ForbiddenError, NotFoundError } from "../utils/errors.js";
 import { canAccessBatch } from "../utils/permissions.js";
 import type { CreateBatchInput, UpdateBatchInput } from "../validators/index.js";
 import { logAdminAction } from "./admin.service.js";
@@ -7,9 +7,17 @@ import { logAdminAction } from "./admin.service.js";
 export async function listBatches(user: NonNullable<Express.Request["user"]>) {
   // req.user already contains role from the authenticate middleware — no extra DB lookup needed
   const isLearner = user.role === "learner";
+  const isMentor = user.role === "mentor";
 
   const batches = await prisma.batch.findMany({
-    where: isLearner
+    where: isMentor
+      ? {
+          OR: [
+            { memberships: { some: { user_id: user.id, role_in_batch: "mentor" } } },
+            { type: { in: ["general", "public"] } },
+          ],
+        }
+      : isLearner
       ? {
           OR: [
             // CRM-synced batches where learner is enrolled
@@ -21,7 +29,7 @@ export async function listBatches(user: NonNullable<Express.Request["user"]>) {
             { type: "general" },
           ],
         }
-      : undefined, // admins/mentors see all
+      : undefined, // admins/batch moderators see all
     include: {
       batch_settings: true,
       memberships: {
@@ -113,6 +121,9 @@ export async function getBatchById(batchId: string, userId?: string) {
       }),
     ]);
     const hasAccess = user ? canAccessBatch(user, batch, membership as any) : false;
+    if (user?.role === "mentor" && !hasAccess) {
+      throw new ForbiddenError("You are not assigned as a mentor to this batch");
+    }
     return { ...batch, hasAccess, userMembership: membership };
   }
 
