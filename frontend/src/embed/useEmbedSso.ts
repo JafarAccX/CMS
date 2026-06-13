@@ -72,7 +72,7 @@ export function useEmbedSso(): {
         return;
       }
 
-      if (data.type !== 'CMS_SSO_CREDENTIALS' || !data.phone || !data.email) return;
+      if (data.type !== 'CMS_SSO_CREDENTIALS' || !data.email) return;
 
       // Don't run overlapping logins; skip if already signed in; back off after
       // a recent failure. This is what prevents the learner-login 429 storm.

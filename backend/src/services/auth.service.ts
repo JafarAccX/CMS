@@ -15,6 +15,7 @@ import {
   verifyCrmMentorLogin,
   findCrmCustomerByContact,
   findCrmCustomerByCustId,
+  findCrmMentorByContact,
   getCustomerEnrollments,
   type CrmCustomer,
   type CrmEnrollmentWithBatch,
@@ -115,9 +116,7 @@ export async function loginUser(data: LoginInput) {
   const idType = detectIdentifierType(identifier);
 
   if (data.provider === "crm") {
-    // 1) For email logins, always try CRM staff auth FIRST. This keeps the
-    //    admin role in sync with CRM even if a stale local user record exists
-    //    (e.g. user was previously synced as a learner customer).
+    // 1) For email logins, always try CRM staff auth FIRST.
     if (idType === "email") {
       try {
         const staff = await loginCrmStaff(identifier, data.password);
@@ -128,7 +127,6 @@ export async function loginUser(data: LoginInput) {
           }
         }
       } catch (err) {
-        // Network/CRM unavailable: fall through to mentor/local-user/customer flow
         console.warn("CRM staff login attempt failed, trying local fallback:", (err as Error).message);
       }
 
@@ -145,7 +143,12 @@ export async function loginUser(data: LoginInput) {
 
     // 2) Local user shortcut (only for users with a real password set).
     const localUser = await findLocalUser(identifier, idType);
-    if (localUser && localUser.provider === "crm" && localUser.password_hash !== "CRM_MANAGED") {
+    if (
+      localUser &&
+      localUser.provider === "crm" &&
+      localUser.password_hash !== "CRM_MANAGED" &&
+      localUser.password_hash !== "OTP_MANAGED"
+    ) {
       if (localUser.is_banned) throw new UnauthorizedError("Your account has been banned");
       const valid = await bcrypt.compare(data.password, localUser.password_hash);
       if (!valid) throw new UnauthorizedError("Invalid credentials");
@@ -164,7 +167,6 @@ export async function loginUser(data: LoginInput) {
     const valid = await bcrypt.compare(data.password, localUser.password_hash);
     if (!valid) throw new UnauthorizedError("Invalid credentials");
 
-    // Move all CRM/LMS enrichment to background — issue the token immediately.
     const customer = await findCrmCustomer(identifier, idType).catch(() => null);
     if (customer) {
       const updates: Record<string, unknown> = {};
@@ -192,7 +194,6 @@ export async function loginUser(data: LoginInput) {
     if (!customer.Active) throw new UnauthorizedError("Your CRM account is inactive");
     const cmsUser = await findOrCreateLearnerUser(customer, data.password);
 
-    // Fire all CRM/LMS work in background — token issued immediately.
     setImmediate(() => {
       getCustomerEnrollments(customer.CustId)
         .then((enrollments) => syncBatchMemberships(cmsUser.id, enrollments))
@@ -203,8 +204,6 @@ export async function loginUser(data: LoginInput) {
     return issueTokens(cmsUser);
   }
 
-  // No local user and no CRM match. Run a dummy compare so response timing
-  // matches the valid-account path, then return a generic error (no enumeration).
   await bcrypt.compare(data.password, DUMMY_PASSWORD_HASH);
   throw new UnauthorizedError("Invalid credentials");
 }
@@ -220,7 +219,6 @@ async function findLocalUser(identifier: string, idType: IdentifierType) {
     return prisma.user.findFirst({ where: { phone: normalized } }) ??
            prisma.user.findFirst({ where: { phone: identifier } });
   }
-  // CRM ID — no direct field in local DB, skip
   return null;
 }
 
@@ -240,7 +238,6 @@ async function findCrmCustomer(identifier: string, idType: IdentifierType) {
 // ─── CRM-provider login ────────────────────────────────────────────────────
 
 async function loginViaCrm(identifier: string, idType: IdentifierType, password: string) {
-  // 1. Check if this identifier belongs to a CRM customer (learner).
   let customer;
   try {
     customer = await findCrmCustomer(identifier, idType);
@@ -265,10 +262,6 @@ async function loginViaCrm(identifier: string, idType: IdentifierType, password:
     return issueTokens(cmsUser, enriched);
   }
 
-  // 2. Not a customer. Staff login is already handled by loginUser() before
-  //    this function is called for emails, so getting here means: not a
-  //    customer, and (if email) staff login also failed → no account.
-  //    Use a generic error + dummy compare so we don't reveal account existence.
   await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
   throw new UnauthorizedError("Invalid credentials");
 }
@@ -366,7 +359,6 @@ async function findOrCreateLearnerUser(
   customer: NonNullable<Awaited<ReturnType<typeof findCrmCustomerByContact>>>,
   passwordPlain: string
 ) {
-  // Try to find an existing user first (by email then phone).
   const email = customer.Email?.toLowerCase() ?? null;
   const phone = String(customer.Mobile);
 
@@ -375,7 +367,6 @@ async function findOrCreateLearnerUser(
 
   if (user) {
     if (user.is_banned) throw new UnauthorizedError("Your account has been banned");
-    // CRM_MANAGED means first login — set a real password now.
     if (user.password_hash === "CRM_MANAGED" || user.password_hash === "OTP_MANAGED") {
       const newHash = await bcrypt.hash(passwordPlain, BCRYPT_ROUNDS);
       user = await prisma.user.update({ where: { id: user.id }, data: { password_hash: newHash } });
@@ -386,13 +377,9 @@ async function findOrCreateLearnerUser(
     return user;
   }
 
-  // No existing record — provision via shared service, using a real hashed password.
   const password_hash = await bcrypt.hash(passwordPlain, BCRYPT_ROUNDS);
   return findOrCreateLearner(customer, password_hash);
 }
-
-// ensureUniqueUsername, syncBatchMemberships, and findOrCreateLearner are now
-// provided by learner.provisioning.service.ts (imported at the top of this file).
 
 // ─── Enriched data fetching ──────────────────────────────────────────────
 
@@ -459,91 +446,123 @@ async function issueTokens(
 }
 
 /**
- * Learner login: verify phone + email both match a CRM customer record.
+ * Learner/Mentor SSO login: verify phone + email both match a CRM record.
  * No password required — CRM identity match is the credential.
+ *
+ * Flow:
+ *   1. Try CRM customer (learner) lookup by phone.
+ *   2. If found → verify email matches → provision learner CMS user.
+ *   3. If NOT found as customer → try CRM mentor lookup by email.
+ *   4. If found as mentor AND the phone matches → provision/update mentor CMS user.
+ *
+ * This allows mentors to SSO into the Community via the LMS iframe without
+ * needing a separate password, because mentors are not CRM customers.
  */
 export async function learnerLogin(phone: string, email: string) {
   const normalizedPhone = normalizePhone(phone.trim());
   const submittedEmail = email.trim().toLowerCase();
 
-  // 1. Find CRM customer by phone
+  // ── Path A: CRM customer (learner) ──────────────────────────────────────
   const customer = await findCrmCustomerByContact(normalizedPhone).catch(() => null);
-  if (!customer) {
-    throw new UnauthorizedError(
-      "No account found with that phone number. Please use the number registered with AcceleratorX."
-    );
-  }
-  if (!customer.Active) {
-    throw new UnauthorizedError("Your account is inactive. Please contact support.");
-  }
 
-  // 2. Verify email matches CRM record — both fields must match
-  const crmEmail = (customer.Email ?? "").toLowerCase();
-  if (!crmEmail || crmEmail !== submittedEmail) {
-    throw new UnauthorizedError(
-      "Phone and email do not match our records. Please use the email registered with AcceleratorX."
-    );
-  }
+  if (customer) {
+    if (!customer.Active) {
+      throw new UnauthorizedError("Your account is inactive. Please contact support.");
+    }
 
-  // 3. Find or create local CMS user (passwordless — identity proven by CRM match)
-  let cmsUser = customer.Email
-    ? await prisma.user.findUnique({ where: { email: customer.Email.toLowerCase() } })
-    : null;
+    // Verify email matches CRM record — both fields must match
+    const crmEmail = (customer.Email ?? "").toLowerCase();
+    if (!crmEmail || crmEmail !== submittedEmail) {
+      throw new UnauthorizedError(
+        "Phone and email do not match our records. Please use the email registered with AcceleratorX."
+      );
+    }
 
-  if (!cmsUser) {
-    cmsUser = await prisma.user.findFirst({ where: { phone: normalizedPhone } });
-  }
+    // Find or create local CMS user (passwordless — identity proven by CRM match)
+    let cmsUser = customer.Email
+      ? await prisma.user.findUnique({ where: { email: customer.Email.toLowerCase() } })
+      : null;
 
-  if (!cmsUser) {
-    const fullName =
-      [customer.FirstName, customer.LastName].filter(Boolean).join(" ").trim() ||
-      (customer.Email ? customer.Email.split("@")[0] : `learner-${customer.CustId}`);
+    if (!cmsUser) {
+      cmsUser = await prisma.user.findFirst({ where: { phone: normalizedPhone } });
+    }
 
-    const emailForDb = customer.Email ?? `cust-${customer.CustId}@crm.local`;
+    if (!cmsUser) {
+      const fullName =
+        [customer.FirstName, customer.LastName].filter(Boolean).join(" ").trim() ||
+        (customer.Email ? customer.Email.split("@")[0] : `learner-${customer.CustId}`);
 
-    cmsUser = await prisma.user.create({
-      data: {
-        email: emailForDb,
-        username: await ensureUniqueUsername(fullName),
-        phone: normalizedPhone,
-        password_hash: "CRM_MANAGED",
-        role: "learner",
-        provider: "crm",
-      },
+      const emailForDb = customer.Email ?? `cust-${customer.CustId}@crm.local`;
+
+      cmsUser = await prisma.user.create({
+        data: {
+          email: emailForDb,
+          username: await ensureUniqueUsername(fullName),
+          phone: normalizedPhone,
+          password_hash: "CRM_MANAGED",
+          role: "learner",
+          provider: "crm",
+        },
+      });
+      await prisma.subscription.create({
+        data: { user_id: cmsUser.id, plan: "free", status: "active", started_at: new Date() },
+      });
+    }
+
+    if (cmsUser.is_banned) throw new UnauthorizedError("Your account has been banned.");
+
+    // Sync missing profile fields from CRM
+    const profileUpdates: Record<string, unknown> = {};
+    if (!cmsUser.phone) profileUpdates.phone = normalizedPhone;
+    if (!cmsUser.avatar_url && customer.ProfilePicture) profileUpdates.avatar_url = customer.ProfilePicture;
+    if (Object.keys(profileUpdates).length > 0) {
+      cmsUser = await prisma.user.update({ where: { id: cmsUser.id }, data: profileUpdates });
+    }
+
+    // Issue tokens immediately — batch sync happens in background
+    const tokens = await issueTokens(cmsUser);
+
+    setImmediate(() => {
+      const _custId = customer!.CustId;
+      const _userId = cmsUser!.id;
+      getCustomerEnrollments(_custId)
+        .then((enrollments) => syncBatchMemberships(_userId, enrollments))
+        .catch((err) => console.error("[bg] Learner batch sync failed:", err));
+      fetchEnrichedData(customer!).catch(() => {});
     });
-    await prisma.subscription.create({
-      data: { user_id: cmsUser.id, plan: "free", status: "active", started_at: new Date() },
-    });
+
+    return tokens;
   }
 
-  if (cmsUser.is_banned) throw new UnauthorizedError("Your account has been banned.");
+  // ── Path B: CRM mentor ───────────────────────────────────────────────────
+  // Mentors are NOT in the CRM customers table. Look them up by email.
+  // The LMS sends both email + phone in the SSO payload; we use email as the
+  // primary lookup key for mentors and phone as a secondary verification.
+  const crmMentor = await findCrmMentorByContact(submittedEmail).catch(() => null);
 
-  // 4. Sync missing profile fields from CRM
-  const profileUpdates: Record<string, unknown> = {};
-  if (!cmsUser.phone) profileUpdates.phone = normalizedPhone;
-  if (!cmsUser.avatar_url && customer.ProfilePicture) profileUpdates.avatar_url = customer.ProfilePicture;
-  if (Object.keys(profileUpdates).length > 0) {
-    cmsUser = await prisma.user.update({ where: { id: cmsUser.id }, data: profileUpdates });
+  if (crmMentor) {
+    if (crmMentor.Active === false) {
+      throw new UnauthorizedError("Your mentor account is inactive. Please contact support.");
+    }
+
+    // Verify the phone the LMS sent matches the mentor's CRM phone.
+    // We only enforce this if the CRM record actually has a phone stored —
+    // some mentors may be phone-less (email-only) in the CRM.
+    const mentorPhone = String(crmMentor.Mobile ?? "").replace(/\D/g, "").slice(-10);
+    if (mentorPhone && normalizedPhone && mentorPhone !== normalizedPhone) {
+      throw new UnauthorizedError(
+        "Phone and email do not match our records. Please use the phone registered with AcceleratorX."
+      );
+    }
+
+    // Provision (or update) the mentor's CMS user account and issue tokens
+    return upsertAndIssueMentor(crmMentor);
   }
 
-  // 5. Issue tokens immediately — don't block on enriched data or batch sync.
-  // Both are fired in the background so the learner gets their token fast.
-  // enrichedData (CRM enrollments + LMS profile) is nice-to-have for the
-  // initial response payload; the client can re-fetch on next login if absent.
-  const tokens = await issueTokens(cmsUser);
-
-  setImmediate(() => {
-    const _custId = customer!.CustId;
-    const _userId = cmsUser!.id;
-    // Batch membership sync
-    getCustomerEnrollments(_custId)
-      .then((enrollments) => syncBatchMemberships(_userId, enrollments))
-      .catch((err) => console.error("[bg] Learner batch sync failed:", err));
-    // Enriched data pre-warm (optional — silently discarded if slow)
-    fetchEnrichedData(customer!).catch(() => {});
-  });
-
-  return tokens;
+  // ── Not found anywhere ───────────────────────────────────────────────────
+  throw new UnauthorizedError(
+    "No account found with that phone number. Please use the number registered with AcceleratorX."
+  );
 }
 
 function hashResetToken(token: string) {
@@ -564,8 +583,6 @@ export async function requestPasswordReset(email: string) {
     return { message: "If that email exists, a password reset link has been sent." };
   }
 
-  // Throttle reset emails per target to prevent inbox bombing. Same neutral
-  // response so the cooldown doesn't reveal that the account exists.
   if (!(await consumeCooldown(`cooldown:pwreset:${normalizedEmail}`, PASSWORD_RESET_COOLDOWN_SECONDS))) {
     return { message: "If that email exists, a password reset link has been sent." };
   }
@@ -595,10 +612,6 @@ export async function requestPasswordReset(email: string) {
   try {
     await sendPasswordResetEmail(user.email, resetUrl, user.username);
   } catch (err: any) {
-    // Never surface mail-provider/transport failures to the client. Doing so would
-    // (1) crash the flow on any provider hiccup, and (2) break the account-enumeration
-    // guarantee — a 500 would only ever happen for real accounts, revealing which
-    // emails exist. The reset token is already persisted; log loudly to diagnose.
     const detail = err?.response?.body ?? err?.response?.data ?? err?.message ?? err;
     console.error(`[AUTH] Failed to send password reset email to ${user.email}:`, detail);
   }
@@ -634,8 +647,6 @@ export async function resetPassword(token: string, newPassword: string) {
       where: { user_id: resetToken.user_id, used_at: null },
       data: { used_at: new Date() },
     }),
-    // Invalidate every existing session so a reset truly locks out any attacker
-    // who already had access.
     prisma.refreshToken.updateMany({
       where: { user_id: resetToken.user_id, revoked_at: null },
       data: { revoked_at: new Date() },
@@ -650,7 +661,6 @@ export async function refreshAccessToken(refreshTokenCookie: string, meta: Sessi
     throw new UnauthorizedError("No refresh token provided");
   }
 
-  // Rotate the session: the presented token is revoked and a new one issued.
   const { userId, refreshToken } = await rotateRefreshSession(refreshTokenCookie, meta);
 
   const user = await prisma.user.findUnique({ where: { id: userId } });

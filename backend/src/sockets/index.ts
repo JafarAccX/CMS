@@ -1,7 +1,7 @@
 import { Server } from "socket.io";
 import { verifyAccessToken } from "../utils/jwt.js";
 import prisma from "../utils/prisma.js";
-import { canSendMessage } from "../utils/permissions.js";
+import { canAccessBatch, canSendMessage } from "../utils/permissions.js";
 import {
   socketSendMessageSchema,
   socketJoinChannelSchema,
@@ -81,6 +81,20 @@ async function loadChannelContext(channelId: string, userId: string) {
   return { channel, user, membership };
 }
 
+async function canAccessChannelRoom(channelId: string, userId: string) {
+  const ctx = await loadChannelContext(channelId, userId);
+  if (!ctx) return false;
+  return canAccessBatch(ctx.user, ctx.channel.batch, ctx.membership);
+}
+
+async function canAccessDmRoom(conversationId: string, userId: string) {
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { user_a_id: true, user_b_id: true },
+  });
+  return Boolean(conversation && (conversation.user_a_id === userId || conversation.user_b_id === userId));
+}
+
 export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>) {
   // Authentication middleware
   io.use(async (socket, next) => {
@@ -124,6 +138,7 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
     socket.on("join_channel", async (data) => {
       try {
         const { channelId } = socketJoinChannelSchema.parse(data);
+        if (!(await canAccessChannelRoom(channelId, userId))) return;
         socket.join(`channel:${channelId}`);
         io.to(`channel:${channelId}`).emit("user_joined", { userId, username });
       } catch (err) {
@@ -231,6 +246,7 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
 
         const message = await prisma.message.findUnique({ where: { id: messageId } });
         if (!message) return;
+        if (!(await canAccessChannelRoom(message.channel_id, userId))) return;
 
         const existing = await prisma.messageReaction.findUnique({
           where: { message_id_user_id_emoji: { message_id: messageId, user_id: userId, emoji } },
@@ -255,17 +271,19 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
       }
     });
 
-    socket.on("typing_start", (data) => {
+    socket.on("typing_start", async (data) => {
       try {
         const { channelId } = socketJoinChannelSchema.parse(data);
+        if (!(await canAccessChannelRoom(channelId, userId))) return;
         redisSet(`typing:${channelId}:${userId}`, "1", 5);
         socket.to(`channel:${channelId}`).emit("typing_indicator", { userId, username, channelId, typing: true });
       } catch (err) {}
     });
 
-    socket.on("typing_stop", (data) => {
+    socket.on("typing_stop", async (data) => {
       try {
         const { channelId } = socketJoinChannelSchema.parse(data);
+        if (!(await canAccessChannelRoom(channelId, userId))) return;
         redisDel(`typing:${channelId}:${userId}`);
         socket.to(`channel:${channelId}`).emit("typing_indicator", { userId, username, channelId, typing: false });
       } catch (err) {}
@@ -282,9 +300,10 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
     });
 
     // ── DM Events (unchanged) ───────────────────────────
-    socket.on("join_dm", (data) => {
+    socket.on("join_dm", async (data) => {
       try {
         const { conversationId } = socketJoinDmSchema.parse(data);
+        if (!(await canAccessDmRoom(conversationId, userId))) return;
         socket.join(`dm:${conversationId}`);
       } catch (err) {}
     });
@@ -334,6 +353,7 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
     socket.on("mark_dm_read", async (data) => {
       try {
         const { conversationId } = socketJoinDmSchema.parse(data);
+        if (!(await canAccessDmRoom(conversationId, userId))) return;
 
         await prisma.directMessage.updateMany({
           where: { conversation_id: conversationId, sender_id: { not: userId }, is_read: false },
@@ -350,16 +370,18 @@ export function initSockets(io: Server<ClientToServerEvents, ServerToClientEvent
       }
     });
 
-    socket.on("dm_typing_start", (data) => {
+    socket.on("dm_typing_start", async (data) => {
       try {
         const { conversationId } = socketJoinDmSchema.parse(data);
+        if (!(await canAccessDmRoom(conversationId, userId))) return;
         socket.to(`dm:${conversationId}`).emit("dm_typing", { conversationId, userId, username, typing: true });
       } catch (err) {}
     });
 
-    socket.on("dm_typing_stop", (data) => {
+    socket.on("dm_typing_stop", async (data) => {
       try {
         const { conversationId } = socketJoinDmSchema.parse(data);
+        if (!(await canAccessDmRoom(conversationId, userId))) return;
         socket.to(`dm:${conversationId}`).emit("dm_typing", { conversationId, userId, username, typing: false });
       } catch (err) {}
     });

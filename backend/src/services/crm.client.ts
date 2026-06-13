@@ -181,7 +181,6 @@ async function fetchServiceToken(force = false): Promise<string> {
   }
 
   // Deduplicate: if another request is already fetching the token, reuse its promise.
-  // This prevents N parallel CRM logins when the token is cold/expired.
   if (!force && tokenInflight) return tokenInflight;
 
   tokenInflight = (async () => {
@@ -367,7 +366,6 @@ export async function findCrmCustomerByContact(
 
   const isEmail = normalized.includes("@");
 
-  // CRM list endpoint shape: { data: Customer[], total: number }
   type ListResp = { data: CrmCustomer[]; total: number };
 
   let customer: CrmCustomer | null = null;
@@ -377,7 +375,6 @@ export async function findCrmCustomerByContact(
     const res = await crmGet<ListResp>(`/customers?Email=${enc}&limit=1`);
     customer = res.data?.[0] ?? null;
   } else {
-    // Phone: normalize by stripping non-digits and any leading country code "91"
     const digits = normalized.replace(/\D/g, "");
     const candidates = new Set<string>([digits]);
     if (digits.startsWith("91") && digits.length > 10) {
@@ -392,13 +389,11 @@ export async function findCrmCustomerByContact(
     }
   }
 
-  // Cache by the identifier used AND by the canonical email/phone from the
-  // returned record so future lookups by either value are instant.
   if (customer) {
     await Promise.all([
       setCachedCustomer(normalized, customer),
       customer.Email ? setCachedCustomer(customer.Email.toLowerCase(), customer) : Promise.resolve(),
-      customer.Mobile ? setCachedCustomer(String(customer.Mobile).replace(/\D/g,"").slice(-10), customer) : Promise.resolve(),
+      customer.Mobile ? setCachedCustomer(String(customer.Mobile).replace(/\D/g, "").slice(-10), customer) : Promise.resolve(),
     ]);
   }
 
@@ -459,7 +454,28 @@ export async function listCrmBatchMentorAssignments(): Promise<CrmBatchMentorAss
   );
 }
 
-// ─── Classes ───────────────────────────────────────────────────────────────
+/**
+ * Look up a CRM mentor by email or phone number.
+ * Used by learnerLogin to identify mentors (who are not CRM customers).
+ */
+export async function findCrmMentorByContact(
+  identifier: string
+): Promise<CrmMentor | null> {
+  const normalized = identifier.toLowerCase().trim();
+  const isEmail = normalized.includes("@");
+  const mentors = await listCrmMentors();
+
+  if (isEmail) {
+    return mentors.find(m => m.Email?.trim().toLowerCase() === normalized) ?? null;
+  } else {
+    const digits = normalized.replace(/\D/g, "").slice(-10);
+    if (!digits) return null;
+    return mentors.find(m => {
+      const mentorDigits = String(m.Mobile ?? "").replace(/\D/g, "").slice(-10);
+      return mentorDigits === digits;
+    }) ?? null;
+  }
+}
 
 export interface CrmClass {
   Id: string;
@@ -503,7 +519,6 @@ export async function getCrmClassesForBatchStrict(crmBatchId: string): Promise<C
 
 /**
  * Fetch all students enrolled in a specific batch from CRM.
- * Uses the CRM's GET /batches/:batchId/students endpoint.
  */
 export interface CrmBatchStudent {
   CustId: string;
