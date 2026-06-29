@@ -8,13 +8,35 @@ async function main() {
 
   // Clean existing tables in reverse dependency order
   console.log("🧹 Cleaning up existing tables...");
+  await prisma.messageAttachment.deleteMany();
+  await prisma.pinnedMessage.deleteMany();
+  await prisma.modQueue.deleteMany();
+  await prisma.messageReaction.deleteMany();
+  await prisma.directMessageAttachment.deleteMany();
+  await prisma.directMessage.deleteMany();
+  await prisma.conversationMessageSequence.deleteMany();
+  await prisma.conversation.deleteMany();
+  await prisma.channelMessageSequence.deleteMany();
+  
+  // Set parent_id to null to prevent self-reference violation on Message delete
+  await prisma.message.updateMany({ data: { parent_id: null } });
   await prisma.message.deleteMany();
+  
+  await prisma.channel.deleteMany();
   await prisma.membership.deleteMany();
   await prisma.batchSettings.deleteMany();
   await prisma.batch.deleteMany();
+  
   await prisma.subscription.deleteMany();
+  await prisma.passwordResetToken.deleteMany();
+  await prisma.refreshToken.deleteMany();
+  await prisma.$executeRawUnsafe(`ALTER TABLE "admin_logs" DISABLE TRIGGER ALL`);
+  await prisma.adminLog.deleteMany();
+  await prisma.$executeRawUnsafe(`ALTER TABLE "admin_logs" ENABLE TRIGGER ALL`);
+  await prisma.notification.deleteMany();
   await prisma.user.deleteMany();
   await prisma.organization.deleteMany();
+  await prisma.outboxEvent.deleteMany();
 
   // ── Organization ─────────────────────────────────────────
   let org = await prisma.organization.findUnique({
@@ -200,11 +222,27 @@ async function main() {
     { channel_id: generalCh.id, sender_id: guestUser.id, content: "Just browsing as a guest." },
   ];
 
+  const nextSeqMap: Record<string, number> = {};
   for (const msg of seedMessages) {
+    const chId = msg.channel_id;
+    const seqId = nextSeqMap[chId] ? nextSeqMap[chId] + 1 : 1;
+    nextSeqMap[chId] = seqId;
+
     await prisma.message.create({
       data: {
         ...msg,
         message_type: "text",
+        seq_id: seqId,
+      },
+    });
+  }
+
+  // Populate channel message sequences so future inserts don't conflict
+  for (const [chId, lastSeq] of Object.entries(nextSeqMap)) {
+    await prisma.channelMessageSequence.create({
+      data: {
+        channel_id: chId,
+        last_seq: lastSeq,
       },
     });
   }

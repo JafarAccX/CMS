@@ -1,0 +1,529 @@
+/* ─────────────────────────────────────────────────────────────────
+   AcceleratorX CMS — Scoped Package Styles
+   Scope is locked to `.cms-shell-root` to prevent variable bleed
+   onto the host LMS. NO @tailwind base to avoid global overrides.
+   ───────────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=Fraunces:ital,wght@0,400;0,500;0,600;1,400;1,500&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@keyframes cms-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes cms-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+.cms-shell-root {
+  @tailwind components;
+  @tailwind utilities;
+  /* Panels & text (used by var(--ax-*) in CSS + inline styles) */
+  --ax-bg: #05070a;
+  --ax-panel: #0a0d12;
+  --ax-panel-2: #10151d;
+  --ax-panel-3: #161e2e;
+  --ax-border: rgba(255, 255, 255, 0.08);
+  --ax-border-strong: rgba(255, 255, 255, 0.14);
+  --ax-text: #e0e3e6;
+  --ax-muted: #94a3b8;
+  --ax-dim: #6c7793;
+  --ax-faint: #424c64;
+
+  /* Brand (theme-independent) */
+  --ax-blue: #3b82ff;
+  --ax-cyan: #00dbe8;
+  --ax-gradient: linear-gradient(180deg, rgb(59, 130, 255) 17%, rgb(0, 219, 232) 100%);
+  --ax-orb-gradient: linear-gradient(180deg, rgb(62, 56, 224) 0%, rgb(0, 219, 232) 100%);
+  --ax-primary-action-bg: var(--ax-gradient);
+  --ax-primary-action-text: #05070a;
+  --ax-primary-action-shadow: 0 0 14px rgba(59,130,255,0.35), 0 1px 0 rgba(255,255,255,0.18) inset;
+
+  /* Layout */
+  --ax-topbar-h: 64px;
+  --ax-sidebar-w: 256px;
+  --ax-radius: 8px;
+  --ax-shadow-card: 0 1px 0 rgba(255,255,255,0.05) inset, 0 12px 32px -12px rgba(0,0,0,0.6);
+
+  /* Tailwind token channels (R G B) — surface scale */
+  --surface: 5 7 10;
+  --surface-50: 10 13 18;
+  --surface-100: 16 21 29;
+  --surface-200: 22 30 46;
+  --surface-300: 30 41 59;
+  --surface-400: 44 52 77;
+  --surface-500: 58 69 99;
+
+  /* Tailwind token colors — text / hairline / accent / shadow */
+  --text-primary: #e0e3e6;
+  --text-muted: #94a3b8;
+  --text-dim: #6c7793;
+  --text-faint: #424c64;
+  --hairline: rgba(255, 255, 255, 0.08);
+  --hairline-strong: rgba(255, 255, 255, 0.14);
+  --accent-300: #afc6ff;
+  --shadow-card: 0 1px 0 rgba(255,255,255,0.05) inset, 0 12px 32px -12px rgba(0,0,0,0.6);
+
+  /* Helper neutrals */
+  --ax-hover: rgba(255, 255, 255, 0.04);
+  --ax-hover-strong: rgba(255, 255, 255, 0.06);
+  --ax-grid-dot: rgba(255, 255, 255, 0.04);
+  --ax-glass: rgba(10, 12, 17, 0.6);
+  --ax-field-bg: rgba(29, 32, 34, 0.5);
+  --ax-field-bg-focus: rgba(29, 32, 34, 0.85);
+  --ax-field-border: rgba(66, 71, 84, 0.5);
+  --ax-input-bg: #07090d;
+  --ax-input-border: #1e293b;
+  --ax-topbar-bg: rgba(10, 12, 17, 0.6);
+  --ax-sidebar-bg: rgba(10, 13, 18, 0.82);
+  --ax-card-bg: #0a0d12;
+  --ax-card-hover-bg: #0d1118;
+  --ax-tile-bg: #05070a;
+  --ax-pill-bg: #05070a;
+  --ax-page-radial: radial-gradient(760px 420px at 100% 10%, rgba(0, 111, 180, 0.22), transparent 58%);
+  --ax-mobile-nav-shadow: 0 16px 40px rgba(0,0,0,0.45);
+  --ax-row-border: rgba(255, 255, 255, 0.06);
+  --ax-row-hover: rgba(255, 255, 255, 0.025);
+  --ax-placeholder: rgba(194, 198, 214, 0.5);
+  --ax-table-head: rgba(16, 21, 29, 0.65);
+  --ax-active-bg: rgba(59, 130, 255, 0.14);
+  --ax-active-border: rgba(59, 130, 255, 0.18);
+  --ax-active-text: #afc6ff;
+  --ax-active-shadow: none;
+  --ax-sidebar-title: var(--ax-text);
+  --ax-sidebar-link: var(--ax-text);
+  --ax-sidebar-muted: var(--ax-muted);
+  --ax-sidebar-section: var(--ax-muted);
+  --ax-sidebar-badge-bg: rgba(59, 130, 255, 0.14);
+  --ax-sidebar-badge-text: var(--accent-300);
+  --ax-control-bg: var(--ax-bg);
+  --ax-segment-active-bg: #ffffff;
+  --ax-segment-active-text: #05070a;
+  --ax-modal-header-bg: rgba(16, 20, 22, 0.5);
+  --ax-modal-footer-bg: rgba(16, 20, 22, 0.4);
+  --ax-modal-accent-panel: #07090d;
+  --ax-option-bg: rgb(var(--surface-100) / 0.45);
+  --ax-option-active-bg: linear-gradient(115deg,rgba(0,219,232,0.08),rgba(59,130,255,0.06));
+  --ax-disabled-bg: rgb(30, 41, 59);
+  --ax-disabled-text: var(--ax-faint);
+  --ax-profile-avatar-bg: linear-gradient(145deg, rgba(45,103,107,0.95), rgba(0,219,232,0.28));
+  --ax-profile-avatar-icon: #e0e3e6;
+  --ax-profile-avatar-shadow: 0 6px 18px -10px rgba(15,23,42,0.5), 0 0 0 3px rgba(0,219,232,0.08);
+  --ax-dm-avatar-mentor-bg: rgba(82, 141, 255, 0.2);
+  --ax-dm-avatar-mentor-border: rgba(175, 198, 255, 0.3);
+  --ax-dm-avatar-mentor-text: rgb(175, 198, 255);
+  --ax-dm-avatar-admin-bg: rgba(124, 92, 255, 0.2);
+  --ax-dm-avatar-admin-border: rgba(183, 139, 255, 0.3);
+  --ax-dm-avatar-admin-text: rgb(183, 139, 255);
+}
+
+.light .cms-shell-root {
+  --ax-bg: #f4f6fa;
+  --ax-panel: #ffffff;
+  --ax-panel-2: #f8fafc;
+  --ax-panel-3: #d7dee9;
+  --ax-border: rgba(15, 23, 42, 0.13);
+  --ax-border-strong: rgba(15, 23, 42, 0.24);
+  --ax-text: #0b1220;
+  --ax-muted: #42506a;
+  --ax-dim: #647089;
+  --ax-faint: #68758c;
+  --ax-shadow-card: 0 1px 1px rgba(255,255,255,0.95) inset, 0 16px 34px -26px rgba(15, 23, 42, 0.28), 0 5px 14px -12px rgba(15, 23, 42, 0.20);
+
+  --surface: 244 246 250;
+  --surface-50: 255 255 255;
+  --surface-100: 248 250 252;
+  --surface-200: 226 232 240;
+  --surface-300: 203 213 225;
+  --surface-400: 148 163 184;
+  --surface-500: 104 122 151;
+
+  --text-primary: #0b1220;
+  --text-muted: #42506a;
+  --text-dim: #647089;
+  --text-faint: #68758c;
+  --hairline: rgba(15, 23, 42, 0.13);
+  --hairline-strong: rgba(15, 23, 42, 0.24);
+  --accent-300: #1d4ed8;
+  --shadow-card: 0 1px 1px rgba(255,255,255,0.95) inset, 0 16px 34px -26px rgba(15, 23, 42, 0.28), 0 5px 14px -12px rgba(15, 23, 42, 0.20);
+  --ax-primary-action-bg: #2563eb;
+  --ax-primary-action-text: #ffffff;
+  --ax-primary-action-shadow: 0 12px 24px -16px rgba(37, 99, 235, 0.65), 0 1px 0 rgba(255, 255, 255, 0.18) inset;
+
+  --ax-hover: rgba(15, 23, 42, 0.05);
+  --ax-hover-strong: rgba(15, 23, 42, 0.08);
+  --ax-grid-dot: rgba(15, 23, 42, 0.035);
+  --ax-glass: rgba(255, 255, 255, 0.9);
+  --ax-field-bg: rgba(255, 255, 255, 0.94);
+  --ax-field-bg-focus: rgba(255, 255, 255, 0.96);
+  --ax-field-border: rgba(30, 41, 59, 0.14);
+  --ax-input-bg: #ffffff;
+  --ax-input-border: #d4dfec;
+  --ax-topbar-bg: rgba(255, 255, 255, 0.96);
+  --ax-sidebar-bg: #ffffff;
+  --ax-card-bg: #ffffff;
+  --ax-card-hover-bg: #f8fafc;
+  --ax-tile-bg: #f1f5f9;
+  --ax-pill-bg: #eef2f7;
+  --ax-page-radial: linear-gradient(180deg, #f5f7fb 0%, #eef2f7 100%);
+  --ax-mobile-nav-shadow: 0 18px 48px -22px rgba(15, 23, 42, 0.28), 0 8px 20px -14px rgba(15, 23, 42, 0.18);
+  --ax-row-border: rgba(30, 41, 59, 0.07);
+  --ax-row-hover: rgba(15, 23, 42, 0.035);
+  --ax-placeholder: rgba(82, 96, 120, 0.55);
+  --ax-table-head: rgba(246, 249, 253, 0.92);
+  --ax-active-bg: #e8f0ff;
+  --ax-active-border: rgba(37, 99, 235, 0.42);
+  --ax-active-text: #1d4ed8;
+  --ax-active-shadow: inset 3px 0 0 #2563eb, 0 10px 22px -18px rgba(37, 99, 235, 0.45);
+  --ax-sidebar-title: #020617;
+  --ax-sidebar-link: #0f172a;
+  --ax-sidebar-muted: #334155;
+  --ax-sidebar-section: #475569;
+  --ax-sidebar-badge-bg: #dbeafe;
+  --ax-sidebar-badge-text: #1e40af;
+  --ax-control-bg: #eef2f7;
+  --ax-segment-active-bg: #ffffff;
+  --ax-segment-active-text: #0b1220;
+  --ax-modal-header-bg: #f8fafc;
+  --ax-modal-footer-bg: #f8fafc;
+  --ax-modal-accent-panel: #ffffff;
+  --ax-option-bg: rgba(255,255,255,0.86);
+  --ax-option-active-bg: #f8fafc;
+  --ax-disabled-bg: #d8e4f4;
+  --ax-disabled-text: #718099;
+  --ax-profile-avatar-bg: #476b72;
+  --ax-profile-avatar-icon: #ffffff;
+  --ax-profile-avatar-shadow: 0 6px 18px -12px rgba(15,23,42,0.28);
+  --ax-dm-avatar-mentor-bg: #dbeafe;
+  --ax-dm-avatar-mentor-border: #93c5fd;
+  --ax-dm-avatar-mentor-text: #1e3a8a;
+  --ax-dm-avatar-admin-bg: #ede9fe;
+  --ax-dm-avatar-admin-border: #c4b5fd;
+  --ax-dm-avatar-admin-text: #5b21b6;
+}
+
+/* ── Scoped Helper styles ─────────────────────────────────────── */
+.cms-shell-root .card {
+  background: var(--ax-panel);
+  border: 1px solid var(--ax-border);
+  border-radius: var(--ax-radius);
+  box-shadow: var(--ax-shadow-card);
+}
+.cms-shell-root .card-hover {
+  transition: all 0.15s ease;
+}
+.cms-shell-root .card-hover:hover {
+  background: rgb(var(--surface-100));
+  border-color: var(--hairline-strong);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card);
+}
+
+.cms-shell-root .btn-primary {
+  background: var(--ax-primary-action-bg);
+  box-shadow: var(--ax-primary-action-shadow);
+  color: var(--ax-primary-action-text);
+  font-weight: 600;
+  border-color: transparent;
+  transition: filter 0.15s ease;
+}
+.cms-shell-root .btn-primary:hover {
+  filter: brightness(1.07);
+}
+.cms-shell-root .btn-primary:active {
+  filter: brightness(0.96);
+}
+
+.cms-shell-root .btn-ghost {
+  border-color: transparent;
+  color: var(--ax-muted);
+  background: transparent;
+  border-radius: 6px;
+}
+.cms-shell-root .btn-ghost:hover {
+  background: rgb(var(--surface-100));
+  color: var(--ax-text);
+}
+
+.cms-shell-root .btn-surface {
+  background: var(--ax-panel-2);
+  border: 1px solid var(--ax-border);
+  color: var(--ax-text);
+  border-radius: 6px;
+}
+.cms-shell-root .btn-surface:hover {
+  background: rgb(var(--surface-200));
+  border-color: var(--hairline-strong);
+}
+
+/* Custom Scrollbars */
+.cms-shell-root .custom-scrollbar::-webkit-scrollbar        { width: 4px; height: 4px; }
+.cms-shell-root .custom-scrollbar::-webkit-scrollbar-track  { background: transparent; }
+.cms-shell-root .custom-scrollbar::-webkit-scrollbar-thumb  { background: rgba(148,175,230,0.12); border-radius: 999px; }
+.cms-shell-root .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(148,175,230,0.22); }
+
+/* ── Layout & Scroll Primitives (ported from standalone CMS frontend) ── */
+
+/* app-content: main content flex column — must have min-height:0 for children to scroll */
+.cms-shell-root .app-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+  z-index: 10;
+}
+
+
+.cms-shell-root .figma-page {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--ax-page-radial), var(--ax-bg);
+  color: var(--ax-text);
+}
+
+/* figma-scroll: the actual scrollable pane inside a figma-page */
+.cms-shell-root .figma-scroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+/* figma-topbar */
+.cms-shell-root .figma-topbar {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  height: var(--ax-topbar-h, 64px);
+  padding: 0 24px;
+  gap: 16px;
+  flex-shrink: 0;
+  background: var(--ax-topbar-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--ax-border);
+}
+
+.cms-shell-root .figma-topbar-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ax-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.cms-shell-root .figma-topbar-search {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.cms-shell-root .figma-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.cms-shell-root .figma-topbar-primary {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  background: var(--ax-primary-action-bg);
+  color: var(--ax-primary-action-text);
+  box-shadow: var(--ax-primary-action-shadow);
+  border: none;
+  font-family: Poppins, Inter, sans-serif;
+  transition: filter 0.15s ease;
+}
+
+.cms-shell-root .figma-topbar-primary:hover {
+  filter: brightness(1.07);
+}
+
+/* page-scroll-content: default page padding, scrollable */
+.cms-shell-root .page-scroll-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* dashboard two-column layout */
+.cms-shell-root .dashboard-layout {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* right sidebar inside dashboard */
+.cms-shell-root .dashboard-side-panel {
+  width: 300px;
+  flex-shrink: 0;
+}
+
+/* ── Responsive helpers ─────────────────────────────────────── */
+@media (max-width: 1180px) {
+  .cms-shell-root .dashboard-layout {
+    flex-direction: column !important;
+  }
+
+  .cms-shell-root .dashboard-side-panel {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .cms-shell-root .responsive-controls {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  .cms-shell-root .responsive-tab-strip,
+  .cms-shell-root .responsive-control-actions {
+    width: 100% !important;
+    overflow-x: auto;
+    justify-content: flex-start !important;
+  }
+
+  .cms-shell-root .responsive-control-actions input {
+    width: 100% !important;
+  }
+
+  .cms-shell-root .responsive-stat-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .cms-shell-root .responsive-table-wrap {
+    overflow-x: auto !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .cms-shell-root .page-scroll-content {
+    padding: 18px 14px 86px !important;
+  }
+
+  .cms-shell-root .figma-topbar {
+    height: auto !important;
+    min-height: 64px;
+    flex-wrap: wrap;
+    align-content: center;
+    padding: 12px 14px !important;
+    gap: 10px !important;
+  }
+
+  .cms-shell-root .figma-topbar-search {
+    display: none !important;
+  }
+
+  .cms-shell-root .figma-topbar-primary {
+    padding: 7px 10px !important;
+    font-size: 12px !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .cms-shell-root .responsive-stat-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1100px) {
+  .cms-shell-root .figma-topbar {
+    height: auto !important;
+    min-height: 64px;
+    flex-wrap: wrap;
+    align-content: center;
+    padding: 12px 18px !important;
+    gap: 10px !important;
+  }
+
+  .cms-shell-root .figma-topbar-search {
+    order: 3;
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .cms-shell-root .figma-topbar-actions {
+    margin-left: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
+
+/* Light theme overrides for layout classes */
+.light .cms-shell-root .figma-topbar {
+  box-shadow: 0 1px 0 rgba(255,255,255,0.85) inset, 0 10px 30px -28px rgba(15,23,42,0.45);
+}
+
+.light .cms-shell-root .dashboard-layout {
+  background: var(--ax-page-radial);
+}
+
+/* Responsive mobile navigation */
+.cms-shell-root .mobile-nav {
+  display: none !important;
+}
+
+.cms-shell-root .app-sidebar {
+  display: flex !important;
+}
+
+@media (max-width: 1023px) {
+  .cms-shell-root .app-sidebar {
+    display: none !important;
+  }
+
+  .cms-shell-root .app-content {
+    padding-bottom: 64px;
+    box-sizing: border-box;
+  }
+
+  .cms-shell-root .mobile-nav {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    z-index: 60;
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid var(--ax-border);
+    border-radius: 14px;
+    background: rgb(var(--surface-50) / 0.92);
+    backdrop-filter: blur(18px);
+    box-shadow: var(--ax-mobile-nav-shadow);
+  }
+
+  .cms-shell-root .mobile-nav .block > div {
+    justify-content: center;
+    gap: 5px;
+    padding: 8px 6px;
+  }
+
+  .cms-shell-root .mobile-nav .block > div > div:first-child {
+    display: none;
+  }
+
+  .cms-shell-root .mobile-nav span:last-child {
+    flex: 0 1 auto;
+    font-size: 11px;
+  }
+}
